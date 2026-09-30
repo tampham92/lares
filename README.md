@@ -28,6 +28,18 @@ Installer **phát hiện và dùng lại** các dịch vụ đang có, không c�
 
 > Mặc định script lấy mã nguồn từ `https://github.com/tampham92/tpanel` (nhánh `main`). Muốn dùng fork hoặc nhánh khác: `--repo <git-url> --branch <nhánh>`, hoặc `--tarball <url .tar.gz>`.
 
+### Tài khoản quản trị
+
+`install.sh` in mật khẩu `admin` một lần duy nhất. Mật khẩu chỉ được lưu dưới dạng bcrypt trong `/var/lib/tpanel/tpanel.db`; bản gốc bị xoá khỏi `tpanel.env` ngay sau khi cài.
+
+```bash
+sudo tpanel users                       # liệt kê tài khoản
+sudo tpanel reset-password              # đặt lại mật khẩu admin (ngẫu nhiên, in ra màn hình)
+sudo tpanel reset-password admin --password 'MatKhauMoi123'
+```
+
+Đổi mật khẩu trên giao diện: **Cài đặt → Đổi mật khẩu quản trị**.
+
 ### Gỡ cài đặt
 
 ```bash

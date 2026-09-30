@@ -112,7 +112,7 @@ fi
 # ---- Panel service & code (both modes) ------------------------------------------
 step "Gỡ service tpanel"
 systemctl disable --now tpanel >/dev/null 2>&1 || true
-rm -f /etc/systemd/system/tpanel.service
+rm -f /etc/systemd/system/tpanel.service /usr/local/bin/tpanel
 systemctl daemon-reload
 ok "Đã dừng và gỡ tpanel.service"
 

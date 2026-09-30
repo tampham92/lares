@@ -28,6 +28,7 @@ PHP_VERSIONS="${PHP_VERSIONS:-8.3 8.2 8.1 7.4}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 MYSQL_ROOT_USER="${MYSQL_ROOT_USER:-root}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
+FRESH_DATA=0
 INSTALL_DIR="/opt/tpanel"
 DATA_DIR="/var/lib/tpanel"
 CONF_DIR="/etc/tpanel"
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
     --tarball) TPANEL_TARBALL="$2"; shift 2 ;;
     --mysql-root-user) MYSQL_ROOT_USER="$2"; shift 2 ;;
     --mysql-root-password) MYSQL_ROOT_PASSWORD="$2"; shift 2 ;;
+    --fresh-data) FRESH_DATA=1; shift ;;
     -h|--help) sed -n '2,20p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "Tham số không hợp lệ: $1"; exit 1 ;;
   esac
@@ -111,6 +113,18 @@ if [[ -n "$(port_pids "$TPANEL_PORT")" ]] && ! systemctl is-active --quiet tpane
 fi
 
 UPGRADE=0; [[ -f "$ENV_FILE" ]] && UPGRADE=1
+# Data from an earlier install without its env file: the env holds TPANEL_SECRET, which decrypts the stored
+# DB/SSH credentials, and the admin account already exists - a "fresh" install would silently break both.
+if [[ $UPGRADE == 0 && -f "$DATA_DIR/tpanel.db" ]]; then
+  if [[ $FRESH_DATA == 1 ]]; then
+    mv "$DATA_DIR" "$DATA_DIR.bak-$(date +%Y%m%d%H%M%S)"
+    warn "Đã chuyển dữ liệu TPanel cũ sang $DATA_DIR.bak-* và cài mới"
+  else
+    die "Tìm thấy dữ liệu TPanel cũ ($DATA_DIR) nhưng thiếu $ENV_FILE (chứa khoá giải mã).
+   - Khôi phục $ENV_FILE từ bản sao lưu rồi chạy lại installer (giữ nguyên site & tài khoản), hoặc
+   - Cài mới, dữ liệu cũ được đổi tên thành bản sao lưu: ... | sudo bash -s -- --fresh-data"
+  fi
+fi
 echo -e "${c_blue}TPanel installer${c_off} - $PRETTY_NAME ($ARCH) - $([[ $UPGRADE == 1 ]] && echo 'NÂNG CẤP' || echo 'CÀI MỚI')"
 
 # ---- Detect what is already on this server -----------------------------------
@@ -417,12 +431,31 @@ UNIT
 systemctl daemon-reload
 systemctl enable tpanel >/dev/null
 systemctl restart tpanel
-sleep 2
-systemctl is-active --quiet tpanel || { journalctl -u tpanel -n 40 --no-pager; die "TPanel không khởi động được"; }
+# The server creates the admin account before it starts listening, so a 401 from the API means it is ready.
+ready=0
+for _ in $(seq 1 30); do
+  code=$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:$TPANEL_PORT/api/auth/me" || true)
+  [[ "$code" == 401 ]] && { ready=1; break; }
+  sleep 1
+done
+[[ $ready == 1 ]] || { journalctl -u tpanel -n 40 --no-pager; die "TPanel không khởi động được (không phản hồi trên port $TPANEL_PORT sau 30s)"; }
 ok "tpanel.service đang chạy"
 
-# The admin password only needs to live in the env file until the first start created the account.
-[[ -n "$ADMIN_PASS" ]] && sed -i 's/^TPANEL_ADMIN_PASSWORD=.*/TPANEL_ADMIN_PASSWORD=/' "$ENV_FILE"
+# Admin CLI: sudo tpanel users | sudo tpanel reset-password [user]
+cat > /usr/local/bin/tpanel <<CLI
+#!/bin/bash
+[ "\$(id -u)" -eq 0 ] || { echo "Hãy chạy bằng sudo: sudo tpanel \$*"; exit 1; }
+set -a; . $ENV_FILE; set +a
+cd $SRC/apps/server && exec /usr/bin/node dist/cli.js "\$@"
+CLI
+chmod 755 /usr/local/bin/tpanel
+
+if [[ -n "$ADMIN_PASS" ]]; then
+  # Make sure the password we are about to print is really the one stored (bcrypt) in SQLite,
+  # then drop the plaintext copy from the env file.
+  /usr/local/bin/tpanel reset-password admin --password "$ADMIN_PASS" >/dev/null
+  sed -i 's/^TPANEL_ADMIN_PASSWORD=.*/TPANEL_ADMIN_PASSWORD=/' "$ENV_FILE"
+fi
 
 # ---- Firewall -----------------------------------------------------------------
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
@@ -445,6 +478,7 @@ else
   echo -e "  Mật khẩu:  $ADMIN_PASS"
   echo -e "  ${c_yellow}Hãy lưu mật khẩu này và đổi ngay sau khi đăng nhập.${c_off}"
 fi
+echo -e "  Quên mật khẩu: sudo tpanel reset-password"
 echo -e "  Log:       journalctl -u tpanel -f"
 if [[ $COEXIST == 1 ]]; then
   echo
