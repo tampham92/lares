@@ -1,0 +1,529 @@
+import { z } from 'zod';
+
+// ---------------------------------------------------------------------------
+// Primitive validators (shared by server & web so both reject the same input)
+// ---------------------------------------------------------------------------
+
+export const DOMAIN_RE = /^(?=.{1,253}$)(?:(?!-)[a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$/i;
+export const DB_IDENT_RE = /^[A-Za-z0-9_]{1,64}$/;
+export const PHP_VERSION_RE = /^\d\.\d$/;
+
+export const domainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(DOMAIN_RE, 'Tên miền không hợp lệ');
+
+/** Absolute POSIX path without `..`, NUL or newlines - safe to shell-quote. */
+export const absPathSchema = z
+  .string()
+  .trim()
+  .regex(/^\/[^\0\r\n]*$/, 'Đường dẫn phải là đường dẫn tuyệt đối')
+  .refine((p) => !p.split('/').includes('..'), 'Đường dẫn không được chứa ".."')
+  .transform((p) => (p.length > 1 ? p.replace(/\/+$/, '') : p));
+
+export const excludePatternSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[\w.\-*/@+ ]+$/, 'Mẫu loại trừ chỉ gồm chữ, số và . - * / _ @ +')
+  .refine((p) => !p.split('/').includes('..'), 'Mẫu loại trừ không được chứa ".."');
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export const loginSchema = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
+// ---------------------------------------------------------------------------
+// Sites & databases
+// ---------------------------------------------------------------------------
+
+/** App types TPanel understands (creation + migration detection). */
+export const APP_TYPES = ['wordpress', 'nextjs', 'laravel', 'php', 'static', 'unknown'] as const;
+export type AppType = (typeof APP_TYPES)[number];
+
+/** Types that can be created from the "Add site" form. */
+export const SITE_TYPES = ['wordpress', 'nextjs', 'php', 'static'] as const;
+export type SiteType = (typeof SITE_TYPES)[number];
+
+export const APP_LABELS: Record<AppType, string> = {
+  wordpress: 'WordPress',
+  nextjs: 'Next.js',
+  laravel: 'Laravel',
+  php: 'PHP',
+  static: 'HTML tĩnh',
+  unknown: 'Không rõ',
+};
+
+export const PACKAGE_MANAGERS = ['auto', 'npm', 'yarn', 'pnpm'] as const;
+export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
+
+/** A single-line shell command supplied by the admin (build/start). */
+const shellCommandSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .regex(/^[^\0\r\n]*$/, 'Lệnh chỉ được nằm trên 1 dòng');
+
+const envKeySchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Tên biến môi trường không hợp lệ');
+
+export const nextjsConfigSchema = z.object({
+  gitUrl: z
+    .string()
+    .trim()
+    .regex(/^(https:\/\/|git@)[^\s'"`$;&|<>]+$/, 'Git URL phải bắt đầu bằng https:// hoặc git@')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  branch: z.string().trim().regex(/^[\w.\-/]+$/).default('main'),
+  packageManager: z.enum(PACKAGE_MANAGERS).default('auto'),
+  installCommand: shellCommandSchema.optional(),
+  buildCommand: shellCommandSchema.optional(),
+  startCommand: shellCommandSchema.optional(),
+  port: z.coerce.number().int().min(1024).max(65535).optional(),
+  env: z.record(envKeySchema, z.string().max(4096).regex(/^[^\0\r\n]*$/)).default({}),
+});
+export type NextjsConfig = z.infer<typeof nextjsConfigSchema>;
+
+export const wordpressConfigSchema = z.object({
+  title: z.string().trim().max(200).optional(),
+  adminUser: z.string().trim().regex(/^[A-Za-z0-9_.@-]{3,60}$/).optional().or(z.literal('').transform(() => undefined)),
+  adminPassword: z.string().min(8).max(128).optional().or(z.literal('').transform(() => undefined)),
+  adminEmail: z.string().trim().email().optional().or(z.literal('').transform(() => undefined)),
+  locale: z.string().regex(/^[a-z]{2}(_[A-Z]{2})?$/).default('vi'),
+});
+export type WordpressConfig = z.infer<typeof wordpressConfigSchema>;
+
+const siteBase = {
+  domain: domainSchema,
+  aliases: z.array(domainSchema).default([]),
+};
+const phpVersionSchema = z.string().regex(PHP_VERSION_RE).optional();
+
+export const createSiteSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('wordpress'), ...siteBase, phpVersion: phpVersionSchema, wordpress: wordpressConfigSchema.default({}) }),
+  z.object({ type: z.literal('nextjs'), ...siteBase, nextjs: nextjsConfigSchema.default({}) }),
+  z.object({ type: z.literal('php'), ...siteBase, phpVersion: phpVersionSchema, createDatabase: z.boolean().default(false) }),
+  z.object({ type: z.literal('static'), ...siteBase }),
+]);
+export type CreateSiteInput = z.infer<typeof createSiteSchema>;
+
+export const deleteSiteSchema = z.object({
+  removeFiles: z.boolean().default(false),
+  removeDatabases: z.boolean().default(false),
+  removeLogs: z.boolean().default(false),
+  revokeSsl: z.boolean().default(true),
+});
+
+export interface SslState {
+  enabled: boolean;
+  type: 'letsencrypt' | 'custom' | null;
+  domains: string[];
+  issuer: string | null;
+  expiresAt: string | null;
+  forceHttps: boolean;
+}
+
+export interface Site {
+  id: number;
+  domain: string;
+  aliases: string[];
+  rootPath: string;
+  /** Directory served by nginx (PHP/static) or application dir (Next.js). */
+  webRoot: string;
+  phpVersion: string | null;
+  appType: AppType;
+  appPort: number | null;
+  status: 'active' | 'disabled';
+  ssl: SslState;
+  accessLog: boolean;
+  migrationId: number | null;
+  createdAt: string;
+}
+
+export interface NodeAppStatus {
+  service: string;
+  active: 'active' | 'inactive' | 'failed' | 'activating' | 'unknown';
+  port: number | null;
+  packageManager: Exclude<PackageManager, 'auto'> | null;
+}
+
+export const siteSettingsSchema = z.object({
+  aliases: z.array(domainSchema).optional(),
+  phpVersion: z.string().regex(PHP_VERSION_RE).optional(),
+  accessLog: z.boolean().optional(),
+  status: z.enum(['active', 'disabled']).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// SSL
+// ---------------------------------------------------------------------------
+
+export const issueSslSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('letsencrypt'),
+    email: z.string().trim().email('Email không hợp lệ'),
+    /** Include aliases (e.g. www.) in the certificate. */
+    includeAliases: z.boolean().default(true),
+    forceHttps: z.boolean().default(true),
+    staging: z.boolean().default(false),
+  }),
+  z.object({
+    type: z.literal('custom'),
+    certificate: z.string().trim().includes('BEGIN CERTIFICATE', { message: 'Certificate PEM không hợp lệ' }),
+    privateKey: z.string().trim().regex(/BEGIN (RSA |EC )?PRIVATE KEY/, 'Private key PEM không hợp lệ'),
+    forceHttps: z.boolean().default(true),
+  }),
+]);
+export type IssueSslInput = z.infer<typeof issueSslSchema>;
+
+// ---------------------------------------------------------------------------
+// Traffic logs
+// ---------------------------------------------------------------------------
+
+/** access/error = nginx logs, app = Next.js process output (journald). */
+export const LOG_TYPES = ['access', 'error', 'app'] as const;
+export type LogType = (typeof LOG_TYPES)[number];
+
+export interface LogTail {
+  file: string;
+  sizeBytes: number;
+  lines: string[];
+  truncated: boolean;
+}
+
+export interface TrafficStats {
+  from: string;
+  to: string;
+  totalRequests: number;
+  uniqueIps: number;
+  bytesSent: number;
+  avgResponseMs: number | null;
+  statusClasses: Record<'2xx' | '3xx' | '4xx' | '5xx' | 'other', number>;
+  topPaths: Array<{ key: string; count: number }>;
+  topIps: Array<{ key: string; count: number }>;
+  topReferrers: Array<{ key: string; count: number }>;
+  topUserAgents: Array<{ key: string; count: number }>;
+  topStatus: Array<{ key: string; count: number }>;
+  timeline: Array<{ t: string; requests: number; bytes: number; errors: number }>;
+  parsedLines: number;
+  skippedLines: number;
+}
+
+export const logrotateSchema = z.object({
+  retentionDays: z.coerce.number().int().min(1).max(365),
+  compress: z.boolean().default(true),
+  maxSizeMb: z.coerce.number().int().min(1).max(10240).optional(),
+});
+export type LogrotateSettings = z.infer<typeof logrotateSchema>;
+
+// ---------------------------------------------------------------------------
+// Databases
+// ---------------------------------------------------------------------------
+
+export const createDatabaseSchema = z.object({
+  name: z.string().regex(DB_IDENT_RE, 'Tên database chỉ gồm chữ, số, gạch dưới'),
+  username: z.string().regex(/^[A-Za-z0-9_]{1,32}$/, 'Username tối đa 32 ký tự chữ/số/_'),
+  password: z.string().min(8).max(128).optional(),
+  siteId: z.number().int().positive().optional(),
+});
+export type CreateDatabaseInput = z.infer<typeof createDatabaseSchema>;
+
+export interface DatabaseRecord {
+  id: number;
+  name: string;
+  username: string;
+  siteId: number | null;
+  siteDomain: string | null;
+  managed: boolean; // false = reused database that TPanel should not drop
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Migration: source connection
+// ---------------------------------------------------------------------------
+
+export const PANEL_TYPES = [
+  'auto',
+  'aapanel',
+  'cyberpanel',
+  'hestiacp',
+  'cpanel',
+  'directadmin',
+  'cloudpanel',
+  'plesk',
+  'webinoly',
+  'generic',
+  'manual',
+] as const;
+export type PanelType = (typeof PANEL_TYPES)[number];
+
+export const PANEL_LABELS: Record<PanelType, string> = {
+  auto: 'Tự động nhận diện',
+  aapanel: 'aaPanel / BT Panel',
+  cyberpanel: 'CyberPanel (OpenLiteSpeed)',
+  hestiacp: 'HestiaCP / VestaCP',
+  cpanel: 'cPanel / WHM',
+  directadmin: 'DirectAdmin',
+  cloudpanel: 'CloudPanel',
+  plesk: 'Plesk',
+  webinoly: 'Webinoly',
+  generic: 'VPS thuần (Nginx/Apache, không panel)',
+  manual: 'Nhập thủ công',
+};
+
+export const sourceConnectionSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('local') }),
+  z.object({
+    mode: z.literal('ssh'),
+    host: z.string().trim().min(1, 'Nhập IP/hostname VPS nguồn'),
+    port: z.coerce.number().int().min(1).max(65535).default(22),
+    username: z.string().trim().min(1).default('root'),
+    authType: z.enum(['password', 'key']),
+    password: z.string().optional(),
+    privateKey: z.string().optional(),
+    passphrase: z.string().optional(),
+    /** Run commands via `sudo -n` when the SSH user is not root. */
+    useSudo: z.boolean().default(false),
+    /** SHA256 host key fingerprint pinned after the first successful connection test (TOFU). */
+    hostFingerprint: z.string().regex(/^SHA256:[A-Za-z0-9+/]+$/).optional(),
+  }),
+]);
+export type SourceConnection = z.infer<typeof sourceConnectionSchema>;
+
+export const sourceInputSchema = z.object({
+  connection: sourceConnectionSchema,
+  panel: z.enum(PANEL_TYPES).default('auto'),
+});
+export type SourceInput = z.infer<typeof sourceInputSchema>;
+
+export interface ToolAvailability {
+  mysqldump: boolean;
+  mysql: boolean;
+  tar: boolean;
+  gzip: boolean;
+  pigz: boolean;
+  rsync: boolean;
+  sha256sum: boolean;
+  wpcli: boolean;
+}
+
+export interface ConnectionReport {
+  ok: boolean;
+  sameHost: boolean;
+  sameHostReason?: string;
+  hostname: string;
+  os: string;
+  user: string;
+  detectedPanel: PanelType;
+  hostFingerprint: string | null;
+  tools: ToolAvailability;
+  tmpFreeBytes: number | null;
+  warnings: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Migration: discovery
+// ---------------------------------------------------------------------------
+
+export const dbCredentialsSchema = z.object({
+  host: z.string().trim().min(1).default('localhost'),
+  port: z.coerce.number().int().min(1).max(65535).optional(),
+  socket: absPathSchema.optional(),
+  // Source databases may use characters TPanel itself never generates (e.g. '-'), but never backticks/control chars.
+  name: z.string().regex(/^[^\0\r\n`/\\]{1,64}$/, 'Tên database không hợp lệ'),
+  user: z.string().min(1).max(80),
+  password: z.string().max(256).default(''),
+  prefix: z.string().regex(/^[A-Za-z0-9_]*$/).optional(),
+});
+export type DbCredentials = z.infer<typeof dbCredentialsSchema>;
+
+export interface DiscoveredSite {
+  domain: string;
+  aliases: string[];
+  /** Directory that will be copied (application root). */
+  rootPath: string;
+  /** Web root relative to rootPath ('' or e.g. 'public' for Laravel). */
+  webRootSubdir: string;
+  /**
+   * App config file (wp-config.php, .env) when it lives OUTSIDE rootPath
+   * (Webinoly keeps wp-config.php one level above htdocs). It is copied into the target root.
+   */
+  configPath: string | null;
+  /** nginx proxies this vhost to a local port (Next.js/Node) - app directory must be confirmed manually. */
+  proxyPass: string | null;
+  phpVersion: string | null;
+  appType: AppType;
+  db: DbCredentials | null;
+  sizeBytes: number | null;
+  owner: string | null;
+  /** Other discovered sites nested inside this root (relative paths) - suggested excludes. */
+  nestedPaths: string[];
+  /** Domain already exists on TPanel. */
+  existsOnTarget: boolean;
+  discoveredBy: string;
+}
+
+export interface DiscoveryResult {
+  panel: PanelType;
+  sites: DiscoveredSite[];
+  warnings: string[];
+}
+
+export const inspectPathSchema = z.object({
+  source: sourceInputSchema,
+  path: absPathSchema,
+});
+
+// ---------------------------------------------------------------------------
+// Migration: jobs
+// ---------------------------------------------------------------------------
+
+export const DB_STRATEGIES = ['import', 'reuse', 'skip'] as const;
+export type DbStrategy = (typeof DB_STRATEGIES)[number];
+
+export const migrationItemInputSchema = z.object({
+  sourceDomain: domainSchema,
+  targetDomain: domainSchema,
+  aliases: z.array(domainSchema).default([]),
+  sourceRoot: absPathSchema,
+  webRootSubdir: z
+    .string()
+    .regex(/^[\w.\-/]*$/)
+    .refine((p) => !p.split('/').includes('..'))
+    .default(''),
+  appType: z.enum(APP_TYPES).default('unknown'),
+  configPath: absPathSchema.optional(),
+  phpVersion: z.string().regex(PHP_VERSION_RE).optional(),
+  /** Next.js: build/start settings used when re-installing on TPanel. */
+  nextjs: nextjsConfigSchema.omit({ gitUrl: true, branch: true }).optional(),
+  db: z.object({
+    strategy: z.enum(DB_STRATEGIES).default('import'),
+    source: dbCredentialsSchema.optional(),
+  }),
+  excludes: z.array(excludePatternSchema).default([]),
+  /** WordPress: search-replace old domain -> new domain when they differ. */
+  searchReplace: z.boolean().default(true),
+  /** Overwrite existing target directory / site. */
+  overwrite: z.boolean().default(false),
+});
+export type MigrationItemInput = z.infer<typeof migrationItemInputSchema>;
+
+export const TRANSFER_MODES = ['auto', 'archive', 'stream'] as const;
+export type TransferMode = (typeof TRANSFER_MODES)[number];
+
+export const migrationOptionsSchema = z.object({
+  /**
+   * archive: compress on source into temp dir, verify sha256, download via SFTP.
+   * stream:  pipe `tar | gzip` over SSH straight into TPanel (no temp space needed on source).
+   * auto:    archive when source has enough free space, otherwise stream.
+   */
+  transferMode: z.enum(TRANSFER_MODES).default('auto'),
+  cleanupSource: z.boolean().default(true),
+  keepLocalArchives: z.boolean().default(false),
+  rollbackOnFailure: z.boolean().default(true),
+});
+export type MigrationOptions = z.infer<typeof migrationOptionsSchema>;
+
+export const createMigrationSchema = z.object({
+  name: z.string().trim().max(100).optional(),
+  source: sourceInputSchema,
+  items: z.array(migrationItemInputSchema).min(1, 'Chọn ít nhất 1 site'),
+  options: migrationOptionsSchema.default({}),
+});
+export type CreateMigrationInput = z.infer<typeof createMigrationSchema>;
+
+export const MIGRATION_STEPS = [
+  { id: 'prepare', label: 'Chuẩn bị & kiểm tra' },
+  { id: 'dump_db', label: 'Dump & nén database' },
+  { id: 'archive_files', label: 'Nén mã nguồn' },
+  { id: 'transfer', label: 'Đồng bộ về TPanel' },
+  { id: 'verify', label: 'Kiểm tra toàn vẹn' },
+  { id: 'create_site', label: 'Tạo site trên TPanel' },
+  { id: 'restore_files', label: 'Khôi phục mã nguồn' },
+  { id: 'restore_db', label: 'Khôi phục database' },
+  { id: 'configure', label: 'Cập nhật cấu hình ứng dụng' },
+  { id: 'finalize', label: 'Nginx, phân quyền' },
+  { id: 'cleanup', label: 'Dọn dẹp file tạm' },
+] as const;
+export type MigrationStepId = (typeof MIGRATION_STEPS)[number]['id'];
+
+export type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed';
+export type MigrationStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled';
+export type ItemStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface StepState {
+  status: StepStatus;
+  detail?: string;
+  progress?: number; // 0..1
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface MigrationItem {
+  id: number;
+  migrationId: number;
+  sourceDomain: string;
+  targetDomain: string;
+  sourceRoot: string;
+  appType: AppType;
+  status: ItemStatus;
+  currentStep: MigrationStepId | null;
+  steps: Record<MigrationStepId, StepState>;
+  error: string | null;
+  siteId: number | null;
+  notes: string[];
+}
+
+export interface Migration {
+  id: number;
+  name: string;
+  sourceLabel: string;
+  panel: PanelType;
+  sameHost: boolean;
+  status: MigrationStatus;
+  options: MigrationOptions;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  items?: MigrationItem[];
+  itemCounts?: Partial<Record<ItemStatus, number>>;
+}
+
+export interface MigrationLog {
+  id: number;
+  migrationId: number;
+  itemId: number | null;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  createdAt: string;
+}
+
+export type MigrationEvent =
+  | { type: 'snapshot'; migration: Migration; logs: MigrationLog[] }
+  | { type: 'migration'; migration: Migration }
+  | { type: 'item'; item: MigrationItem }
+  | { type: 'log'; log: MigrationLog };
+
+// ---------------------------------------------------------------------------
+// System
+// ---------------------------------------------------------------------------
+
+export interface SystemStats {
+  hostname: string;
+  os: string;
+  uptimeSec: number;
+  loadavg: number[];
+  cpuCount: number;
+  memTotal: number;
+  memFree: number;
+  disk: { total: number; used: number; free: number } | null;
+  services: Record<string, 'active' | 'inactive' | 'unknown'>;
+  phpVersions: string[];
+  dryRun: boolean;
+}
