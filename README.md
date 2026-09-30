@@ -28,6 +28,18 @@ Installer **phát hiện và dùng lại** các dịch vụ đang có, không c�
 
 > Mặc định script lấy mã nguồn từ `https://github.com/tampham92/tpanel` (nhánh `main`). Muốn dùng fork hoặc nhánh khác: `--repo <git-url> --branch <nhánh>`, hoặc `--tarball <url .tar.gz>`.
 
+### Gỡ cài đặt
+
+```bash
+# Gỡ panel, GIỮ các website đang chạy (cài lại sẽ nhận lại site):
+curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/uninstall.sh | sudo bash
+
+# Xoá sạch panel + mọi site, database, SSL, log do TPanel tạo (hỏi xác nhận bằng cách gõ XOA):
+curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/uninstall.sh | sudo bash -s -- --purge
+```
+
+Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và không động vào site hay database không do TPanel tạo (kể cả database "dùng chung" với panel khác).
+
 ## Tính năng
 
 | Nhóm        | Chi tiết                                                                                                                                                                                                                                                                                                                               |
