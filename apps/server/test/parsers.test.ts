@@ -154,3 +154,17 @@ describe('wp-config port fix', async () => {
     expect(parseWpConfig(once)).toMatchObject({ name: 'x', user: 'y' });
   });
 });
+
+describe('WordPress URL move', async () => {
+  const { urlReplacePairs } = await import('../src/services/wordpress.js');
+  it('http -> https on the same domain only upgrades the scheme', () => {
+    expect(urlReplacePairs('http://dalat.vn', 'https://dalat.vn')).toEqual([['http://dalat.vn', 'https://dalat.vn']]);
+  });
+  it('port site straight to an https domain', () => {
+    expect(urlReplacePairs('http://1.2.3.4:8001/', 'https://a.vn')).toEqual([
+      ['//1.2.3.4:8001', '//a.vn'],
+      ['\\/\\/1.2.3.4:8001', '\\/\\/a.vn'],
+      ['http://a.vn', 'https://a.vn'],
+    ]);
+  });
+});

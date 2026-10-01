@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { WordpressConfig } from '@tpanel/shared';
+import { DB_IDENT_RE, type WordpressConfig } from '@tpanel/shared';
 import { config } from '../config.js';
 import { shq } from '../lib/shell.js';
+import { parseWpConfig } from '../migration/appDetect.js';
 import { host, type HostLogger } from './host.js';
+import * as mysql from './mysql.js';
 
 const phpStr = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
@@ -134,32 +136,85 @@ export async function wordpressHomeUrl(webRoot: string, home: string): Promise<s
   return r.code === 0 && /^https?:\/\//.test(url) ? url.replace(/\/+$/, '') : null;
 }
 
+/** Search/replace pairs that move every stored form of a URL: http, https, protocol-relative, JSON-escaped. */
+export function urlReplacePairs(from: string, to: string): Array<[string, string]> {
+  const strip = (u: string) => u.replace(/^https?:/, '').replace(/\/+$/, '');
+  const pairs: Array<[string, string]> = [];
+  if (strip(from) !== strip(to)) {
+    pairs.push([strip(from), strip(to)]);
+    pairs.push([strip(from).replace(/\//g, '\\/'), strip(to).replace(/\//g, '\\/')]);
+  }
+  // going https: links that were written as http:// would be blocked as mixed content
+  if (to.startsWith('https://')) pairs.push([`http:${strip(to)}`, `https:${strip(to)}`]);
+  return pairs;
+}
+
+/** DB name + table prefix from the site's own wp-config.php. */
+async function wpDbInfo(webRoot: string): Promise<{ name: string; prefix: string } | null> {
+  const src = await fs.readFile(path.join(webRoot, 'wp-config.php'), 'utf8').catch(() => null);
+  const c = src ? parseWpConfig(src) : null;
+  if (!c) return null;
+  const prefix = c.prefix ?? 'wp_';
+  return DB_IDENT_RE.test(c.name) && /^[A-Za-z0-9_]+$/.test(prefix) ? { name: c.name, prefix } : null;
+}
+
+/**
+ * Fallback without (working) wp-cli: update what keeps the site reachable - home/siteurl and post
+ * content. Serialized data (widgets, page-builder meta) is left alone; only wp-cli handles it safely.
+ */
+async function replaceUrlViaSql(webRoot: string, to: string, from: string | null | undefined, log: HostLogger): Promise<boolean> {
+  const info = await wpDbInfo(webRoot);
+  if (!info) return false;
+  const t = (table: string) => `\`${info.name}\`.\`${info.prefix}${table}\``;
+  const rows = await mysql.query<Array<{ option_value: string }>>(`SELECT option_value FROM ${t('options')} WHERE option_name = 'home'`);
+  const current = (from ?? rows[0]?.option_value ?? '').replace(/\/+$/, '');
+  await mysql.query(`UPDATE ${t('options')} SET option_value = ? WHERE option_name IN ('home', 'siteurl')`, [to]);
+  for (const [a, b] of current ? urlReplacePairs(current, to) : []) {
+    await mysql.query(`UPDATE ${t('posts')} SET post_content = REPLACE(post_content, ?, ?), post_excerpt = REPLACE(post_excerpt, ?, ?)`, [a, b, a, b]);
+  }
+  log(`Đã đổi URL WordPress qua database: ${current || '?'} → ${to} (widget/page-builder có thể còn link cũ - nên chạy wp search-replace khi có wp-cli)`);
+  return true;
+}
+
 /**
  * Move a WordPress site to a new base URL (domain assigned, or http -> https after SSL).
- * Runs as the web user: by now the site may contain third-party plugins/themes.
+ * wp-cli runs as the web user: by now the site may contain third-party plugins/themes.
+ * Never throws: a failure here must not leave the caller half-way (the domain is already switched).
  */
-export async function wordpressReplaceUrl(webRoot: string, home: string, to: string, log: HostLogger, from?: string | null) {
-  const current = from ?? (await wordpressHomeUrl(webRoot, home));
+export async function wordpressReplaceUrl(webRoot: string, home: string, to: string, log: HostLogger, from?: string | null): Promise<boolean> {
   if (config.dryRun) {
-    log(`[dry-run] wp search-replace ${current ?? '<home>'} ${to}`);
-    return;
+    log(`[dry-run] wp search-replace ${from ?? '<home>'} ${to}`);
+    return true;
   }
-  if (!(await host.has('wp'))) {
-    log(`Cảnh báo: không có wp-cli - hãy tự đổi "Địa chỉ WordPress" và "Địa chỉ trang" thành ${to} trong Cài đặt → Tổng quan của wp-admin`);
-    return;
+  const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).split('\n').slice(-2).join(' ');
+  if (await host.has('wp')) {
+    try {
+      const current = from ?? (await wordpressHomeUrl(webRoot, home));
+      if (!current) throw new Error('không đọc được URL hiện tại (option home)');
+      if (current === to) return true;
+      const run = (args: string) => host.run(wpCliAsWebUser(webRoot, home, args), { timeoutMs: 30 * 60_000 });
+      // serialized PHP data needs wp-cli's search-replace; a plain SQL REPLACE would corrupt it
+      for (const [a, b] of urlReplacePairs(current, to)) {
+        await run(`search-replace ${shq(a)} ${shq(b)} --all-tables-with-prefix --skip-columns=guid --precise --report-changed-only`);
+      }
+      await run(`option update home ${shq(to)}`);
+      await run(`option update siteurl ${shq(to)}`);
+      await run('cache flush').catch(() => undefined);
+      log(`Đã đổi URL WordPress: ${current} → ${to}`);
+      return true;
+    } catch (err) {
+      log(`Cảnh báo: wp-cli không đổi được URL (${msg(err)}) - chuyển sang cập nhật trực tiếp trong database`);
+    }
   }
-  if (!current) {
-    log('Cảnh báo: không đọc được URL hiện tại của WordPress - bỏ qua bước đổi URL');
-    return;
+  try {
+    if (await replaceUrlViaSql(webRoot, to, from, log)) return true;
+  } catch (err) {
+    log(`Cảnh báo: không cập nhật được database (${msg(err)})`);
   }
-  if (current === to) return;
-  const run = (args: string) => host.run(wpCliAsWebUser(webRoot, home, args), { timeoutMs: 30 * 60_000 });
-  // serialized PHP data needs wp-cli's search-replace, a plain SQL REPLACE would corrupt it
-  await run(`search-replace ${shq(current)} ${shq(to)} --all-tables-with-prefix --skip-columns=guid --precise --report-changed-only`);
-  await run(`option update home ${shq(to)}`);
-  await run(`option update siteurl ${shq(to)}`);
-  await run('cache flush').catch(() => undefined);
-  log(`Đã đổi URL WordPress: ${current} → ${to}`);
+  log(
+    `CẦN LÀM TAY: WordPress vẫn giữ URL cũ. Chạy trên VPS: sudo -u ${config.webUser} wp --path=${shq(webRoot)} option update home ${shq(to)} && sudo -u ${config.webUser} wp --path=${shq(webRoot)} option update siteurl ${shq(to)}`,
+  );
+  return false;
 }
 
 /** Patch wp-config.php of a port-based site that was created before PORT_HOST_FIX existed. */
