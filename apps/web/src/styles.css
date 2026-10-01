@@ -63,6 +63,8 @@ code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monosp
 
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; }
 .grid { display: grid; gap: 16px; }
+/* grid items default to min-width:auto and grow with long unbreakable content (paths, tokens) */
+.grid > * { min-width: 0; }
 .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
@@ -149,7 +151,8 @@ tr:last-child td { border-bottom: 0; }
 .login { min-height: 100%; display: grid; place-items: center; padding: 16px; }
 .login .card { width: 100%; max-width: 380px; }
 .empty { text-align: center; color: var(--muted); padding: 30px; }
-.kv { display: grid; grid-template-columns: 160px 1fr; gap: 6px 12px; }
+.kv { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 6px 12px; }
+.kv > div { overflow-wrap: anywhere; }
 .kv > div:nth-child(odd) { color: var(--muted); }
 details summary { cursor: pointer; color: var(--primary); }
 

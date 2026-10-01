@@ -153,6 +153,7 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
             </select>
           </Field>
         )}
+        {(!site.listenPort || site.phpVersion) && (
         <div className="row">
           <button
             className="btn primary"
@@ -169,6 +170,7 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
             Lưu
           </button>
         </div>
+        )}
         <Check checked={site.accessLog} onChange={(v) => save({ accessLog: v })}>
           Ghi access log (cần cho thống kê traffic)
         </Check>
