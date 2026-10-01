@@ -89,14 +89,6 @@ WantedBy=multi-user.target
 `;
 }
 
-export async function allocatePort(used: Iterable<number>): Promise<number> {
-  const taken = new Set(used);
-  const listening = await host.exec(`ss -ltnH 2>/dev/null | awk '{print $4}' | sed -E 's/.*:([0-9]+)$/\\1/'`);
-  for (const p of listening.stdout.split('\n')) if (p.trim()) taken.add(Number(p));
-  for (let port = config.nodeAppPortStart; port < 65000; port++) if (!taken.has(port)) return port;
-  throw new Error('Hết port trống cho ứng dụng Node');
-}
-
 export async function writeServiceFiles(domain: string, appDir: string, homeDir: string, port: number, cfg: NodeAppConfig, log: HostLogger) {
   const pm = await detectPackageManager(appDir, cfg.packageManager);
   const defaults = await defaultCommands(appDir, pm);

@@ -1,0 +1,61 @@
+{
+  "id": "doanh-nghiep",
+  "name": "Doanh nghiệp",
+  "description": "Công ty dịch vụ / giải pháp: giới thiệu dịch vụ, năng lực, quy trình, khách hàng, tin tức và form nhận báo giá.",
+  "types": ["wordpress", "static"],
+  "colors": { "primary": "#2449d8", "accent": "#ff7a45" },
+  "previewImage": "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=640&q=60&auto=format&fit=crop",
+  "font": "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap",
+  "defaults": {
+    "siteName": "Nova Solutions",
+    "tagline": "Tư vấn chiến lược, marketing số và công nghệ giúp doanh nghiệp vừa và nhỏ tăng trưởng nhanh, bền vững.",
+    "phone": "028 3822 9999",
+    "email": "hello@example.com",
+    "address": "Tầng 12, 81 Cách Mạng Tháng 8, Quận 3, TP. Hồ Chí Minh"
+  },
+  "wordpress": {
+    "nav": [
+      { "label": "Trang chủ", "url": "/" },
+      { "label": "Dịch vụ", "url": "/#dich-vu" },
+      { "label": "Tin tức", "url": "/category/tin-tuc/" },
+      { "label": "Giới thiệu", "url": "/gioi-thieu/" },
+      { "label": "Liên hệ", "url": "/lien-he/" }
+    ],
+    "categories": [{ "slug": "tin-tuc", "name": "Tin tức" }],
+    "posts": [
+      {
+        "title": "5 chiến lược marketing số hiệu quả cho doanh nghiệp vừa và nhỏ",
+        "category": "tin-tuc",
+        "image": "https://images.unsplash.com/photo-1551434678-e076c223a692?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "Ngân sách có hạn vẫn có thể tạo ra tăng trưởng mạnh nếu tập trung đúng kênh và đo lường đúng chỉ số.",
+        "content": "Ngân sách có hạn vẫn có thể tạo ra tăng trưởng mạnh nếu doanh nghiệp tập trung đúng kênh và đo lường đúng chỉ số.\n\n**1. Xác định khách hàng mục tiêu rõ ràng** trước khi chọn kênh quảng cáo.\n**2. Tối ưu website** để mỗi lượt truy cập có khả năng chuyển đổi cao nhất.\n**3. Đầu tư SEO dài hạn** cho các từ khoá mang lại doanh thu.\n**4. Tự động hoá email** để nuôi dưỡng khách hàng tiềm năng.\n**5. Đo lường hằng tuần** và cắt giảm kênh kém hiệu quả."
+      },
+      {
+        "title": "Chuyển đổi số: bắt đầu từ đâu?",
+        "category": "tin-tuc",
+        "image": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "Chuyển đổi số không phải mua phần mềm đắt tiền, mà là thay đổi cách vận hành dựa trên dữ liệu.",
+        "content": "Chuyển đổi số không phải là mua phần mềm đắt tiền, mà là thay đổi cách doanh nghiệp vận hành dựa trên dữ liệu.\n\nHãy bắt đầu từ quy trình gây tốn thời gian nhất, số hoá nó, đo lường kết quả rồi mở rộng dần sang các bộ phận khác."
+      },
+      {
+        "title": "Làm sao để website mang lại khách hàng thật?",
+        "category": "tin-tuc",
+        "image": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "Một website đẹp chưa đủ. Nội dung, tốc độ và lời kêu gọi hành động mới quyết định tỉ lệ chuyển đổi.",
+        "content": "Một website đẹp chưa đủ. Nội dung đúng nhu cầu, tốc độ tải nhanh và lời kêu gọi hành động rõ ràng mới quyết định tỉ lệ chuyển đổi.\n\nKiểm tra định kỳ: tốc độ trang dưới 2 giây, form liên hệ ngắn gọn, số điện thoại hiển thị ở mọi trang."
+      }
+    ],
+    "pages": [
+      {
+        "title": "Giới thiệu",
+        "slug": "gioi-thieu",
+        "content": "{{SITE_NAME}} được thành lập với sứ mệnh giúp doanh nghiệp Việt tăng trưởng bền vững bằng chiến lược đúng và công nghệ phù hợp.\n\nHơn 12 năm qua, chúng tôi đã hoàn thành hơn 500 dự án cho các doanh nghiệp trong lĩnh vực bán lẻ, sản xuất, logistics và dịch vụ.\n\n**Giá trị cốt lõi:** Minh bạch · Cam kết kết quả · Đồng hành dài hạn."
+      },
+      {
+        "title": "Liên hệ",
+        "slug": "lien-he",
+        "content": "**Hotline:** {{PHONE}}\n**Email:** {{EMAIL}}\n**Văn phòng:** {{ADDRESS}}\n\nGiờ làm việc: 8:30 – 17:30, thứ Hai đến thứ Sáu."
+      }
+    ]
+  }
+}

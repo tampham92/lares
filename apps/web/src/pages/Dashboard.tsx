@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { Site, SystemStats } from '@tpanel/shared';
 import { APP_LABELS } from '@tpanel/shared';
-import { fmtBytes, get } from '../api';
+import { fmtBytes, get, siteLabel } from '../api';
 import { Alert, Badge, ErrorBox, Progress } from '../components/ui';
 
 export function Dashboard() {
@@ -87,7 +87,7 @@ export function Dashboard() {
               {(sites.data ?? []).slice(0, 8).map((x) => (
                 <tr key={x.id}>
                   <td>
-                    <Link to={`/sites/${x.id}`}>{x.domain}</Link>
+                    <Link to={`/sites/${x.id}`}>{siteLabel(x)}</Link>
                   </td>
                   <td>{APP_LABELS[x.appType]}</td>
                   <td>{x.ssl.enabled ? <Badge tone="ok">HTTPS</Badge> : <Badge>HTTP</Badge>}</td>

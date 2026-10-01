@@ -98,17 +98,57 @@ export const wordpressConfigSchema = z.object({
 });
 export type WordpressConfig = z.infer<typeof wordpressConfigSchema>;
 
+/**
+ * "localhost" (or an empty value) means: no domain yet - TPanel assigns a port and the site is
+ * reachable at http://<server-ip>:<port>.
+ */
+export const LOCALHOST = 'localhost';
+export const siteDomainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((v) => (v === '' ? LOCALHOST : v))
+  .refine((v) => v === LOCALHOST || DOMAIN_RE.test(v), 'Tên miền không hợp lệ (hoặc nhập localhost để chạy theo port)');
+
+/** Hostname/IP the browser used to reach the panel - becomes the site URL of port-based sites. */
+export const publicHostSchema = z
+  .string()
+  .trim()
+  .max(253)
+  .regex(/^([a-z0-9-]+\.)*[a-z0-9-]+$|^\[?[0-9a-f:.]+\]?$/i, 'Host không hợp lệ');
+
+const oneLine = (max: number) => z.string().trim().max(max).regex(/^[^\r\n<>]*$/, 'Không được chứa xuống dòng hoặc < >');
+
+/** Values substituted into a template ({{SITE_NAME}}, {{PHONE}}...). Empty = template defaults. */
+export const brandingSchema = z.object({
+  siteName: oneLine(80).optional(),
+  tagline: oneLine(200).optional(),
+  phone: z.string().trim().max(30).regex(/^[0-9+().\s-]*$/, 'Số điện thoại không hợp lệ').optional(),
+  email: z.string().trim().email('Email không hợp lệ').optional().or(z.literal('').transform(() => undefined)),
+  address: oneLine(200).optional(),
+});
+export type Branding = z.infer<typeof brandingSchema>;
+
+export const templateIdSchema = z.string().regex(/^[a-z0-9-]{1,40}$/, 'Template không hợp lệ');
+
 const siteBase = {
-  domain: domainSchema,
+  domain: siteDomainSchema,
   aliases: z.array(domainSchema).default([]),
+  /** Port-based sites only: choose the port (otherwise TPanel picks a free one). */
+  listenPort: z.coerce.number().int().min(1024).max(65535).optional(),
+  publicHost: publicHostSchema.optional(),
+};
+const templateFields = {
+  template: templateIdSchema.optional(),
+  branding: brandingSchema.default({}),
 };
 const phpVersionSchema = z.string().regex(PHP_VERSION_RE).optional();
 
 export const createSiteSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('wordpress'), ...siteBase, phpVersion: phpVersionSchema, wordpress: wordpressConfigSchema.default({}) }),
+  z.object({ type: z.literal('wordpress'), ...siteBase, ...templateFields, phpVersion: phpVersionSchema, wordpress: wordpressConfigSchema.default({}) }),
   z.object({ type: z.literal('nextjs'), ...siteBase, nextjs: nextjsConfigSchema.default({}) }),
   z.object({ type: z.literal('php'), ...siteBase, phpVersion: phpVersionSchema, createDatabase: z.boolean().default(false) }),
-  z.object({ type: z.literal('static'), ...siteBase }),
+  z.object({ type: z.literal('static'), ...siteBase, ...templateFields }),
 ]);
 export type CreateSiteInput = z.infer<typeof createSiteSchema>;
 
@@ -138,11 +178,30 @@ export interface Site {
   phpVersion: string | null;
   appType: AppType;
   appPort: number | null;
+  /** Port-based site (no domain): nginx listens on this port. */
+  listenPort: number | null;
   status: 'active' | 'disabled';
   ssl: SslState;
   accessLog: boolean;
   migrationId: number | null;
   createdAt: string;
+}
+
+export interface TemplateInfo {
+  id: string;
+  name: string;
+  description: string;
+  types: Array<'wordpress' | 'static'>;
+  colors: { primary: string; accent: string };
+  previewImage: string | null;
+  defaults: Required<Pick<Branding, 'siteName' | 'tagline' | 'phone' | 'email' | 'address'>>;
+}
+
+export interface CreateSiteResult {
+  site: Site;
+  url: string;
+  database: { name: string; username: string; password: string } | null;
+  wordpressAdmin: { url: string; user: string; password: string } | null;
 }
 
 export interface NodeAppStatus {

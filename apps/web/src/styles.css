@@ -161,3 +161,19 @@ details summary { cursor: pointer; color: var(--primary); }
   .main { padding: 16px; }
   .kv { grid-template-columns: 1fr; }
 }
+
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.tpl { text-align: left; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text); cursor: pointer; overflow: hidden; font: inherit; display: flex; flex-direction: column; }
+.tpl:hover { border-color: var(--primary); }
+.tpl.active { border-color: var(--primary); outline: 3px solid var(--primary-soft); }
+.tpl-thumb { height: 120px; position: relative; overflow: hidden; }
+.tpl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpl-thumb.blank { display: grid; place-items: center; color: var(--muted); background: repeating-linear-gradient(45deg, var(--panel-2), var(--panel-2) 10px, var(--bg) 10px, var(--bg) 20px); font-size: 13px; }
+.tpl-colors { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
+.tpl-colors i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; display: block; }
+.tpl-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+.tpl-body .sub { font-size: 12.5px; line-height: 1.4; }
+.tpl-body .link { color: var(--primary); font-size: 13px; font-weight: 600; margin-top: 2px; }
+.modal { position: fixed; inset: 0; background: rgba(2, 6, 23, .6); z-index: 100; display: grid; place-items: center; padding: 16px; }
+.modal-box { background: var(--panel); border-radius: var(--radius); width: min(1200px, 100%); height: min(90vh, 900px); display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.modal-box iframe { flex: 1; border: 1px solid var(--border); border-radius: 8px; background: #fff; width: 100%; }

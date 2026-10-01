@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { AppType, CreateSiteInput, IssueSslInput, Site, SslState } from '@tpanel/shared';
+import { LOCALHOST, type AppType, type CreateSiteInput, type CreateSiteResult, type IssueSslInput, type Site, type SslState } from '@tpanel/shared';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
-import { decrypt, encrypt } from '../lib/crypto.js';
+import { decrypt, encrypt, randomPassword } from '../lib/crypto.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import { UndoStack } from '../lib/undo.js';
@@ -11,8 +11,10 @@ import * as databases from './databases.js';
 import { host, type HostLogger } from './host.js';
 import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type VhostSpec } from './nginx.js';
 import * as nodeapp from './nodeapp.js';
+import * as ports from './ports.js';
 import { resolvePhpVersion } from './php.js';
 import * as ssl from './ssl.js';
+import * as templates from './templates.js';
 import { installWordpress } from './wordpress.js';
 
 interface SiteRow {
@@ -24,6 +26,7 @@ interface SiteRow {
   php_version: string | null;
   app_type: AppType;
   app_port: number | null;
+  listen_port: number | null;
   app_config_enc: string | null;
   ssl_json: string;
   access_log: number;
@@ -41,6 +44,7 @@ const toSite = (r: SiteRow): Site => ({
   phpVersion: r.php_version,
   appType: r.app_type,
   appPort: r.app_port,
+  listenPort: r.listen_port,
   status: r.status,
   ssl: { ...ssl.EMPTY_SSL, ...(JSON.parse(r.ssl_json) as Partial<SslState>) },
   accessLog: r.access_log === 1,
@@ -101,6 +105,7 @@ export function vhostSpecFor(site: Site): VhostSpec {
     webRoot: site.webRoot,
     phpVersion: site.phpVersion,
     appPort: site.appPort,
+    listenPort: site.listenPort,
     accessLog: site.accessLog,
     disabled: site.status === 'disabled',
     ssl: sslPaths ? { ...sslPaths, forceHttps: site.ssl.forceHttps } : null,
@@ -131,6 +136,17 @@ export interface ProvisionInput {
   nodeConfig?: nodeapp.NodeAppConfig;
   /** Allow an existing non-empty directory (migration overwrite). */
   allowExistingDir?: boolean;
+  /** No domain: serve on a public port instead (domain must then be the synthetic `siteNNNN.localhost`). */
+  listenPort?: number | null;
+}
+
+/** Synthetic, unique identifier for port-based sites; doubles as directory / vhost / log name. */
+export const portSiteDomain = (port: number) => `site${port}.${LOCALHOST}`;
+
+/** The address people type in a browser. */
+export function siteUrl(site: Pick<Site, 'domain' | 'listenPort' | 'ssl'>, publicHost?: string | null): string {
+  if (site.listenPort) return `http://${publicHost || 'IP-MAY-CHU'}:${site.listenPort}`;
+  return `${site.ssl.enabled ? 'https' : 'http'}://${site.domain}`;
 }
 
 /**
@@ -153,14 +169,14 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
   }
   let appPort: number | null = null;
   if (input.appType === 'nextjs') {
-    const used = (db.prepare('SELECT app_port FROM sites WHERE app_port IS NOT NULL').all() as Array<{ app_port: number }>).map((r) => r.app_port);
-    appPort = input.nodeConfig?.port && !used.includes(input.nodeConfig.port) ? input.nodeConfig.port : await nodeapp.allocatePort(used);
+    const wanted = input.nodeConfig?.port;
+    appPort = wanted && (await ports.isPortFree(wanted)) ? wanted : await ports.allocatePort(config.nodeAppPortStart);
   }
 
   const info = db
     .prepare(
-      `INSERT INTO sites (domain, aliases_json, root_path, web_root, php_version, app_type, app_port, app_config_enc, migration_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sites (domain, aliases_json, root_path, web_root, php_version, app_type, app_port, listen_port, app_config_enc, migration_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.domain,
@@ -170,6 +186,7 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
       phpVersion,
       input.appType,
       appPort,
+      input.listenPort ?? null,
       input.nodeConfig ? encrypt(input.nodeConfig) : null,
       input.migrationId ?? null,
     );
@@ -179,29 +196,47 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
   const site = getSite(siteId);
   await applySiteVhost(site, log);
   undo.push(`xoá vhost ${input.domain}`, () => removeVhost(input.domain, log));
-  log(`Đã tạo vhost nginx cho ${input.domain}${appPort ? ` → 127.0.0.1:${appPort}` : ''}`);
+  if (input.listenPort) {
+    if (await ports.openFirewallPort(input.listenPort, log)) {
+      undo.push(`đóng port ${input.listenPort}`, () => ports.closeFirewallPort(input.listenPort!, log));
+      log(`Đã mở port ${input.listenPort} trên firewall (ufw)`);
+    }
+    log(`Đã tạo vhost nginx lắng nghe port ${input.listenPort}${appPort ? ` → 127.0.0.1:${appPort}` : ''}`);
+  } else {
+    log(`Đã tạo vhost nginx cho ${input.domain}${appPort ? ` → 127.0.0.1:${appPort}` : ''}`);
+  }
   return site;
 }
 
-export async function createSite(input: CreateSiteInput, log: HostLogger) {
+export async function createSite(input: CreateSiteInput, log: HostLogger): Promise<CreateSiteResult> {
   const undo = new UndoStack();
   try {
+    // "localhost" = no domain yet: reserve a public port, the site lives at http://<ip>:<port>
+    let listenPort: number | null = null;
+    if (input.domain === LOCALHOST) {
+      if (input.listenPort && !(await ports.isPortFree(input.listenPort))) throw conflict(`Port ${input.listenPort} đang được sử dụng`);
+      listenPort = input.listenPort ?? (await ports.allocatePort(config.sitePortStart));
+    }
+    const domain = listenPort ? portSiteDomain(listenPort) : input.domain;
     const nodeConfig = input.type === 'nextjs' ? input.nextjs : undefined;
     const site = await provisionSite(
       {
-        domain: input.domain,
-        aliases: input.aliases,
+        domain,
+        aliases: listenPort ? [] : input.aliases,
         appType: input.type,
         phpVersion: 'phpVersion' in input ? input.phpVersion : undefined,
         nodeConfig,
+        listenPort,
       },
       log,
       undo,
     );
-    let database: { name: string; username: string; password: string } | null = null;
+    const url = siteUrl(site, input.publicHost);
+    let database: CreateSiteResult['database'] = null;
+    let wordpressAdmin: CreateSiteResult['wordpressAdmin'] = null;
 
     if (input.type === 'wordpress' || (input.type === 'php' && input.createDatabase)) {
-      const name = databases.deriveDbName(input.domain);
+      const name = databases.deriveDbName(domain);
       const created = await databases.createDatabase({ name, username: name, siteId: site.id }, log);
       undo.push(`xoá database ${name}`, () => databases.deleteDatabase(created.record.id, log));
       database = { name, username: name, password: created.password };
@@ -209,14 +244,37 @@ export async function createSite(input: CreateSiteInput, log: HostLogger) {
     }
 
     switch (input.type) {
-      case 'wordpress':
-        await installWordpress(site.webRoot, site.domain, { name: database!.name, user: database!.username, password: database!.password }, input.wordpress, log);
+      case 'wordpress': {
+        const tpl = input.template ? await templates.getTemplate(input.template) : null;
+        const vars = tpl ? templates.templateVars(tpl, input.branding) : null;
+        const wp = { ...input.wordpress, title: input.wordpress.title || vars?.SITE_NAME };
+        // A template needs a finished install to import its content, so generate an admin account if none was given.
+        if (tpl && !(wp.adminUser && wp.adminPassword && wp.adminEmail)) {
+          wp.adminUser ||= 'admin';
+          wp.adminPassword ||= randomPassword(16);
+          wp.adminEmail ||= input.branding.email || `admin@${listenPort ? 'example.com' : domain}`;
+        }
+        const installed = await installWordpress(site.webRoot, url, { name: database!.name, user: database!.username, password: database!.password }, wp, log);
+        if (installed && wp.adminUser && wp.adminPassword) {
+          wordpressAdmin = { url: `${url}/wp-admin/`, user: wp.adminUser, password: wp.adminPassword };
+        }
+        if (tpl && vars) {
+          if (installed) await templates.installWordpressTemplate(tpl.id, site.webRoot, vars, log);
+          else log('Cảnh báo: cần wp-cli trên máy chủ để cài giao diện mẫu WordPress - site được tạo với giao diện mặc định');
+        }
+        if (wordpressAdmin) log(`Tài khoản quản trị WordPress: ${wordpressAdmin.user} / ${wordpressAdmin.password} - đăng nhập tại ${wordpressAdmin.url}`);
         break;
+      }
       case 'php':
-        await host.writeFile(path.join(site.webRoot, 'index.php'), `<?php\necho '<h1>${site.domain}</h1><p>Site được tạo bởi TPanel.</p>';\n`);
+        await host.writeFile(path.join(site.webRoot, 'index.php'), `<?php\necho '<h1>${domain}</h1><p>Site được tạo bởi TPanel.</p>';\n`);
         break;
       case 'static':
-        await host.writeFile(path.join(site.webRoot, 'index.html'), `<!doctype html><meta charset="utf-8"><title>${site.domain}</title><h1>${site.domain}</h1><p>Site được tạo bởi TPanel.</p>\n`);
+        if (input.template) {
+          const tpl = await templates.getTemplate(input.template);
+          await templates.installStaticTemplate(tpl.id, site.webRoot, templates.templateVars(tpl, input.branding), log);
+        } else {
+          await host.writeFile(path.join(site.webRoot, 'index.html'), `<!doctype html><meta charset="utf-8"><title>${domain}</title><h1>${domain}</h1><p>Site được tạo bởi TPanel.</p>\n`);
+        }
         break;
       case 'nextjs': {
         undo.push(`xoá service ${nodeapp.serviceName(site.domain)}`, () => nodeapp.removeService(site.domain, log));
@@ -233,8 +291,8 @@ export async function createSite(input: CreateSiteInput, log: HostLogger) {
 
     await fixPermissions(site.rootPath, log);
     undo.clear();
-    log(`Hoàn tất tạo site ${site.domain}`);
-    return { site: getSite(site.id), database };
+    log(`Hoàn tất tạo site - truy cập: ${url}`);
+    return { site: getSite(site.id), url, database, wordpressAdmin };
   } catch (err) {
     await undo.run(log);
     throw err;
@@ -284,6 +342,7 @@ function saveSsl(id: number, state: SslState) {
 
 export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger) {
   const site = getSite(id);
+  if (site.listenPort) throw conflict('Site đang chạy theo port (chưa có tên miền) nên không cài được SSL. Hãy tạo site với tên miền thật.');
   let state: SslState;
   if (input.type === 'letsencrypt') {
     if (!(await nginxRunning())) {
@@ -363,6 +422,7 @@ export async function deleteSite(
   const site = getSite(id);
   if (site.appType === 'nextjs') await nodeapp.removeService(site.domain, log);
   await removeVhost(site.domain, log);
+  if (site.listenPort) await ports.closeFirewallPort(site.listenPort, log);
   if (site.ssl.type === 'letsencrypt' && opts.revokeSsl) await ssl.deleteLetsEncrypt(site.domain, log);
   if (site.ssl.type === 'custom') await ssl.removeCustomCert(site.domain);
   if (opts.removeDatabases) {

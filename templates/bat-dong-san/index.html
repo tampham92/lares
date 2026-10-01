@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{SITE_NAME}} – {{TAGLINE}}</title>
+<meta name="description" content="{{TAGLINE}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-area" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-bed" viewBox="0 0 24 24"><path d="M3 19v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8M3 15h18M7 9V6.5h4V9"/></symbol>
+  <symbol id="i-bath" viewBox="0 0 24 24"><path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-3zM6 12V6a2 2 0 0 1 3.4-1.4M7 19l-1 2M17 19l1 2"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h3.5l2 5-2.5 1.5a11 11 0 0 0 5.5 5.5L15 13.5l5 2V19a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+</svg>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="logo" href="#"><span class="logo-mark"><svg class="icon"><use href="#i-home"/></svg></span>{{SITE_NAME}}</a>
+    <nav class="menu" id="menu">
+      <a href="#du-an">Dự án</a>
+      <a href="#khu-vuc">Khu vực</a>
+      <a href="#vi-sao">Vì sao chọn chúng tôi</a>
+      <a href="#lien-he">Liên hệ</a>
+    </nav>
+    <a class="btn btn-accent nav-cta" href="tel:{{PHONE_LINK}}"><svg class="icon"><use href="#i-phone"/></svg>{{PHONE}}</a>
+    <button class="menu-toggle" aria-label="Mở menu" onclick="document.getElementById('menu').classList.toggle('open')"><svg class="icon"><use href="#i-menu"/></svg></button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <p class="eyebrow">Bất động sản uy tín · Pháp lý minh bạch</p>
+    <h1>Tìm ngôi nhà mơ ước của bạn</h1>
+    <p class="lead">{{TAGLINE}}</p>
+    <form class="search" onsubmit="filterListings(event)">
+      <select id="f-type" aria-label="Nhu cầu">
+        <option value="">Mua &amp; thuê</option>
+        <option value="ban">Mua bán</option>
+        <option value="thue">Cho thuê</option>
+      </select>
+      <select id="f-kind" aria-label="Loại bất động sản">
+        <option value="">Tất cả loại BĐS</option>
+        <option value="can-ho">Căn hộ</option>
+        <option value="nha-pho">Nhà phố</option>
+        <option value="biet-thu">Biệt thự</option>
+      </select>
+      <select id="f-area" aria-label="Khu vực">
+        <option value="">Tất cả khu vực</option>
+        <option value="quan-1">Quận 1</option>
+        <option value="thu-duc">TP. Thủ Đức</option>
+        <option value="quan-7">Quận 7</option>
+        <option value="binh-thanh">Bình Thạnh</option>
+      </select>
+      <button class="btn btn-accent" type="submit">Tìm kiếm</button>
+    </form>
+    <div class="stats">
+      <div class="stat"><strong>1.200+</strong><span>Bất động sản</span></div>
+      <div class="stat"><strong>850+</strong><span>Khách hàng hài lòng</span></div>
+      <div class="stat"><strong>15 năm</strong><span>Kinh nghiệm</span></div>
+      <div class="stat"><strong>24/7</strong><span>Hỗ trợ tư vấn</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="du-an">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Dự án nổi bật</p>
+      <h2>Bất động sản đang được quan tâm</h2>
+      <p>Tuyển chọn những căn hộ, nhà phố và biệt thự có pháp lý rõ ràng, vị trí đẹp và giá tốt nhất.</p>
+    </div>
+    <div class="listings" id="listings">
+      <article class="card" data-type="ban" data-kind="biet-thu" data-area="thu-duc">
+        <div class="card-media"><img src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=70&auto=format&fit=crop" alt="Biệt thự hồ bơi Thảo Điền" loading="lazy"><span class="badge">Mua bán</span></div>
+        <div class="card-body">
+          <p class="price">32 tỷ</p>
+          <h3>Biệt thự hồ bơi Thảo Điền</h3>
+          <p class="address"><svg class="icon"><use href="#i-pin"/></svg>Thảo Điền, TP. Thủ Đức</p>
+          <ul class="specs"><li><svg class="icon"><use href="#i-area"/></svg>420 m²</li><li><svg class="icon"><use href="#i-bed"/></svg>5 PN</li><li><svg class="icon"><use href="#i-bath"/></svg>6 WC</li></ul>
+        </div>
+      </article>
+      <article class="card" data-type="ban" data-kind="can-ho" data-area="binh-thanh">
+        <div class="card-media"><img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=70&auto=format&fit=crop" alt="Căn hộ view sông Sài Gòn" loading="lazy"><span class="badge">Mua bán</span></div>
+        <div class="card-body">
+          <p class="price">6,8 tỷ</p>
+          <h3>Căn hộ cao cấp view sông Sài Gòn</h3>
+          <p class="address"><svg class="icon"><use href="#i-pin"/></svg>Phường 22, Bình Thạnh</p>
+          <ul class="specs"><li><svg class="icon"><use href="#i-area"/></svg>98 m²</li><li><svg class="icon"><use href="#i-bed"/></svg>3 PN</li><li><svg class="icon"><use href="#i-bath"/></svg>2 WC</li></ul>
+        </div>
+      </article>
+      <article class="card" data-type="ban" data-kind="nha-pho" data-area="quan-7">
+        <div class="card-media"><img src="https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=800&q=70&auto=format&fit=crop" alt="Nhà phố Phú Mỹ Hưng" loading="lazy"><span class="badge">Mua bán</span></div>
+        <div class="card-body">
+          <p class="price">14,5 tỷ</p>
+          <h3>Nhà phố liền kề Phú Mỹ Hưng</h3>
+          <p class="address"><svg class="icon"><use href="#i-pin"/></svg>Tân Phong, Quận 7</p>
+          <ul class="specs"><li><svg class="icon"><use href="#i-area"/></svg>160 m²</li><li><svg class="icon"><use href="#i-bed"/></svg>4 PN</li><li><svg class="icon"><use href="#i-bath"/></svg>5 WC</li></ul>
+        </div>
+      </article>
+      <article class="card" data-type="thue" data-kind="can-ho" data-area="quan-1">
+        <div class="card-media"><img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=70&auto=format&fit=crop" alt="Căn hộ cho thuê Quận 1" loading="lazy"><span class="badge rent">Cho thuê</span></div>
+        <div class="card-body">
+          <p class="price">22 triệu <small>/ tháng</small></p>
+          <h3>Căn hộ 2 phòng ngủ đầy đủ nội thất</h3>
+          <p class="address"><svg class="icon"><use href="#i-pin"/></svg>Bến Nghé, Quận 1</p>
+          <ul class="specs"><li><svg class="icon"><use href="#i-area"/></svg>75 m²</li><li><svg class="icon"><use href="#i-bed"/></svg>2 PN</li><li><svg class="icon"><use href="#i-bath"/></svg>2 WC</li></ul>
+        </div>
+      </article>
+      <article class="card" data-type="thue" data-kind="biet-thu" data-area="thu-duc">
+        <div class="card-media"><img src="https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?w=800&q=70&auto=format&fit=crop" alt="Villa sân vườn cho thuê" loading="lazy"><span class="badge rent">Cho thuê</span></div>
+        <div class="card-body">
+          <p class="price">85 triệu <small>/ tháng</small></p>
+          <h3>Villa sân vườn yên tĩnh</h3>
+          <p class="address"><svg class="icon"><use href="#i-pin"/></svg>An Phú, TP. Thủ Đức</p>
+          <ul class="specs"><li><svg class="icon"><use href="#i-area"/></svg>300 m²</li><li><svg class="icon"><use href="#i-bed"/></svg>4 PN</li><li><svg class="icon"><use href="#i-bath"/></svg>4 WC</li></ul>
+        </div>
+      </article>
+      <article class="card" data-type="ban" data-kind="nha-pho" data-area="binh-thanh">
+        <div class="card-media"><img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=70&auto=format&fit=crop" alt="Nhà phố hiện đại mặt tiền" loading="lazy"><span class="badge">Mua bán</span></div>
+        <div class="card-body">
+          <p class="price">18,9 tỷ</p>
+          <h3>Nhà phố hiện đại mặt tiền đường lớn</h3>
+          <p class="address"><svg class="icon"><use href="#i-pin"/></svg>Phường 25, Bình Thạnh</p>
+          <ul class="specs"><li><svg class="icon"><use href="#i-area"/></svg>210 m²</li><li><svg class="icon"><use href="#i-bed"/></svg>5 PN</li><li><svg class="icon"><use href="#i-bath"/></svg>5 WC</li></ul>
+        </div>
+      </article>
+    </div>
+    <p class="empty" id="no-result" hidden>Chưa có bất động sản phù hợp. <a href="#lien-he">Để lại yêu cầu</a>, chúng tôi sẽ tìm giúp bạn trong 24 giờ.</p>
+  </div>
+</section>
+
+<section class="section alt" id="khu-vuc">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Khu vực</p>
+      <h2>Khám phá theo khu vực</h2>
+      <p>Những địa điểm có tiềm năng tăng giá và hạ tầng phát triển mạnh.</p>
+    </div>
+    <div class="areas">
+      <a class="area" href="#du-an" onclick="pickArea('thu-duc')" style="background-image:url('https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=1200&q=70&auto=format&fit=crop')"><div><strong>TP. Thủ Đức</strong><span>320 bất động sản</span></div></a>
+      <a class="area" href="#du-an" onclick="pickArea('quan-1')" style="background-image:url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=70&auto=format&fit=crop')"><div><strong>Quận 1</strong><span>148 bất động sản</span></div></a>
+      <a class="area" href="#du-an" onclick="pickArea('quan-7')" style="background-image:url('https://images.unsplash.com/photo-1460317442991-0ec209397118?w=800&q=70&auto=format&fit=crop')"><div><strong>Quận 7</strong><span>215 bất động sản</span></div></a>
+      <a class="area" href="#du-an" onclick="pickArea('binh-thanh')" style="background-image:url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=70&auto=format&fit=crop')"><div><strong>Bình Thạnh</strong><span>176 bất động sản</span></div></a>
+      <a class="area" href="#du-an" onclick="pickArea('')" style="background-image:url('https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=70&auto=format&fit=crop')"><div><strong>Tất cả khu vực</strong><span>Xem toàn bộ dự án</span></div></a>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="vi-sao">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Vì sao chọn {{SITE_NAME}}</p>
+      <h2>An tâm trong từng giao dịch</h2>
+    </div>
+    <div class="features">
+      <div class="feature"><div class="ficon"><svg class="icon"><use href="#i-shield"/></svg></div><h3>Pháp lý minh bạch</h3><p>Mọi bất động sản đều được kiểm tra sổ hồng, quy hoạch trước khi giới thiệu.</p></div>
+      <div class="feature"><div class="ficon"><svg class="icon"><use href="#i-tag"/></svg></div><h3>Giá tốt nhất</h3><p>Làm việc trực tiếp với chủ nhà và chủ đầu tư, không qua trung gian.</p></div>
+      <div class="feature"><div class="ficon"><svg class="icon"><use href="#i-users"/></svg></div><h3>Tư vấn tận tâm</h3><p>Chuyên viên am hiểu thị trường đồng hành từ lúc xem nhà đến khi bàn giao.</p></div>
+      <div class="feature"><div class="ficon"><svg class="icon"><use href="#i-key"/></svg></div><h3>Bàn giao nhanh</h3><p>Hỗ trợ thủ tục công chứng, vay ngân hàng và sang tên trọn gói.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Khách hàng nói gì</p>
+      <h2>Hơn 850 gia đình đã tìm được tổ ấm</h2>
+    </div>
+    <div class="quotes">
+      <blockquote class="quote"><p class="stars">★★★★★</p><p>Chỉ sau hai tuần, tôi đã chọn được căn hộ ưng ý gần chỗ làm. Thủ tục vay ngân hàng được hỗ trợ rất nhanh.</p><cite>Chị Minh Anh<span>Mua căn hộ tại Bình Thạnh</span></cite></blockquote>
+      <blockquote class="quote"><p class="stars">★★★★★</p><p>Đội ngũ tư vấn trung thực, giới thiệu đúng nhu cầu và giá rất sát thị trường. Rất đáng tin cậy.</p><cite>Anh Quốc Huy<span>Mua nhà phố tại Quận 7</span></cite></blockquote>
+      <blockquote class="quote"><p class="stars">★★★★★</p><p>Ký gửi cho thuê biệt thự, chỉ một tháng đã có khách thuê dài hạn. Tôi hoàn toàn yên tâm.</p><cite>Bà Thu Hà<span>Chủ nhà tại TP. Thủ Đức</span></cite></blockquote>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="lien-he">
+  <div class="container contact-grid">
+    <div>
+      <p class="eyebrow">Liên hệ</p>
+      <h2>Bạn đang tìm nhà hay cần ký gửi?</h2>
+      <p>Để lại thông tin, chuyên viên của {{SITE_NAME}} sẽ gọi lại cho bạn trong vòng 30 phút.</p>
+      <ul class="contact-list">
+        <li><span class="ci"><svg class="icon"><use href="#i-phone"/></svg></span><div><small>Hotline</small><a href="tel:{{PHONE_LINK}}">{{PHONE}}</a></div></li>
+        <li><span class="ci"><svg class="icon"><use href="#i-mail"/></svg></span><div><small>Email</small><a href="mailto:{{EMAIL}}">{{EMAIL}}</a></div></li>
+        <li><span class="ci"><svg class="icon"><use href="#i-pin"/></svg></span><div><small>Văn phòng</small>{{ADDRESS}}</div></li>
+      </ul>
+    </div>
+    <form class="form" onsubmit="sendContact(event)">
+      <h3>Nhận tư vấn miễn phí</h3>
+      <div class="row2">
+        <input name="name" placeholder="Họ và tên" required>
+        <input name="phone" type="tel" placeholder="Số điện thoại" required>
+      </div>
+      <select name="need">
+        <option>Tôi muốn mua</option>
+        <option>Tôi muốn thuê</option>
+        <option>Tôi muốn ký gửi bán / cho thuê</option>
+      </select>
+      <textarea name="message" placeholder="Khu vực, ngân sách, số phòng ngủ mong muốn..."></textarea>
+      <button class="btn btn-primary" type="submit">Gửi yêu cầu</button>
+      <p class="thanks" id="thanks" hidden>Cảm ơn bạn! Ứng dụng email sẽ mở để gửi yêu cầu tới {{EMAIL}}.</p>
+      <p class="form-note">Thông tin của bạn được bảo mật tuyệt đối.</p>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="#"><span class="logo-mark"><svg class="icon"><use href="#i-home"/></svg></span>{{SITE_NAME}}</a>
+        <p>{{TAGLINE}}</p>
+      </div>
+      <div>
+        <h4>Liên hệ</h4>
+        <p>{{ADDRESS}}</p>
+        <p><a href="tel:{{PHONE_LINK}}">{{PHONE}}</a></p>
+        <p><a href="mailto:{{EMAIL}}">{{EMAIL}}</a></p>
+      </div>
+      <div>
+        <h4>Liên kết</h4>
+        <ul class="footer-links">
+          <li><a href="#du-an">Dự án nổi bật</a></li>
+          <li><a href="#khu-vuc">Khu vực</a></li>
+          <li><a href="#vi-sao">Về chúng tôi</a></li>
+          <li><a href="#lien-he">Ký gửi bất động sản</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="copyright">© {{YEAR}} {{SITE_NAME}}. Bảo lưu mọi quyền.</p>
+  </div>
+</footer>
+
+<script>
+function val(id){return document.getElementById(id).value}
+function filterListings(e){
+  if(e)e.preventDefault();
+  var t=val('f-type'),k=val('f-kind'),a=val('f-area'),n=0;
+  document.querySelectorAll('#listings .card').forEach(function(c){
+    var ok=(!t||c.dataset.type===t)&&(!k||c.dataset.kind===k)&&(!a||c.dataset.area===a);
+    c.hidden=!ok; if(ok)n++;
+  });
+  document.getElementById('no-result').hidden=n>0;
+  if(e)document.getElementById('du-an').scrollIntoView({behavior:'smooth'});
+}
+function pickArea(a){document.getElementById('f-area').value=a;filterListings();}
+function sendContact(e){
+  e.preventDefault();
+  var d=new FormData(e.target);
+  var body='Họ tên: '+d.get('name')+'\nĐiện thoại: '+d.get('phone')+'\nNhu cầu: '+d.get('need')+'\n\n'+d.get('message');
+  document.getElementById('thanks').hidden=false;
+  location.href='mailto:{{EMAIL}}?subject='+encodeURIComponent('Yêu cầu tư vấn từ website')+'&body='+encodeURIComponent(body);
+}
+</script>
+</body>
+</html>

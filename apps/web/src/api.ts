@@ -75,3 +75,12 @@ export const fmtDate = (s: string | null | undefined) => (s ? new Date(s.endsWit
 export function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+
+/** What to type in a browser: http://<panel host>:<port> for port-based sites, the domain otherwise. */
+export function siteHref(site: { domain: string; listenPort: number | null; ssl: { enabled: boolean } }): string {
+  if (site.listenPort) return `http://${window.location.hostname}:${site.listenPort}`;
+  return `${site.ssl.enabled ? 'https' : 'http'}://${site.domain}`;
+}
+
+export const siteLabel = (site: { domain: string; listenPort: number | null }) =>
+  site.listenPort ? `${window.location.hostname}:${site.listenPort}` : site.domain;

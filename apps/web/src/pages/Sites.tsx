@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { APP_LABELS, type Site } from '@tpanel/shared';
-import { fmtDate, get } from '../api';
+import { fmtDate, get, siteHref, siteLabel } from '../api';
 import { Badge, ErrorBox } from '../components/ui';
 
 export function Sites() {
@@ -40,9 +40,15 @@ export function Sites() {
               <tr key={s.id}>
                 <td>
                   <Link to={`/sites/${s.id}`}>
-                    <strong>{s.domain}</strong>
-                  </Link>
-                  {s.aliases.length > 0 && <div className="sub">{s.aliases.join(', ')}</div>}
+                    <strong>{siteLabel(s)}</strong>
+                  </Link>{' '}
+                  {s.listenPort && <Badge tone="info">port {s.listenPort}</Badge>}
+                  <div className="sub">
+                    <a href={siteHref(s)} target="_blank" rel="noreferrer">
+                      {siteHref(s)} ↗
+                    </a>
+                    {s.aliases.length > 0 && ` · ${s.aliases.join(', ')}`}
+                  </div>
                 </td>
                 <td>
                   {APP_LABELS[s.appType]} {s.migrationId && <Badge tone="info">migrated</Badge>}

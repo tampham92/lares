@@ -13,6 +13,8 @@ export interface VhostSpec {
   webRoot: string;
   phpVersion: string | null;
   appPort: number | null;
+  /** Port-based site: listen on this public port for any hostname instead of name-based :80. */
+  listenPort?: number | null;
   accessLog: boolean;
   disabled: boolean;
   ssl: { certificate: string; privateKey: string; forceHttps: boolean } | null;
@@ -140,6 +142,11 @@ export function renderVhost(spec: VhostSpec, opts: { http2Directive?: boolean } 
   const names = [spec.domain, ...spec.aliases].join(' ');
   const body = appBody(spec);
   const header = `# Managed by TPanel - changes will be overwritten\n# site: ${spec.domain} (${spec.appType})\n`;
+
+  if (spec.listenPort) {
+    // reachable as http://<server-ip>:<port>; the ACME location is harmless here
+    return `${header}server {\n    listen ${spec.listenPort};\n    listen [::]:${spec.listenPort};\n    server_name _;\n\n${indent(body)}\n}\n`;
+  }
 
   if (!spec.ssl) {
     return `${header}server {\n    listen 80;\n    listen [::]:80;\n    server_name ${names};\n\n${indent(body)}\n}\n`;

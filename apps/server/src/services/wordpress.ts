@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import type { WordpressConfig } from '@tpanel/shared';
+import { config } from '../config.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
 
@@ -49,14 +50,18 @@ export const wpCli = (webRoot: string, args: string) => `wp --path=${shq(webRoot
 export const wpCliAsWebUser = (webRoot: string, home: string, args: string) =>
   host.asWebUser(`wp --path=${shq(webRoot)} --skip-plugins --skip-themes ${args}`, { cwd: webRoot, home });
 
+/**
+ * Download WordPress, write wp-config.php and - when wp-cli is present and admin credentials are
+ * given - run `wp core install`. Returns true when the site is fully installed (not just downloaded).
+ */
 export async function installWordpress(
   webRoot: string,
-  domain: string,
+  siteUrl: string,
   db: { name: string; user: string; password: string },
   wp: WordpressConfig,
   log: HostLogger,
-) {
-  const hasCli = await host.has('wp');
+): Promise<boolean> {
+  const hasCli = config.dryRun || (await host.has('wp'));
   log('Đang tải WordPress...');
   if (hasCli) {
     await host.mutate(wpCli(webRoot, `core download --locale=${shq(wp.locale)} --force`), { log, timeoutMs: 10 * 60_000 });
@@ -71,13 +76,14 @@ export async function installWordpress(
     await host.mutate(
       wpCli(
         webRoot,
-        `core install --url=${shq(`http://${domain}`)} --title=${shq(wp.title || domain)} --admin_user=${shq(wp.adminUser)} --admin_password=${shq(wp.adminPassword)} --admin_email=${shq(wp.adminEmail)} --skip-email`,
+        `core install --url=${shq(siteUrl)} --title=${shq(wp.title || siteUrl)} --admin_user=${shq(wp.adminUser)} --admin_password=${shq(wp.adminPassword)} --admin_email=${shq(wp.adminEmail)} --skip-email`,
       ),
       { log },
     );
-  } else {
-    log(`Hoàn tất cài WordPress tại http://${domain}/wp-admin/install.php`);
+    return true;
   }
+  log(`Hoàn tất cài WordPress tại ${siteUrl}/wp-admin/install.php`);
+  return false;
 }
 
 /** Update DB credentials in an existing wp-config.php (migrated sites). */

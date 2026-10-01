@@ -57,6 +57,8 @@ Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và kh�
 | Nhóm        | Chi tiết                                                                                                                                                                                                                                                                                                                               |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Website      | Thêm/xoá/tạm ngưng site, alias, đổi phiên bản PHP. Loại site:**WordPress** (tự tải WP, tạo DB, wp-config, `wp core install` nếu nhập admin), **Next.js** (systemd service + Nginx reverse proxy, tự cấp port, clone từ Git, build/restart), PHP, HTML tĩnh                                              |
+| Giao diện mẫu | Khi tạo site **WordPress** hoặc **HTML tĩnh**, chọn giao diện dựng sẵn (hiện có *Bất động sản* và *Doanh nghiệp*, xem trước ngay trong panel), chỉ cần nhập tên thương hiệu, SĐT, email, địa chỉ. HTML tĩnh: trang hoàn chỉnh, responsive, có lọc dự án và form liên hệ. WordPress: block theme riêng kèm nội dung mẫu thật (bài dự án có ảnh, trang Giới thiệu/Liên hệ, menu, trang chủ), sửa được trong wp-admin; tài khoản admin tạo tự động. Thêm mẫu mới bằng một thư mục trong [templates/](templates/) |
+| Site không cần tên miền | Nhập `localhost` (hoặc để trống) thay cho tên miền: TPanel tự cấp port (từ 8001), nginx lắng nghe port đó, truy cập qua `http://IP-VPS:8001`. Tự mở port trên ufw nếu đang bật. Dạng này không cài được SSL |
 | Next.js      | Không cần database; dữ liệu JSON nằm trong thư mục app và được giữ nguyên khi deploy lại. Tự nhận npm/yarn/pnpm theo lockfile, cho sửa lệnh install/build/start, biến môi trường (`.env.production.local`, giá trị được mã hoá trong DB), xem log ứng dụng (journald)                                  |
 | SSL          | Let's Encrypt (HTTP-01 webroot dùng chung, chạy được cả với site proxy Next.js), bao gồm alias, staging, gia hạn; hoặc upload certificate riêng (kiểm tra key có khớp cert). Bật/tắt bắt buộc HTTPS + HSTS, cảnh báo khi DNS chưa trỏ về hoặc cert sắp hết hạn                                               |
 | Log traffic  | Access/error log riêng cho từng site. Thống kê theo 1h/24h/7 ngày/30 ngày: số request, IP duy nhất, băng thông, thời gian phản hồi trung bình, 2xx–5xx, biểu đồ theo giờ/ngày, top URL/IP/referrer/user-agent (đọc được cả log đã xoay vòng`.gz`). Có tail + lọc, tải về, xoá, cấu hình logrotate |
@@ -112,6 +114,7 @@ apps/server          Fastify API (chạy bằng root trên VPS)
   src/services       nginx, php, mysql, sites, nodeapp (Next.js), wordpress, ssl, logs, tasks
   src/migration      panels/ (adapter + parser), appDetect, source (kết nối/quét), runner (pipeline), repo
   src/routes         REST + SSE
+templates/           Giao diện mẫu: _base.css, _wp.css + <id>/{template.json, style.css, index.html, wordpress/home.html}
 apps/web             React 19 + Vite + TanStack Query
 install.sh           Bộ cài 1 lệnh
 ```

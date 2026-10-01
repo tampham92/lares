@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { APP_LABELS, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@tpanel/shared';
-import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, type TaskInfo } from '../api';
+import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 
 interface SiteDetailResponse {
@@ -33,14 +33,15 @@ export function SiteDetail() {
       <div className="page-head">
         <div>
           <h1>
-            <a href={`${site.ssl.enabled ? 'https' : 'http'}://${site.domain}`} target="_blank" rel="noreferrer">
-              {site.domain}
+            <a href={siteHref(site)} target="_blank" rel="noreferrer">
+              {siteLabel(site)}
             </a>
           </h1>
           <div className="row sub">
             <Badge tone="info">{APP_LABELS[site.appType]}</Badge>
             {site.status === 'active' ? <Badge tone="ok">Hoạt động</Badge> : <Badge tone="warn">Tạm ngưng</Badge>}
             {site.ssl.enabled ? <Badge tone="ok">HTTPS</Badge> : <Badge>HTTP</Badge>}
+            {site.listenPort && <Badge tone="info">chạy theo port {site.listenPort}</Badge>}
           </div>
         </div>
       </div>
@@ -203,6 +204,7 @@ function SslTab({ site }: { site: Site }) {
       <div className="card stack">
         <h2>Trạng thái SSL</h2>
         <ErrorBox error={error} />
+        {site.listenPort && <Alert tone="warn">Site chạy theo port (chưa có tên miền) nên không cài được SSL. Let&apos;s Encrypt chỉ cấp chứng chỉ cho tên miền thật.</Alert>}
         {site.ssl.enabled ? (
           <>
             <div className="kv">

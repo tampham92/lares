@@ -12,6 +12,7 @@ import { databaseRoutes } from './routes/databases.js';
 import { migrationRoutes } from './routes/migrations.js';
 import { siteRoutes } from './routes/sites.js';
 import { systemRoutes } from './routes/system.js';
+import { templateRoutes } from './routes/templates.js';
 import { getLogrotate, saveLogrotate } from './services/logs.js';
 import { closeMysql } from './services/mysql.js';
 import { ensureGlobalConfig } from './services/nginx.js';
@@ -51,6 +52,7 @@ await app.register(systemRoutes);
 await app.register(siteRoutes);
 await app.register(databaseRoutes);
 await app.register(migrationRoutes);
+await app.register(templateRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });

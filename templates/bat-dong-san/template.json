@@ -1,0 +1,88 @@
+{
+  "id": "bat-dong-san",
+  "name": "Bất động sản",
+  "description": "Sàn / môi giới bất động sản: tìm kiếm & lọc dự án, khu vực nổi bật, đánh giá khách hàng, form tư vấn.",
+  "types": ["wordpress", "static"],
+  "colors": { "primary": "#0f3d5e", "accent": "#e0a526" },
+  "previewImage": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=640&q=60&auto=format&fit=crop",
+  "font": "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap",
+  "defaults": {
+    "siteName": "An Cư Land",
+    "tagline": "Mua bán, cho thuê căn hộ, nhà phố và biệt thự với pháp lý minh bạch, giá tốt nhất thị trường.",
+    "phone": "0909 123 456",
+    "email": "lienhe@example.com",
+    "address": "123 Nguyễn Văn Linh, Quận 7, TP. Hồ Chí Minh"
+  },
+  "wordpress": {
+    "nav": [
+      { "label": "Trang chủ", "url": "/" },
+      { "label": "Dự án", "url": "/category/du-an/" },
+      { "label": "Khu vực", "url": "/#khu-vuc" },
+      { "label": "Giới thiệu", "url": "/gioi-thieu/" },
+      { "label": "Liên hệ", "url": "/lien-he/" }
+    ],
+    "categories": [{ "slug": "du-an", "name": "Dự án" }],
+    "posts": [
+      {
+        "title": "Biệt thự hồ bơi Thảo Điền",
+        "category": "du-an",
+        "tags": ["Mua bán"],
+        "image": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "32 tỷ · 420 m² · 5 phòng ngủ · Thảo Điền, TP. Thủ Đức",
+        "content": "Biệt thự compound an ninh 24/7 tại Thảo Điền, hồ bơi riêng, sân vườn rộng và gara 2 ô tô.\n\n**Giá:** 32 tỷ (thương lượng)\n**Diện tích:** 420 m² · 5 phòng ngủ · 6 WC\n**Pháp lý:** Sổ hồng riêng, công chứng ngay\n\nVị trí cách trung tâm Quận 1 chỉ 10 phút, gần trường quốc tế và các tiện ích cao cấp."
+      },
+      {
+        "title": "Căn hộ cao cấp view sông Sài Gòn",
+        "category": "du-an",
+        "tags": ["Mua bán"],
+        "image": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "6,8 tỷ · 98 m² · 3 phòng ngủ · Phường 22, Bình Thạnh",
+        "content": "Căn hộ góc tầng cao, view trực diện sông Sài Gòn, nội thất cao cấp bàn giao đầy đủ.\n\n**Giá:** 6,8 tỷ\n**Diện tích:** 98 m² · 3 phòng ngủ · 2 WC\n**Tiện ích:** hồ bơi, gym, công viên ven sông, trung tâm thương mại."
+      },
+      {
+        "title": "Nhà phố liền kề Phú Mỹ Hưng",
+        "category": "du-an",
+        "tags": ["Mua bán"],
+        "image": "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "14,5 tỷ · 160 m² · 4 phòng ngủ · Tân Phong, Quận 7",
+        "content": "Nhà phố 1 trệt 3 lầu trong khu đô thị Phú Mỹ Hưng, đường nội bộ rộng, phù hợp vừa ở vừa kinh doanh.\n\n**Giá:** 14,5 tỷ\n**Diện tích:** 160 m² · 4 phòng ngủ · 5 WC"
+      },
+      {
+        "title": "Căn hộ 2 phòng ngủ đầy đủ nội thất",
+        "category": "du-an",
+        "tags": ["Cho thuê"],
+        "image": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "22 triệu/tháng · 75 m² · 2 phòng ngủ · Bến Nghé, Quận 1",
+        "content": "Căn hộ cho thuê ngay trung tâm Quận 1, nội thất mới, dọn vào ở ngay.\n\n**Giá thuê:** 22 triệu/tháng (bao phí quản lý)\n**Diện tích:** 75 m² · 2 phòng ngủ · 2 WC"
+      },
+      {
+        "title": "Villa sân vườn yên tĩnh",
+        "category": "du-an",
+        "tags": ["Cho thuê"],
+        "image": "https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "85 triệu/tháng · 300 m² · 4 phòng ngủ · An Phú, TP. Thủ Đức",
+        "content": "Villa sân vườn rộng, nhiều cây xanh, phù hợp gia đình hoặc làm văn phòng đại diện.\n\n**Giá thuê:** 85 triệu/tháng\n**Diện tích:** 300 m² · 4 phòng ngủ · 4 WC"
+      },
+      {
+        "title": "Nhà phố hiện đại mặt tiền đường lớn",
+        "category": "du-an",
+        "tags": ["Mua bán"],
+        "image": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=75&auto=format&fit=crop",
+        "excerpt": "18,9 tỷ · 210 m² · 5 phòng ngủ · Phường 25, Bình Thạnh",
+        "content": "Nhà phố thiết kế hiện đại, mặt tiền 6 m, vị trí đắc địa thuận tiện kinh doanh.\n\n**Giá:** 18,9 tỷ\n**Diện tích:** 210 m² · 5 phòng ngủ · 5 WC"
+      }
+    ],
+    "pages": [
+      {
+        "title": "Giới thiệu",
+        "slug": "gioi-thieu",
+        "content": "{{SITE_NAME}} là đơn vị môi giới và phân phối bất động sản với hơn 15 năm kinh nghiệm.\n\nChúng tôi kiểm tra pháp lý từng sản phẩm, làm việc trực tiếp với chủ nhà và chủ đầu tư để mang lại mức giá tốt nhất, đồng thời hỗ trợ trọn gói thủ tục công chứng, vay ngân hàng và sang tên.\n\n**Sứ mệnh:** giúp mỗi gia đình tìm được tổ ấm phù hợp một cách an toàn và minh bạch."
+      },
+      {
+        "title": "Liên hệ",
+        "slug": "lien-he",
+        "content": "**Hotline:** {{PHONE}}\n**Email:** {{EMAIL}}\n**Văn phòng:** {{ADDRESS}}\n\nGiờ làm việc: 8:00 – 20:00, tất cả các ngày trong tuần."
+      }
+    ]
+  }
+}

@@ -42,6 +42,8 @@ export async function siteRoutes(app: FastifyInstance) {
   app.post('/api/sites', async (req) => {
     const input = parse(createSiteSchema, req.body);
     if (sites.findSiteByHostname(input.domain)) throw badRequest(`${input.domain} đã tồn tại`);
+    // Port-based sites are opened as http://<the host the admin is using>:<port>
+    input.publicHost ||= req.hostname.replace(/:\d+$/, '');
     return startTask(`Tạo site ${input.domain}`, (log) => sites.createSite(input, log));
   });
 

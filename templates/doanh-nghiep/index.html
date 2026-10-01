@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{SITE_NAME}} – {{TAGLINE}}</title>
+<meta name="description" content="{{TAGLINE}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2z"/></symbol>
+  <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M4 10v4h3l7 4V6L7 10H4z"/><path d="M18 9a4 4 0 0 1 0 6"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-headset" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h3.5l2 5-2.5 1.5a11 11 0 0 0 5.5 5.5L15 13.5l5 2V19a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+</svg>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="logo" href="#"><span class="logo-mark"><svg class="icon"><use href="#i-layers"/></svg></span>{{SITE_NAME}}</a>
+    <nav class="menu" id="menu">
+      <a href="#dich-vu">Dịch vụ</a>
+      <a href="#gioi-thieu">Giới thiệu</a>
+      <a href="#quy-trinh">Quy trình</a>
+      <a href="#khach-hang">Khách hàng</a>
+      <a href="#lien-he">Liên hệ</a>
+    </nav>
+    <a class="btn btn-accent nav-cta" href="#lien-he">Nhận báo giá</a>
+    <button class="menu-toggle" aria-label="Mở menu" onclick="document.getElementById('menu').classList.toggle('open')"><svg class="icon"><use href="#i-menu"/></svg></button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <p class="eyebrow">Đối tác tăng trưởng của doanh nghiệp</p>
+      <h1>Giải pháp giúp doanh nghiệp <em>tăng trưởng bền vững</em></h1>
+      <p class="lead">{{TAGLINE}}</p>
+      <div class="hero-actions">
+        <a class="btn btn-accent" href="#lien-he">Nhận tư vấn miễn phí</a>
+        <a class="btn btn-outline" href="#dich-vu">Xem dịch vụ</a>
+      </div>
+      <p class="trust"><span class="stars">★★★★★</span><span><strong>4.9/5</strong> từ hơn 300 doanh nghiệp</span></p>
+    </div>
+    <figure class="hero-media">
+      <img src="https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1200&q=75&auto=format&fit=crop" alt="Văn phòng làm việc">
+      <div class="float-card"><span class="fi"><svg class="icon"><use href="#i-trend"/></svg></span><div><strong>+38%</strong><span>Doanh thu trung bình năm đầu</span></div></div>
+    </figure>
+  </div>
+</section>
+
+<section class="logos">
+  <div class="container">
+    <p>Được tin dùng bởi</p>
+    <span class="brand">VINAGROUP</span><span class="brand">SAIGONTECH</span><span class="brand">MEKONG FOODS</span><span class="brand">HANOI LOGISTICS</span><span class="brand">AN PHÁT</span>
+  </div>
+</section>
+
+<section class="section" id="dich-vu">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Dịch vụ</p>
+      <h2>Mọi thứ doanh nghiệp cần để bứt phá</h2>
+      <p>Từ chiến lược đến triển khai, đội ngũ của {{SITE_NAME}} đồng hành cùng bạn ở từng giai đoạn.</p>
+    </div>
+    <div class="services">
+      <div class="service"><div class="sicon"><svg class="icon"><use href="#i-compass"/></svg></div><h3>Tư vấn chiến lược</h3><p>Phân tích thị trường, xây dựng mô hình kinh doanh và lộ trình tăng trưởng rõ ràng.</p></div>
+      <div class="service"><div class="sicon"><svg class="icon"><use href="#i-megaphone"/></svg></div><h3>Marketing số</h3><p>SEO, quảng cáo đa kênh và nội dung giúp thương hiệu tiếp cận đúng khách hàng.</p></div>
+      <div class="service"><div class="sicon"><svg class="icon"><use href="#i-monitor"/></svg></div><h3>Thiết kế website</h3><p>Website chuẩn SEO, tối ưu chuyển đổi, hiển thị hoàn hảo trên mọi thiết bị.</p></div>
+      <div class="service"><div class="sicon"><svg class="icon"><use href="#i-code"/></svg></div><h3>Phát triển phần mềm</h3><p>Ứng dụng web, mobile và hệ thống quản trị nội bộ theo yêu cầu.</p></div>
+      <div class="service"><div class="sicon"><svg class="icon"><use href="#i-chart"/></svg></div><h3>Phân tích dữ liệu</h3><p>Báo cáo trực quan, theo dõi KPI theo thời gian thực để ra quyết định nhanh hơn.</p></div>
+      <div class="service"><div class="sicon"><svg class="icon"><use href="#i-headset"/></svg></div><h3>Chăm sóc khách hàng</h3><p>Tổng đài, chatbot và CRM giúp giữ chân khách hàng và tăng giá trị vòng đời.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="gioi-thieu">
+  <div class="container about-grid">
+    <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=75&auto=format&fit=crop" alt="Đội ngũ làm việc" loading="lazy">
+    <div>
+      <p class="eyebrow">Về chúng tôi</p>
+      <h2>Hơn 12 năm đồng hành cùng doanh nghiệp Việt</h2>
+      <p>{{SITE_NAME}} quy tụ đội ngũ chuyên gia giàu kinh nghiệm trong chiến lược, công nghệ và marketing. Chúng tôi cam kết kết quả bằng con số cụ thể, minh bạch trong từng giai đoạn.</p>
+      <ul class="checks">
+        <li><svg class="icon"><use href="#i-check"/></svg>Đội ngũ hơn 40 chuyên gia được chứng nhận quốc tế</li>
+        <li><svg class="icon"><use href="#i-check"/></svg>Báo cáo tiến độ hằng tuần, cam kết KPI trong hợp đồng</li>
+        <li><svg class="icon"><use href="#i-check"/></svg>Hỗ trợ sau triển khai không giới hạn trong 12 tháng</li>
+      </ul>
+      <a class="btn btn-primary" href="#lien-he">Trao đổi với chuyên gia</a>
+    </div>
+  </div>
+</section>
+
+<section class="stats-band">
+  <div class="container">
+    <div><strong>12+</strong><span>Năm kinh nghiệm</span></div>
+    <div><strong>500+</strong><span>Dự án hoàn thành</span></div>
+    <div><strong>98%</strong><span>Khách hàng hài lòng</span></div>
+    <div><strong>40+</strong><span>Chuyên gia</span></div>
+  </div>
+</section>
+
+<section class="section" id="quy-trinh">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Quy trình</p>
+      <h2>4 bước rõ ràng, kết quả đo lường được</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><h3>Khảo sát</h3><p>Lắng nghe mục tiêu, đánh giá hiện trạng và cơ hội của doanh nghiệp.</p></div>
+      <div class="step"><h3>Đề xuất</h3><p>Giải pháp, ngân sách và lộ trình chi tiết kèm KPI cụ thể.</p></div>
+      <div class="step"><h3>Triển khai</h3><p>Thực hiện theo sprint, báo cáo tiến độ minh bạch hằng tuần.</p></div>
+      <div class="step"><h3>Tối ưu</h3><p>Đo lường, tối ưu liên tục để đạt và vượt mục tiêu đề ra.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="khach-hang">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Khách hàng nói gì</p>
+      <h2>Kết quả thật từ những doanh nghiệp thật</h2>
+    </div>
+    <div class="quotes">
+      <blockquote class="quote"><p class="stars">★★★★★</p><p>Sau 6 tháng hợp tác, lượng khách hàng tiềm năng từ website tăng gấp 3 lần. Đội ngũ rất chuyên nghiệp.</p><cite>Anh Hoàng Nam<span>Giám đốc, SaigonTech</span></cite></blockquote>
+      <blockquote class="quote"><p class="stars">★★★★★</p><p>Hệ thống quản lý kho được triển khai đúng tiến độ, giúp chúng tôi giảm 30% chi phí vận hành.</p><cite>Chị Thanh Thảo<span>COO, Hanoi Logistics</span></cite></blockquote>
+      <blockquote class="quote"><p class="stars">★★★★★</p><p>Chiến lược marketing bài bản, báo cáo rõ ràng. Doanh thu kênh online tăng 45% chỉ sau một quý.</p><cite>Anh Đức Minh<span>CEO, Mekong Foods</span></cite></blockquote>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="lien-he">
+  <div class="container contact-grid">
+    <div>
+      <p class="eyebrow">Liên hệ</p>
+      <h2>Sẵn sàng tăng trưởng cùng {{SITE_NAME}}?</h2>
+      <p>Để lại thông tin, chuyên gia sẽ liên hệ tư vấn và gửi báo giá trong vòng 24 giờ làm việc.</p>
+      <ul class="contact-list">
+        <li><span class="ci"><svg class="icon"><use href="#i-phone"/></svg></span><div><small>Hotline</small><a href="tel:{{PHONE_LINK}}">{{PHONE}}</a></div></li>
+        <li><span class="ci"><svg class="icon"><use href="#i-mail"/></svg></span><div><small>Email</small><a href="mailto:{{EMAIL}}">{{EMAIL}}</a></div></li>
+        <li><span class="ci"><svg class="icon"><use href="#i-pin"/></svg></span><div><small>Văn phòng</small>{{ADDRESS}}</div></li>
+      </ul>
+    </div>
+    <form class="form" onsubmit="sendContact(event)">
+      <h3>Nhận báo giá miễn phí</h3>
+      <div class="row2">
+        <input name="name" placeholder="Họ và tên" required>
+        <input name="company" placeholder="Công ty">
+      </div>
+      <div class="row2">
+        <input name="phone" type="tel" placeholder="Số điện thoại" required>
+        <input name="email" type="email" placeholder="Email">
+      </div>
+      <select name="need">
+        <option>Tư vấn chiến lược</option>
+        <option>Marketing số</option>
+        <option>Thiết kế website</option>
+        <option>Phát triển phần mềm</option>
+        <option>Khác</option>
+      </select>
+      <textarea name="message" placeholder="Mô tả ngắn nhu cầu của bạn..."></textarea>
+      <button class="btn btn-primary" type="submit">Gửi yêu cầu</button>
+      <p class="thanks" id="thanks" hidden>Cảm ơn bạn! Ứng dụng email sẽ mở để gửi yêu cầu tới {{EMAIL}}.</p>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="#"><span class="logo-mark"><svg class="icon"><use href="#i-layers"/></svg></span>{{SITE_NAME}}</a>
+        <p>{{TAGLINE}}</p>
+      </div>
+      <div>
+        <h4>Liên hệ</h4>
+        <p>{{ADDRESS}}</p>
+        <p><a href="tel:{{PHONE_LINK}}">{{PHONE}}</a></p>
+        <p><a href="mailto:{{EMAIL}}">{{EMAIL}}</a></p>
+      </div>
+      <div>
+        <h4>Liên kết</h4>
+        <ul class="footer-links">
+          <li><a href="#dich-vu">Dịch vụ</a></li>
+          <li><a href="#gioi-thieu">Về chúng tôi</a></li>
+          <li><a href="#quy-trinh">Quy trình làm việc</a></li>
+          <li><a href="#lien-he">Nhận báo giá</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="copyright">© {{YEAR}} {{SITE_NAME}}. Bảo lưu mọi quyền.</p>
+  </div>
+</footer>
+
+<script>
+function sendContact(e){
+  e.preventDefault();
+  var d=new FormData(e.target);
+  var body='Họ tên: '+d.get('name')+'\nCông ty: '+d.get('company')+'\nĐiện thoại: '+d.get('phone')+'\nEmail: '+d.get('email')+'\nNhu cầu: '+d.get('need')+'\n\n'+d.get('message');
+  document.getElementById('thanks').hidden=false;
+  location.href='mailto:{{EMAIL}}?subject='+encodeURIComponent('Yêu cầu báo giá từ website')+'&body='+encodeURIComponent(body);
+}
+</script>
+</body>
+</html>

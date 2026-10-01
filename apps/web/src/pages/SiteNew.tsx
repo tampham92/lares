@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SITE_TYPES, type SiteType, type SystemStats } from '@tpanel/shared';
+import { LOCALHOST, SITE_TYPES, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@tpanel/shared';
 import { get, post, type TaskInfo } from '../api';
+import { TemplatePicker } from '../components/TemplatePicker';
 import { Alert, Check, ErrorBox, Field, TaskLog } from '../components/ui';
 
 const TYPE_INFO: Record<SiteType, { title: string; desc: string }> = {
-  wordpress: { title: 'WordPress', desc: 'Tự tải WordPress, tạo database & wp-config.php' },
+  wordpress: { title: 'WordPress', desc: 'Tự cài WordPress + database, chọn được giao diện mẫu có sẵn nội dung' },
   nextjs: { title: 'Next.js', desc: 'Node.js app chạy bằng systemd, Nginx reverse proxy. Không cần database (dữ liệu JSON).' },
   php: { title: 'PHP', desc: 'Site PHP thuần / framework (Laravel, CodeIgniter...)' },
-  static: { title: 'HTML tĩnh', desc: 'HTML/CSS/JS, hoặc Next.js static export' },
+  static: { title: 'HTML tĩnh', desc: 'HTML/CSS/JS, có giao diện mẫu dựng sẵn hoặc Next.js static export' },
 };
 
 export function SiteNew() {
@@ -23,15 +24,25 @@ export function SiteNew() {
   const [wp, setWp] = useState({ title: '', adminUser: '', adminPassword: '', adminEmail: '', locale: 'vi' });
   const [next, setNext] = useState({ gitUrl: '', branch: 'main', packageManager: 'auto', installCommand: '', buildCommand: '', startCommand: '', env: '' });
   const [createDb, setCreateDb] = useState(false);
+  const [template, setTemplate] = useState<string | null>(null);
+  const [branding, setBranding] = useState<Branding>({});
+  const [listenPort, setListenPort] = useState('');
   const [task, setTask] = useState<string | null>(null);
+  const [result, setResult] = useState<CreateSiteResult | null>(null);
   const [error, setError] = useState<unknown>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const d = domain.trim().toLowerCase();
-    const aliases = addWww && !d.startsWith('www.') ? [`www.${d}`] : [];
-    const body: Record<string, unknown> = { type, domain: d, aliases };
+    const d = domain.trim().toLowerCase() || LOCALHOST;
+    const portMode = d === LOCALHOST;
+    const aliases = !portMode && addWww && !d.startsWith('www.') ? [`www.${d}`] : [];
+    const body: Record<string, unknown> = { type, domain: d, aliases, publicHost: window.location.hostname };
+    if (portMode && listenPort) body.listenPort = Number(listenPort);
+    if (type === 'wordpress' || type === 'static') {
+      body.template = template ?? undefined;
+      body.branding = Object.fromEntries(Object.entries(branding).filter(([, v]) => typeof v === 'string' && v.trim()));
+    }
     if (type === 'wordpress' || type === 'php') body.phpVersion = php || undefined;
     if (type === 'wordpress') body.wordpress = wp;
     if (type === 'php') body.createDatabase = createDb;
@@ -61,22 +72,71 @@ export function SiteNew() {
 
   const onDone = (t: TaskInfo) => {
     void qc.invalidateQueries({ queryKey: ['sites'] });
-    const r = t.result as { site?: { id: number } } | undefined;
-    if (t.status === 'completed' && r?.site) setTimeout(() => nav(`/sites/${r.site!.id}`), 1200);
+    if (t.status === 'completed') setResult(t.result as CreateSiteResult);
   };
 
   if (task) {
     return (
       <>
         <div className="page-head">
-          <h1>Đang tạo {domain}</h1>
+          <h1>{result ? 'Đã tạo website' : `Đang tạo ${domain || 'site'}`}</h1>
         </div>
+        {result && (
+          <div className="card stack">
+            <div className="kv">
+              <div>Địa chỉ truy cập</div>
+              <div>
+                <a href={result.url} target="_blank" rel="noreferrer">
+                  <strong>{result.url}</strong>
+                </a>
+              </div>
+              {result.wordpressAdmin && (
+                <>
+                  <div>Trang quản trị WordPress</div>
+                  <div>
+                    <a href={result.wordpressAdmin.url} target="_blank" rel="noreferrer">
+                      {result.wordpressAdmin.url}
+                    </a>
+                  </div>
+                  <div>Tài khoản / mật khẩu</div>
+                  <div className="mono">
+                    {result.wordpressAdmin.user} / {result.wordpressAdmin.password}
+                  </div>
+                </>
+              )}
+              {result.database && (
+                <>
+                  <div>Database</div>
+                  <div className="mono">
+                    {result.database.name} / {result.database.username} / {result.database.password}
+                  </div>
+                </>
+              )}
+            </div>
+            {result.wordpressAdmin && <Alert tone="warn">Lưu lại mật khẩu WordPress — TPanel chỉ hiển thị một lần.</Alert>}
+            {result.site.listenPort && (
+              <Alert tone="info">
+                Site chạy theo port {result.site.listenPort}. Nếu VPS có firewall của nhà cung cấp (AWS, GCP, Vultr…), hãy mở thêm port này.
+              </Alert>
+            )}
+            <div className="row">
+              <a className="btn primary" href={result.url} target="_blank" rel="noreferrer">
+                Mở website
+              </a>
+              <button className="btn" onClick={() => nav(`/sites/${result.site.id}`)}>
+                Quản lý site
+              </button>
+            </div>
+          </div>
+        )}
         <div className="card">
           <TaskLog taskId={task} onDone={onDone} />
         </div>
       </>
     );
   }
+
+  const portMode = domain.trim().toLowerCase() === LOCALHOST || domain.trim() === '';
 
   return (
     <form onSubmit={submit}>
@@ -102,9 +162,14 @@ export function SiteNew() {
       </div>
       <div className="card stack">
         <div className="form-grid">
-          <Field label="Tên miền" hint="Ví dụ: example.com">
-            <input required value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" />
+          <Field label="Tên miền" hint={<>Ví dụ: example.com — hoặc nhập <code>localhost</code> (để trống) để chạy qua http://{window.location.hostname}:PORT khi chưa có tên miền</>}>
+            <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com hoặc localhost" />
           </Field>
+          {portMode && (
+            <Field label="Port" hint="Bỏ trống để TPanel tự chọn port trống (từ 8001)">
+              <input type="number" min={1024} max={65535} value={listenPort} onChange={(e) => setListenPort(e.target.value)} placeholder="tự động" />
+            </Field>
+          )}
           {(type === 'wordpress' || type === 'php') && (
             <Field label="Phiên bản PHP">
               <select value={php} onChange={(e) => setPhp(e.target.value)}>
@@ -118,14 +183,28 @@ export function SiteNew() {
             </Field>
           )}
         </div>
-        <Check checked={addWww} onChange={setAddWww}>
-          Thêm alias www.{domain || 'example.com'}
-        </Check>
+        {portMode ? (
+          <Alert tone="info">
+            Chưa có tên miền: site sẽ truy cập qua <strong>http://{window.location.hostname}:{listenPort || 'PORT'}</strong>. Không cài được SSL cho dạng này.
+          </Alert>
+        ) : (
+          <Check checked={addWww} onChange={setAddWww}>
+            Thêm alias www.{domain || 'example.com'}
+          </Check>
+        )}
+
+        {(type === 'wordpress' || type === 'static') && (
+          <TemplatePicker siteType={type} value={template} onChange={setTemplate} branding={branding} onBranding={setBranding} />
+        )}
 
         {type === 'wordpress' && (
           <>
-            <h3>Thông tin WordPress (tuỳ chọn)</h3>
-            <div className="sub">Nếu điền đủ và server có wp-cli, TPanel sẽ cài đặt luôn. Bỏ trống để tự hoàn tất qua trình duyệt.</div>
+            <h3>Tài khoản quản trị WordPress (tuỳ chọn)</h3>
+            <div className="sub">
+              {template
+                ? 'Bỏ trống để TPanel tự tạo tài khoản admin (hiển thị sau khi tạo xong).'
+                : 'Nếu điền đủ và server có wp-cli, TPanel sẽ cài đặt luôn. Bỏ trống để tự hoàn tất qua trình duyệt.'}
+            </div>
             <div className="form-grid">
               <Field label="Tiêu đề site">
                 <input value={wp.title} onChange={(e) => setWp({ ...wp, title: e.target.value })} />

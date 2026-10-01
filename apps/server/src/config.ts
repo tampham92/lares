@@ -30,7 +30,9 @@ function loadSecret(): string {
   return secret;
 }
 
-const dryRun = env('TPANEL_DRY_RUN', process.platform === 'linux' ? '0' : '1') === '1';
+// Outside Linux (developer laptops) system commands are never executed for real, whatever .env says:
+// TPanel would otherwise chown/systemctl/mysql against the developer's own machine.
+const dryRun = process.platform !== 'linux' || env('TPANEL_DRY_RUN', '0') === '1';
 
 export const config = {
   isProd,
@@ -66,6 +68,9 @@ export const config = {
   logrotateFile: env('TPANEL_LOGROTATE_FILE', dryRun ? path.join(dataDir, 'logrotate-tpanel') : '/etc/logrotate.d/tpanel'),
   nginxGlobalConf: env('TPANEL_NGINX_GLOBAL_CONF', dryRun ? path.join(dataDir, 'nginx/tpanel-global.conf') : '/etc/nginx/conf.d/00-tpanel.conf'),
   nodeAppPortStart: Number(env('TPANEL_NODE_PORT_START', '3100')),
+  /** Port-based sites (domain "localhost") get public ports from here upward. */
+  sitePortStart: Number(env('TPANEL_SITE_PORT_START', '8001')),
+  templatesDir: path.resolve(env('TPANEL_TEMPLATES_DIR', path.resolve(process.cwd(), '../../templates'))),
   stagingDir: path.join(dataDir, 'migrations'),
   webDist: path.resolve(env('TPANEL_WEB_DIST', path.resolve(process.cwd(), '../web/dist'))),
   mysql: {

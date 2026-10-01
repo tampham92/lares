@@ -88,6 +88,14 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE INDEX IF NOT EXISTS idx_migration_logs_mid ON migration_logs(migration_id, id);
 `);
 
+/** Additive schema migrations for databases created by older versions. */
+function ensureColumn(table: string, column: string, definition: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+ensureColumn('sites', 'listen_port', 'INTEGER');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_listen_port ON sites(listen_port) WHERE listen_port IS NOT NULL');
+
 export const nowIso = () => new Date().toISOString();
 
 export function getSetting<T>(key: string, fallback: T): T {
