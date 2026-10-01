@@ -15,7 +15,7 @@ import * as ports from './ports.js';
 import { resolvePhpVersion } from './php.js';
 import * as ssl from './ssl.js';
 import * as templates from './templates.js';
-import { installWordpress, wordpressReplaceUrl } from './wordpress.js';
+import { ensurePortHostFix, installWordpress, wordpressReplaceUrl } from './wordpress.js';
 
 interface SiteRow {
   id: number;
@@ -405,6 +405,13 @@ export async function disableSsl(id: number, revoke: boolean, log?: HostLogger) 
   if (site.ssl.type === 'custom') await ssl.removeCustomCert(site.domain);
   saveSsl(id, ssl.EMPTY_SSL);
   return getSite(id);
+}
+
+/** One-off repairs for sites created by older TPanel versions (runs at startup, idempotent). */
+export async function repairSites(log: HostLogger) {
+  for (const s of listSites()) {
+    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, log).catch((e) => log(`Không vá được ${s.domain}: ${e instanceof Error ? e.message : e}`));
+  }
 }
 
 /** Refresh certificate expiry dates (certbot renews in the background via its own timer). */

@@ -17,7 +17,7 @@ import { getLogrotate, saveLogrotate } from './services/logs.js';
 import { closeMysql } from './services/mysql.js';
 import { stopDevNginx, syncDevNginx } from './services/devNginx.js';
 import { ensureGlobalConfig } from './services/nginx.js';
-import { refreshSslExpiry } from './services/sites.js';
+import { refreshSslExpiry, repairSites } from './services/sites.js';
 
 const https =
   config.tlsCert && config.tlsKey && fs.existsSync(config.tlsCert) && fs.existsSync(config.tlsKey)
@@ -69,6 +69,7 @@ failInterruptedMigrations();
 if (config.dryRun) app.log.warn('TPANEL_DRY_RUN=1 - các lệnh thay đổi hệ thống chỉ được ghi log, không thực thi');
 await ensureGlobalConfig((m) => app.log.info(m)).catch((err) => app.log.warn(`nginx global config: ${err.message}`));
 await saveLogrotate(getLogrotate()).catch((err) => app.log.warn(`logrotate: ${err.message}`));
+await repairSites((m) => app.log.warn(m)).catch((err) => app.log.warn(`repairSites: ${err.message}`));
 setInterval(() => void refreshSslExpiry().catch(() => {}), 12 * 3_600_000).unref();
 await syncDevNginx((m) => app.log.info(m));
 

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { WordpressConfig } from '@tpanel/shared';
 import { config } from '../config.js';
@@ -11,6 +12,26 @@ function salt(): string {
   // Printable ASCII without quote/backslash so the value is trivially safe inside a PHP string.
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%&()*+,-./:;<=>?@[]^_{|}~';
   return Array.from(crypto.randomBytes(64), (b) => chars[b % chars.length]).join('');
+}
+
+const PORT_HOST_FIX_MARKER = 'TPANEL_PORT_HOST_FIX';
+
+/**
+ * Sites served on a custom port (http://IP:8001): when the Host header reaches PHP without the port
+ * (seen with some FastCGI setups), WordPress builds its current URL without ":8001", decides it differs
+ * from the stored home URL and redirects to itself forever. Restore the port from the real server port.
+ */
+export const PORT_HOST_FIX = `// ${PORT_HOST_FIX_MARKER}: keep the port in HTTP_HOST for sites served on a custom port (prevents redirect loops)
+if ( isset( $_SERVER['HTTP_HOST'], $_SERVER['SERVER_PORT'] ) && strpos( $_SERVER['HTTP_HOST'], ':' ) === false
+	&& ! in_array( (string) $_SERVER['SERVER_PORT'], array( '80', '443' ), true ) ) {
+	$_SERVER['HTTP_HOST'] .= ':' . $_SERVER['SERVER_PORT'];
+}
+`;
+
+/** Insert PORT_HOST_FIX into an existing wp-config.php (idempotent). */
+export function addPortHostFix(src: string): string {
+  if (src.includes(PORT_HOST_FIX_MARKER)) return src;
+  return /<\?php[^\n]*\n/.test(src) ? src.replace(/<\?php[^\n]*\n/, (m) => `${m}${PORT_HOST_FIX}\n`) : src;
 }
 
 export function renderWpConfig(db: { name: string; user: string; password: string; host: string }, prefix = 'wp_'): string {
@@ -31,6 +52,7 @@ $table_prefix = ${phpStr(prefix)};
 define( 'WP_DEBUG', false );
 define( 'FS_METHOD', 'direct' );
 
+${PORT_HOST_FIX}
 // Behind a TLS-terminating proxy / load balancer
 if ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https' ) {
 	$_SERVER['HTTPS'] = 'on';
@@ -138,4 +160,17 @@ export async function wordpressReplaceUrl(webRoot: string, home: string, to: str
   await run(`option update siteurl ${shq(to)}`);
   await run('cache flush').catch(() => undefined);
   log(`Đã đổi URL WordPress: ${current} → ${to}`);
+}
+
+/** Patch wp-config.php of a port-based site that was created before PORT_HOST_FIX existed. */
+export async function ensurePortHostFix(webRoot: string, log?: HostLogger): Promise<boolean> {
+  const file = path.join(webRoot, 'wp-config.php');
+  const src = await fs.readFile(file, 'utf8').catch(() => null);
+  if (src === null) return false;
+  const next = addPortHostFix(src);
+  if (next === src) return false;
+  await host.writeFile(file, next, 0o640);
+  await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(file)}`, { log });
+  log?.(`Đã vá wp-config.php (giữ port trong HTTP_HOST): ${file}`);
+  return true;
 }

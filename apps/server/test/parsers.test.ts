@@ -138,3 +138,19 @@ describe('access log parsing', () => {
     expect(parseAccessLine('garbage')).toBeNull();
   });
 });
+
+describe('wp-config port fix', async () => {
+  const { addPortHostFix, renderWpConfig } = await import('../src/services/wordpress.js');
+  it('is part of generated configs and keeps credentials parseable', () => {
+    const cfg = renderWpConfig({ name: 'd', user: 'u', password: 'p', host: 'localhost' });
+    expect(cfg).toContain('TPANEL_PORT_HOST_FIX');
+    expect(parseWpConfig(cfg)).toMatchObject({ name: 'd', user: 'u', password: 'p' });
+  });
+  it('patches old configs once, right after <?php', () => {
+    const old = "<?php\ndefine( 'DB_NAME', 'x' );\ndefine( 'DB_USER', 'y' );\n";
+    const once = addPortHostFix(old);
+    expect(once.startsWith("<?php\n// TPANEL_PORT_HOST_FIX")).toBe(true);
+    expect(addPortHostFix(once)).toBe(once);
+    expect(parseWpConfig(once)).toMatchObject({ name: 'x', user: 'y' });
+  });
+});
