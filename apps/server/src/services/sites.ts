@@ -15,7 +15,7 @@ import * as ports from './ports.js';
 import { resolvePhpVersion } from './php.js';
 import * as ssl from './ssl.js';
 import * as templates from './templates.js';
-import { installWordpress } from './wordpress.js';
+import { installWordpress, wordpressReplaceUrl } from './wordpress.js';
 
 interface SiteRow {
   id: number;
@@ -375,6 +375,8 @@ export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger
   await applySiteVhost({ ...site, ssl: state }, log);
   saveSsl(id, state);
   log(`Đã bật SSL cho ${site.domain}${state.expiresAt ? `, hết hạn ${state.expiresAt.slice(0, 10)}` : ''}`);
+  // An http:// home URL on an https page makes browsers block the theme's CSS/JS (mixed content).
+  if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, site.rootPath, `https://${site.domain}`, log);
   return getSite(id);
 }
 
@@ -412,6 +414,72 @@ export async function refreshSslExpiry() {
     const info = await ssl.readCertInfo(ssl.certPaths(s.domain, s.ssl.type).certificate);
     if (info.expiresAt && info.expiresAt !== s.ssl.expiresAt) saveSsl(s.id, { ...s.ssl, expiresAt: info.expiresAt });
   }
+}
+
+/**
+ * Give a site a (new) real domain - typically a port-based site that is ready to go live.
+ * Files stay where they are (paths are stored per site); vhost, logs, Next.js service and
+ * WordPress URLs move to the new name. Any certificate for the old name is dropped.
+ */
+export async function changeDomain(id: number, input: { domain: string; aliases: string[] }, log: HostLogger) {
+  const site = getSite(id);
+  const domain = input.domain.toLowerCase();
+  if (domain === LOCALHOST) throw conflict('Hãy nhập tên miền thật');
+  if (domain === site.domain && !site.listenPort) throw conflict('Site đã dùng tên miền này');
+  assertHostnamesFree([domain, ...input.aliases], id);
+  const target = siteLayout(domain, site.appType);
+  if (target.rootPath !== site.rootPath && (await host.exists(target.rootPath))) {
+    log(`Lưu ý: thư mục ${target.rootPath} đã tồn tại, site vẫn dùng thư mục hiện tại ${site.rootPath}`);
+  }
+
+  const undo = new UndoStack();
+  const next: Site = { ...site, domain, aliases: input.aliases, listenPort: null, ssl: ssl.EMPTY_SSL };
+  try {
+    await applySiteVhost(next, log);
+    undo.push(`xoá vhost ${domain}`, () => removeVhost(domain, log));
+
+    if (site.appType === 'nextjs' && site.appPort) {
+      await nodeapp.writeServiceFiles(domain, site.webRoot, site.rootPath, site.appPort, getNodeConfig(id), log);
+      undo.push(`xoá service ${nodeapp.serviceName(domain)}`, () => nodeapp.removeService(domain, log));
+      await nodeapp.serviceAction(domain, 'restart', log);
+    }
+
+    db.prepare(`UPDATE sites SET domain = ?, aliases_json = ?, listen_port = NULL, ssl_json = '{}' WHERE id = ?`).run(domain, JSON.stringify(input.aliases), id);
+    undo.clear();
+  } catch (err) {
+    await undo.run(log);
+    throw err;
+  }
+
+  // Point of no return passed: clean up what belonged to the old name (best effort).
+  await removeVhost(site.domain, log).catch((e) => log(`Không xoá được vhost cũ: ${e instanceof Error ? e.message : e}`));
+  if (site.appType === 'nextjs') await nodeapp.removeService(site.domain, log).catch(() => {});
+  // Only now - with the old vhost gone - can the old log files move (nginx -t opens every log path).
+  await moveSiteLogs(site.domain, domain, log).catch((e) => log(`Không chuyển được log cũ: ${e instanceof Error ? e.message : e}`));
+  if (site.listenPort) await ports.closeFirewallPort(site.listenPort, log);
+  if (site.ssl.type === 'letsencrypt') await ssl.deleteLetsEncrypt(site.domain, log);
+  if (site.ssl.type === 'custom') await ssl.removeCustomCert(site.domain);
+  if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, site.rootPath, `http://${domain}`, log);
+
+  log(`Đã gán tên miền ${[domain, ...input.aliases].join(', ')}. Tiếp theo: trỏ bản ghi DNS A về IP máy chủ, rồi cài SSL ở tab SSL.`);
+  return getSite(id);
+}
+
+/** Keep traffic history when a site is renamed: move old log files unless the new ones already have data. */
+async function moveSiteLogs(from: string, to: string, log: HostLogger) {
+  const src = siteLogPaths(from).dir;
+  const dst = siteLogPaths(to).dir;
+  if (src === dst || !(await host.exists(src))) return;
+  await fs.mkdir(dst, { recursive: true });
+  for (const f of await fs.readdir(src)) {
+    const target = path.join(dst, f);
+    const size = (await fs.stat(target).catch(() => null))?.size ?? 0;
+    if (size === 0) await fs.rename(path.join(src, f), target);
+  }
+  await fs.rm(src, { recursive: true, force: true });
+  // nginx still holds the replaced (empty) files open
+  if (!config.dryRun && (await nginxRunning())) await host.run(`${shq(config.nginxBin)} -s reopen`).catch(() => undefined);
+  log('Đã giữ lại lịch sử log traffic cho tên miền mới');
 }
 
 export async function deleteSite(

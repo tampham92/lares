@@ -24,25 +24,44 @@ interface TemplateManifest extends TemplateInfo {
 }
 
 const ID_RE = /^[a-z0-9-]{1,40}$/;
-const dir = (id: string) => path.join(config.templatesDir, id);
+const exists = (p: string) => fs.access(p).then(() => true, () => false);
+
+/** Custom templates (survive upgrades) win over built-in ones with the same id. */
+const templateDirs = () => [config.customTemplatesDir, config.templatesDir];
+
+async function dir(id: string): Promise<string> {
+  for (const base of templateDirs()) {
+    const d = path.join(base, id);
+    if (await exists(path.join(d, 'template.json'))) {
+      return d;
+    }
+  }
+  throw notFound(`Template "${id}" không tồn tại`);
+}
 
 export async function getTemplate(id: string): Promise<TemplateManifest> {
   if (!ID_RE.test(id)) throw notFound('Template không tồn tại');
+  const d = await dir(id);
   try {
-    return JSON.parse(await fs.readFile(path.join(dir(id), 'template.json'), 'utf8')) as TemplateManifest;
-  } catch {
-    throw notFound(`Template "${id}" không tồn tại`);
+    const t = JSON.parse(await fs.readFile(path.join(d, 'template.json'), 'utf8')) as TemplateManifest;
+    return { ...t, id, custom: d.startsWith(config.customTemplatesDir) };
+  } catch (err) {
+    throw notFound(`template.json của "${id}" không hợp lệ: ${err instanceof Error ? err.message : err}`);
   }
 }
 
 export async function listTemplates(): Promise<TemplateInfo[]> {
-  const entries = await fs.readdir(config.templatesDir, { withFileTypes: true }).catch(() => []);
+  const ids = new Set<string>();
+  for (const base of templateDirs()) {
+    for (const e of await fs.readdir(base, { withFileTypes: true }).catch(() => [])) {
+      if (e.isDirectory() && !e.name.startsWith('_') && ID_RE.test(e.name)) ids.add(e.name);
+    }
+  }
   const out: TemplateInfo[] = [];
-  for (const e of entries) {
-    if (!e.isDirectory() || e.name.startsWith('_') || !ID_RE.test(e.name)) continue;
-    const t = await getTemplate(e.name).catch(() => null);
+  for (const id of ids) {
+    const t = await getTemplate(id).catch(() => null);
     if (!t) continue;
-    out.push({ id: t.id, name: t.name, description: t.description, types: t.types, colors: t.colors, previewImage: t.previewImage ?? null, defaults: t.defaults });
+    out.push({ id: t.id, name: t.name, description: t.description, types: t.types, colors: t.colors, previewImage: t.previewImage ?? null, defaults: t.defaults, custom: t.custom });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
@@ -75,7 +94,8 @@ export function fill(text: string, vars: TemplateVars): string {
 }
 
 async function readCss(id: string, forWordpress: boolean): Promise<string> {
-  const parts = [path.join(config.templatesDir, '_base.css'), path.join(dir(id), 'style.css')];
+  // the shared design system always comes from the built-in folder
+  const parts = [path.join(config.templatesDir, '_base.css'), path.join(await dir(id), 'style.css')];
   if (forWordpress) parts.push(path.join(config.templatesDir, '_wp.css'));
   return (await Promise.all(parts.map((p) => fs.readFile(p, 'utf8')))).join('\n');
 }
@@ -85,7 +105,7 @@ async function readCss(id: string, forWordpress: boolean): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export async function renderStaticPage(id: string, vars: TemplateVars): Promise<string> {
-  const html = await fs.readFile(path.join(dir(id), 'index.html'), 'utf8');
+  const html = await fs.readFile(path.join(await dir(id), 'index.html'), 'utf8');
   const css = await readCss(id, false);
   return fill(html, vars).replace('{{CSS}}', () => css);
 }
@@ -401,7 +421,7 @@ export async function installWordpressTemplate(id: string, webRoot: string, vars
       await wp(`post create ${shq(file)} --post_type=page --post_status=publish --post_title=${shq(pg.title)} --post_name=${shq(pg.slug)}`);
     }
 
-    const homeHtml = await fs.readFile(path.join(dir(t.id), 'wordpress', 'home.html'), 'utf8');
+    const homeHtml = await fs.readFile(path.join(await dir(t.id), 'wordpress', 'home.html'), 'utf8');
     const homeFile = await writeContent('home.html', fillCategoryIds(fill(homeHtml, vars), catIds));
     const homeId = (await wp(`post create ${shq(homeFile)} --post_type=page --post_status=publish --post_title=${shq('Trang chủ')} --post_name=trang-chu --porcelain`)).trim();
     if (/^\d+$/.test(homeId)) {

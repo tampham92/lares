@@ -341,6 +341,7 @@ install -d -m 755 /var/www "$CONF_DIR" "$CONF_DIR/apps" /var/log/tpanel /var/log
 install -d -m 700 "$CONF_DIR/ssl" "$INSTALL_DIR"
 install -d -m 711 "$DATA_DIR"
 install -d -m 755 "$DATA_DIR/acme"
+install -d -m 755 "$DATA_DIR/templates"   # your own templates - kept across upgrades
 
 # ---- Fetch & build TPanel ----------------------------------------------------
 step "Tải mã nguồn TPanel"
@@ -430,6 +431,20 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 systemctl enable tpanel >/dev/null
+
+# Upgrade: snapshot TPanel's own state first (env/secret, certificates, SQLite, custom templates).
+# Websites, their files and MySQL databases are never touched by an upgrade.
+if [[ $UPGRADE == 1 && -f "$DATA_DIR/tpanel.db" ]]; then
+  step "Sao lưu dữ liệu TPanel trước khi cập nhật"
+  BACKUP_DIR="$DATA_DIR/backups"
+  install -d -m 700 "$BACKUP_DIR"
+  systemctl stop tpanel 2>/dev/null || true   # consistent SQLite copy (WAL files included)
+  BACKUP_FILE="$BACKUP_DIR/tpanel-$(date +%Y%m%d-%H%M%S).tar.gz"
+  (cd / && tar -czf "$BACKUP_FILE" etc/tpanel ${DATA_DIR#/}/tpanel.db* $( [[ -d "$DATA_DIR/templates" ]] && echo "${DATA_DIR#/}/templates" ))
+  chmod 600 "$BACKUP_FILE"
+  ls -1t "$BACKUP_DIR"/tpanel-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f   # keep the 5 newest
+  ok "Đã sao lưu: $BACKUP_FILE"
+fi
 systemctl restart tpanel
 # The server creates the admin account before it starts listening, so a 401 from the API means it is ready.
 ready=0
@@ -469,8 +484,9 @@ IP=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I 
 echo
 echo -e "${c_green}==============================================================${c_off}"
 if [[ $UPGRADE == 1 ]]; then
-  echo -e "${c_green} TPanel đã được nâng cấp${c_off}"
+  echo -e "${c_green} TPanel đã được nâng cấp${c_off} (website và database không bị thay đổi)"
   echo -e "  URL:  https://$IP:$TPANEL_PORT"
+  [[ -n "${BACKUP_FILE:-}" ]] && echo -e "  Bản sao lưu trước khi nâng cấp: $BACKUP_FILE"
 else
   echo -e "${c_green} Cài đặt TPanel thành công!${c_off}"
   echo -e "  URL:       https://$IP:$TPANEL_PORT   (chứng chỉ tự ký - trình duyệt sẽ cảnh báo)"

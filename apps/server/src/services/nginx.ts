@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { AppType } from '@tpanel/shared';
 import { config } from '../config.js';
 import { shq } from '../lib/shell.js';
+import { syncDevNginx } from './devNginx.js';
 import { host, type HostLogger } from './host.js';
 import { phpSocket } from './php.js';
 
@@ -185,6 +186,7 @@ export async function nginxRunning(): Promise<boolean> {
 export async function testAndReload(log?: HostLogger) {
   if (config.dryRun) {
     log?.('[dry-run] nginx -t && systemctl reload nginx');
+    await syncDevNginx(log);
     return;
   }
   const test = await host.exec(`${shq(config.nginxBin)} -t`);

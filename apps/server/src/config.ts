@@ -70,7 +70,10 @@ export const config = {
   nodeAppPortStart: Number(env('TPANEL_NODE_PORT_START', '3100')),
   /** Port-based sites (domain "localhost") get public ports from here upward. */
   sitePortStart: Number(env('TPANEL_SITE_PORT_START', '8001')),
+  /** Built-in templates shipped with TPanel (replaced on every upgrade). */
   templatesDir: path.resolve(env('TPANEL_TEMPLATES_DIR', path.resolve(process.cwd(), '../../templates'))),
+  /** Your own templates - survive upgrades; a template here overrides a built-in one with the same id. */
+  customTemplatesDir: path.resolve(env('TPANEL_CUSTOM_TEMPLATES_DIR', path.join(dataDir, 'templates'))),
   stagingDir: path.join(dataDir, 'migrations'),
   webDist: path.resolve(env('TPANEL_WEB_DIST', path.resolve(process.cwd(), '../web/dist'))),
   mysql: {

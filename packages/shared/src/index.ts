@@ -195,6 +195,8 @@ export interface TemplateInfo {
   colors: { primary: string; accent: string };
   previewImage: string | null;
   defaults: Required<Pick<Branding, 'siteName' | 'tagline' | 'phone' | 'email' | 'address'>>;
+  /** Lives in the custom templates folder (kept across upgrades). */
+  custom?: boolean;
 }
 
 export interface CreateSiteResult {

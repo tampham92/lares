@@ -64,6 +64,15 @@ function useRefreshSite(id: number) {
 }
 
 function Overview({ data }: { data: SiteDetailResponse }) {
+  return (
+    <>
+      <OverviewCards data={data} />
+      <DomainCard key={`${data.site.domain}-${data.site.listenPort}`} site={data.site} />
+    </>
+  );
+}
+
+function OverviewCards({ data }: { data: SiteDetailResponse }) {
   const { site, databases } = data;
   const refresh = useRefreshSite(site.id);
   const stats = useQuery({ queryKey: ['stats'], queryFn: () => get<SystemStats>('/api/system/stats') });
@@ -128,9 +137,11 @@ function Overview({ data }: { data: SiteDetailResponse }) {
       <div className="card stack">
         <h2>Cấu hình</h2>
         {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        {!site.listenPort && (
         <Field label="Alias (cách nhau bởi dấu phẩy)">
           <input value={aliases} onChange={(e) => setAliases(e.target.value)} />
         </Field>
+        )}
         {site.phpVersion && (
           <Field label="Phiên bản PHP">
             <select value={php} onChange={(e) => setPhp(e.target.value)}>
@@ -165,6 +176,55 @@ function Overview({ data }: { data: SiteDetailResponse }) {
           Tạm ngưng site (trả về 503)
         </Check>
       </div>
+    </div>
+  );
+}
+
+function DomainCard({ site }: { site: Site }) {
+  const refresh = useRefreshSite(site.id);
+  const [domain, setDomain] = useState(site.listenPort ? '' : site.domain);
+  const [addWww, setAddWww] = useState(true);
+  const [task, setTask] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const d = domain.trim().toLowerCase();
+  const changed = d !== '' && (site.listenPort !== null || d !== site.domain);
+
+  const submit = async () => {
+    setError(null);
+    if (!confirm(site.listenPort ? `Gán tên miền ${d}? Site sẽ không còn chạy ở port ${site.listenPort}.` : `Đổi tên miền ${site.domain} → ${d}? Chứng chỉ SSL của tên miền cũ sẽ bị gỡ.`)) return;
+    try {
+      const aliases = addWww && !d.startsWith('www.') ? [`www.${d}`] : [];
+      setTask((await put<TaskInfo>(`/api/sites/${site.id}/domain`, { domain: d, aliases })).id);
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  return (
+    <div className="card stack">
+      <h2>{site.listenPort ? 'Gán tên miền thật' : 'Tên miền'}</h2>
+      {site.listenPort ? (
+        <div className="sub">
+          Site đang chạy tạm ở <strong>{siteHref(site)}</strong>. Khi giao diện đã ổn, nhập tên miền để đưa site lên chính thức: TPanel đổi vhost sang tên miền
+          {site.appType === 'wordpress' ? ', cập nhật lại toàn bộ URL trong WordPress' : ''} và đóng port {site.listenPort}.
+        </div>
+      ) : (
+        <div className="sub">Đổi tên miền chính của site. File và database được giữ nguyên.</div>
+      )}
+      <ErrorBox error={error} />
+      <div className="row">
+        <input style={{ flex: 1, minWidth: 220 }} value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" />
+        <button className="btn primary" disabled={!changed || !!task} onClick={submit}>
+          {site.listenPort ? 'Gán tên miền' : 'Đổi tên miền'}
+        </button>
+      </div>
+      <Check checked={addWww} onChange={setAddWww}>
+        Thêm alias www.{d || 'example.com'}
+      </Check>
+      <Alert tone="info">
+        Trước hoặc sau khi gán: tạo bản ghi DNS <strong>A</strong> cho {d || 'tên miền'} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab <strong>SSL</strong>.
+      </Alert>
+      {task && <TaskLog taskId={task} onDone={(t) => t.status === 'completed' && refresh()} />}
     </div>
   );
 }

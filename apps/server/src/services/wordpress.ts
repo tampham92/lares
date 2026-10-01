@@ -103,3 +103,39 @@ export function rewriteWpConfig(src: string, db: { name: string; user: string; p
 export async function hasWpCli() {
   return host.has('wp');
 }
+
+/** Current home URL of a WordPress install (read via wp-cli as the web user), or null. */
+export async function wordpressHomeUrl(webRoot: string, home: string): Promise<string | null> {
+  if (config.dryRun || !(await host.has('wp'))) return null;
+  const r = await host.exec(wpCliAsWebUser(webRoot, home, 'option get home'));
+  const url = r.stdout.trim().split('\n').pop()?.trim() ?? '';
+  return r.code === 0 && /^https?:\/\//.test(url) ? url.replace(/\/+$/, '') : null;
+}
+
+/**
+ * Move a WordPress site to a new base URL (domain assigned, or http -> https after SSL).
+ * Runs as the web user: by now the site may contain third-party plugins/themes.
+ */
+export async function wordpressReplaceUrl(webRoot: string, home: string, to: string, log: HostLogger, from?: string | null) {
+  const current = from ?? (await wordpressHomeUrl(webRoot, home));
+  if (config.dryRun) {
+    log(`[dry-run] wp search-replace ${current ?? '<home>'} ${to}`);
+    return;
+  }
+  if (!(await host.has('wp'))) {
+    log(`Cảnh báo: không có wp-cli - hãy tự đổi "Địa chỉ WordPress" và "Địa chỉ trang" thành ${to} trong Cài đặt → Tổng quan của wp-admin`);
+    return;
+  }
+  if (!current) {
+    log('Cảnh báo: không đọc được URL hiện tại của WordPress - bỏ qua bước đổi URL');
+    return;
+  }
+  if (current === to) return;
+  const run = (args: string) => host.run(wpCliAsWebUser(webRoot, home, args), { timeoutMs: 30 * 60_000 });
+  // serialized PHP data needs wp-cli's search-replace, a plain SQL REPLACE would corrupt it
+  await run(`search-replace ${shq(current)} ${shq(to)} --all-tables-with-prefix --skip-columns=guid --precise --report-changed-only`);
+  await run(`option update home ${shq(to)}`);
+  await run(`option update siteurl ${shq(to)}`);
+  await run('cache flush').catch(() => undefined);
+  log(`Đã đổi URL WordPress: ${current} → ${to}`);
+}

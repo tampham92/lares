@@ -28,6 +28,15 @@ Installer **phát hiện và dùng lại** các dịch vụ đang có, không c�
 
 > Mặc định script lấy mã nguồn từ `https://github.com/tampham92/tpanel` (nhánh `main`). Muốn dùng fork hoặc nhánh khác: `--repo <git-url> --branch <nhánh>`, hoặc `--tarball <url .tar.gz>`.
 
+### Cập nhật TPanel có mất dữ liệu không?
+
+Không. Chạy lại đúng lệnh cài đặt; installer nhận ra `/etc/tpanel/tpanel.env` nên chuyển sang chế độ **nâng cấp**:
+
+- Chỉ thay mã nguồn trong `/opt/tpanel/src`, build lại, khởi động lại service `tpanel` (panel gián đoạn vài giây, **website vẫn chạy bình thường**).
+- Giữ nguyên: website trong `/var/www`, database MySQL, vhost nginx, SSL, service Next.js, tài khoản admin, khoá giải mã và dữ liệu SQLite trong `/var/lib/tpanel`. Cấu trúc database của TPanel được tự nâng cấp khi khởi động.
+- Trước khi khởi động lại, installer tự sao lưu `/etc/tpanel` + database SQLite + template riêng vào `/var/lib/tpanel/backups/` (giữ 5 bản gần nhất).
+- Đừng sửa trực tiếp file trong `/opt/tpanel/src` (bị ghi đè khi cập nhật); template riêng đặt ở `/var/lib/tpanel/templates/`.
+
 ### Tài khoản quản trị
 
 `install.sh` in mật khẩu `admin` một lần duy nhất. Mật khẩu chỉ được lưu dưới dạng bcrypt trong `/var/lib/tpanel/tpanel.db`; bản gốc bị xoá khỏi `tpanel.env` ngay sau khi cài.
@@ -57,8 +66,8 @@ Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và kh�
 | Nhóm        | Chi tiết                                                                                                                                                                                                                                                                                                                               |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Website      | Thêm/xoá/tạm ngưng site, alias, đổi phiên bản PHP. Loại site:**WordPress** (tự tải WP, tạo DB, wp-config, `wp core install` nếu nhập admin), **Next.js** (systemd service + Nginx reverse proxy, tự cấp port, clone từ Git, build/restart), PHP, HTML tĩnh                                              |
-| Giao diện mẫu | Khi tạo site **WordPress** hoặc **HTML tĩnh**, chọn giao diện dựng sẵn (hiện có *Bất động sản* và *Doanh nghiệp*, xem trước ngay trong panel), chỉ cần nhập tên thương hiệu, SĐT, email, địa chỉ. HTML tĩnh: trang hoàn chỉnh, responsive, có lọc dự án và form liên hệ. WordPress: block theme riêng kèm nội dung mẫu thật (bài dự án có ảnh, trang Giới thiệu/Liên hệ, menu, trang chủ), sửa được trong wp-admin; tài khoản admin tạo tự động. Thêm mẫu mới bằng một thư mục trong [templates/](templates/) |
-| Site không cần tên miền | Nhập `localhost` (hoặc để trống) thay cho tên miền: TPanel tự cấp port (từ 8001), nginx lắng nghe port đó, truy cập qua `http://IP-VPS:8001`. Tự mở port trên ufw nếu đang bật. Dạng này không cài được SSL |
+| Giao diện mẫu | Khi tạo site **WordPress** hoặc **HTML tĩnh**, chọn giao diện dựng sẵn (hiện có *Bất động sản* và *Doanh nghiệp*, xem trước ngay trong panel), chỉ cần nhập tên thương hiệu, SĐT, email, địa chỉ. HTML tĩnh: trang hoàn chỉnh, responsive, có lọc dự án và form liên hệ. WordPress: block theme riêng kèm nội dung mẫu thật (bài dự án có ảnh, trang Giới thiệu/Liên hệ, menu, trang chủ), sửa được trong wp-admin; tài khoản admin tạo tự động. Thêm mẫu riêng vào `/var/lib/tpanel/templates/` trên VPS (giữ nguyên khi cập nhật), xem [templates/README.md](templates/README.md) |
+| Site không cần tên miền | Nhập `localhost` (hoặc để trống) thay cho tên miền: TPanel tự cấp port (từ 8001), nginx lắng nghe port đó, truy cập qua `http://IP-VPS:8001`. Tự mở port trên ufw nếu đang bật. Khi giao diện đã xong, bấm **Gán tên miền thật** trong trang site: vhost chuyển sang tên miền, port được đóng, log traffic giữ nguyên, WordPress được đổi lại toàn bộ URL. Sau đó cài SSL (WordPress tự chuyển URL sang `https://`) |
 | Next.js      | Không cần database; dữ liệu JSON nằm trong thư mục app và được giữ nguyên khi deploy lại. Tự nhận npm/yarn/pnpm theo lockfile, cho sửa lệnh install/build/start, biến môi trường (`.env.production.local`, giá trị được mã hoá trong DB), xem log ứng dụng (journald)                                  |
 | SSL          | Let's Encrypt (HTTP-01 webroot dùng chung, chạy được cả với site proxy Next.js), bao gồm alias, staging, gia hạn; hoặc upload certificate riêng (kiểm tra key có khớp cert). Bật/tắt bắt buộc HTTPS + HSTS, cảnh báo khi DNS chưa trỏ về hoặc cert sắp hết hạn                                               |
 | Log traffic  | Access/error log riêng cho từng site. Thống kê theo 1h/24h/7 ngày/30 ngày: số request, IP duy nhất, băng thông, thời gian phản hồi trung bình, 2xx–5xx, biểu đồ theo giờ/ngày, top URL/IP/referrer/user-agent (đọc được cả log đã xoay vòng`.gz`). Có tail + lọc, tải về, xoá, cấu hình logrotate |
@@ -103,7 +112,9 @@ npm run typecheck
 npm run build
 ```
 
-Trên macOS/không phải Linux, `TPANEL_DRY_RUN=1` là mặc định: mọi lệnh thay đổi hệ thống (nginx reload, systemctl, certbot, mysql, chown) chỉ được **ghi log**, còn file site/vhost được ghi vào `./data`. Mật khẩu admin lần đầu được in ra log (hoặc đặt `TPANEL_ADMIN_PASSWORD`). Các biến cấu hình có trong [.env.example](.env.example).
+Nếu máy có nginx (`brew install nginx`), TPanel tự chạy một **nginx dev** (không cần root) phục vụ các site chạy theo port, nên xem được site HTML tại `http://localhost:8001`. Site WordPress/PHP chỉ chạy thật trên VPS (cần PHP-FPM + MySQL).
+
+Ngoài Linux, TPanel luôn chạy chế độ dry-run: mọi lệnh thay đổi hệ thống (nginx reload, systemctl, certbot, mysql, chown) chỉ được **ghi log**, còn file site/vhost được ghi vào `./data`. Mật khẩu admin lần đầu được in ra log (hoặc đặt `TPANEL_ADMIN_PASSWORD`). Các biến cấu hình có trong [.env.example](.env.example).
 
 ## Cấu trúc
 

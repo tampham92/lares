@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { LOG_TYPES, createSiteSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@tpanel/shared';
+import { LOG_TYPES, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@tpanel/shared';
 import { requireAuth } from '../auth/index.js';
 import { badRequest } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
@@ -50,6 +50,13 @@ export async function siteRoutes(app: FastifyInstance) {
   app.patch('/api/sites/:id', async (req) => {
     const patch = parse(siteSettingsSchema, req.body);
     return sites.updateSite(idParam(req.params), patch);
+  });
+
+  app.put('/api/sites/:id/domain', async (req) => {
+    const id = idParam(req.params);
+    const input = parse(z.object({ domain: domainSchema, aliases: z.array(domainSchema).default([]) }), req.body);
+    const site = sites.getSite(id);
+    return startTask(`Gán tên miền ${input.domain} cho ${site.domain}`, (log) => sites.changeDomain(id, input, log));
   });
 
   app.delete('/api/sites/:id', async (req) => {
