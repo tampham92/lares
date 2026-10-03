@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { APP_LABELS, type Site } from '@tpanel/shared';
 import { fmtDate, get, siteHref, siteLabel } from '../api';
 import { Badge, ErrorBox } from '../components/ui';
+import { WpAdminButton } from '../components/WpAdminButton';
 
 export function Sites() {
   const q = useQuery({ queryKey: ['sites'], queryFn: () => get<Site[]>('/api/sites') });
@@ -33,6 +34,7 @@ export function Sites() {
               <th>SSL</th>
               <th>Trạng thái</th>
               <th>Tạo lúc</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -65,6 +67,7 @@ export function Sites() {
                 </td>
                 <td>{s.status === 'active' ? <Badge tone="ok">Hoạt động</Badge> : <Badge tone="warn">Tạm ngưng</Badge>}</td>
                 <td className="sub">{fmtDate(s.createdAt)}</td>
+                <td>{s.appType === 'wordpress' && <WpAdminButton siteId={s.id} className="btn sm" />}</td>
               </tr>
             ))}
           </tbody>

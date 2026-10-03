@@ -75,8 +75,9 @@ export async function serverIdentity(): Promise<string | null> {
 }
 
 /** Temp client option file so passwords never show up in `ps`. Defaults to the admin account. */
+let cnfSeq = 0;
 async function withDefaultsFile<T>(fn: (file: string) => Promise<T>, creds = { user: config.mysql.user, password: config.mysql.password }): Promise<T> {
-  const file = path.join(config.dataDir, `.my-${process.pid}-${Date.now()}.cnf`);
+  const file = path.join(config.dataDir, `.my-${process.pid}-${Date.now()}-${++cnfSeq}.cnf`);
   const lines = ['[client]', `user=${creds.user}`, `password="${creds.password.replace(/(["\\])/g, '\\$1')}"`];
   if (config.mysql.socketPath) lines.push(`socket=${config.mysql.socketPath}`);
   else lines.push(`host=${config.mysql.host}`, `port=${config.mysql.port}`);
@@ -87,6 +88,15 @@ async function withDefaultsFile<T>(fn: (file: string) => Promise<T>, creds = { u
     await fs.rm(file, { force: true });
   }
 }
+
+/** Dumps are replayed as a site user: drop DEFINER clauses, map collations only MySQL 8 / MariaDB 11 know. */
+const DUMP_FILTER = `sed -E ${[
+  's/DEFINER=`[^`]+`@`[^`]+`//g',
+  's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g',
+  's/utf8mb4_uca1400_ai_ci/utf8mb4_unicode_ci/g',
+]
+  .map((e) => `-e ${shq(e)}`)
+  .join(' ')}`;
 
 /**
  * Import a gzipped dump. DEFINER clauses are stripped (the original definer user does not exist here)
@@ -103,24 +113,55 @@ export async function importGzipDump(
   opts: { signal?: AbortSignal; log?: HostLogger } = {},
 ) {
   assertIdent(dbName, 'Tên database');
-  const sed = [
-    's/DEFINER=`[^`]+`@`[^`]+`//g',
-    's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g',
-    's/utf8mb4_uca1400_ai_ci/utf8mb4_unicode_ci/g',
-  ]
-    .map((e) => `-e ${shq(e)}`)
-    .join(' ');
   if (config.dryRun) {
     opts.log?.(`[dry-run] gunzip -c ${dumpFile} | sed ... | mysql ${dbName}`);
     return;
   }
   await withDefaultsFile(
     (cnf) =>
-      host.run(`gunzip -c ${shq(dumpFile)} | sed -E ${sed} | mysql --defaults-extra-file=${shq(cnf)} --default-character-set=utf8mb4 ${shq(dbName)}`, {
+      host.run(`gunzip -c ${shq(dumpFile)} | ${DUMP_FILTER} | mysql --defaults-extra-file=${shq(cnf)} --default-character-set=utf8mb4 ${shq(dbName)}`, {
         signal: opts.signal,
       }),
     creds,
   );
+}
+
+/**
+ * Copy a database of this server into another one (site cloning): dumped with the admin account,
+ * replayed with the target's own user, as with importGzipDump. Routines are dropped when the
+ * target user may not create them (binary logging without log_bin_trust_function_creators).
+ */
+export async function copyDatabase(
+  src: string,
+  dst: string,
+  dstCreds: { user: string; password: string },
+  dumpFlags: string[],
+  log?: HostLogger,
+) {
+  assertIdent(src, 'Tên database');
+  assertIdent(dst, 'Tên database');
+  if (config.dryRun) {
+    log?.(`[dry-run] mysqldump ${src} | mysql ${dst}`);
+    return;
+  }
+  const copy = (flags: string[]) =>
+    withDefaultsFile((adminCnf) =>
+      withDefaultsFile(
+        (dstCnf) =>
+          host.run(
+            `mysqldump --defaults-extra-file=${shq(adminCnf)} ${flags.join(' ')} ${shq(src)} | ${DUMP_FILTER} | mysql --defaults-extra-file=${shq(dstCnf)} --default-character-set=utf8mb4 ${shq(dst)}`,
+            { timeoutMs: 6 * 3_600_000 },
+          ),
+        dstCreds,
+      ),
+    );
+  try {
+    await copy([...dumpFlags, '--routines']);
+  } catch (err) {
+    if (!/routine|PROCEDURE|FUNCTION|SUPER|log_bin_trust/i.test(err instanceof Error ? err.message : String(err))) throw err;
+    log?.('Không tạo được stored procedure/function trong database mới → sao chép lại không kèm routines');
+    await copy(dumpFlags);
+  }
 }
 
 export async function closeMysql() {

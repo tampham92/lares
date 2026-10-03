@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { APP_LABELS, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@tpanel/shared';
+import { APP_LABELS, LOCALHOST, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@tpanel/shared';
 import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
+import { AiWriter } from '../components/AiWriter';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
+import { WpAdminButton } from '../components/WpAdminButton';
 
 interface SiteDetailResponse {
   site: Site;
@@ -12,10 +14,15 @@ interface SiteDetailResponse {
   nodeConfig: { gitUrl?: string; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
-type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'danger';
+type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'clone' | 'danger';
 
 export function SiteDetail() {
   const id = Number(useParams().id);
+  // fresh state (tab, forms) when navigating from one site to another, e.g. to a new clone
+  return <SitePage key={id} id={id} />;
+}
+
+function SitePage({ id }: { id: number }) {
   const q = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetailResponse>(`/api/sites/${id}`) });
   const [tab, setTab] = useState<Tab>('overview');
   if (q.error) return <ErrorBox error={q.error} />;
@@ -26,6 +33,8 @@ export function SiteDetail() {
     ['ssl', 'SSL'],
     ['logs', 'Log traffic'],
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
+    ...(site.appType === 'wordpress' ? ([['ai', 'Viết bài AI']] as Array<[Tab, string]>) : []),
+    ['clone', 'Nhân bản'],
     ['danger', 'Xoá site'],
   ];
   return (
@@ -44,12 +53,20 @@ export function SiteDetail() {
             {site.listenPort && <Badge tone="info">chạy theo port {site.listenPort}</Badge>}
           </div>
         </div>
+        <div className="row">
+          <a className="btn" href={siteHref(site)} target="_blank" rel="noreferrer">
+            Mở website ↗
+          </a>
+          {site.appType === 'wordpress' && <WpAdminButton siteId={site.id} className="btn primary" />}
+        </div>
       </div>
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab === 'overview' && <Overview data={q.data} />}
       {tab === 'ssl' && <SslTab site={site} />}
       {tab === 'logs' && <LogsTab site={site} />}
       {tab === 'nextjs' && <NextTab data={q.data} />}
+      {tab === 'ai' && <AiWriter site={site} />}
+      {tab === 'clone' && <CloneTab site={site} dbs={q.data.databases} />}
       {tab === 'danger' && <DangerTab site={site} dbs={q.data.databases} />}
     </>
   );
@@ -677,6 +694,127 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
             Lưu cấu hình
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const CLONE_NOTES: Partial<Record<Site['appType'], string>> = {
+  wordpress: 'WordPress: database được sao chép sang database mới, wp-config.php trỏ sang database đó và toàn bộ URL được đổi sang địa chỉ mới.',
+  nextjs: 'Next.js: chạy bằng service riêng trên port nội bộ mới, dùng lại bản build và biến môi trường của site nguồn.',
+  laravel: 'Laravel: .env được cập nhật DB_* và APP_URL theo database và địa chỉ mới.',
+  php: 'PHP: nếu dùng .env, DB_* và APP_URL được cập nhật; cấu hình database ở file khác cần sửa tay.',
+};
+
+function CloneTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const [domain, setDomain] = useState('');
+  const [listenPort, setListenPort] = useState('');
+  const [addWww, setAddWww] = useState(true);
+  const [task, setTask] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<CreateSiteResult | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const d = domain.trim().toLowerCase();
+  const portMode = d === '' || d === LOCALHOST;
+
+  const submit = async () => {
+    setError(null);
+    setResult(null);
+    const body: Record<string, unknown> = {
+      domain: d || LOCALHOST,
+      aliases: !portMode && addWww && !d.startsWith('www.') ? [`www.${d}`] : [],
+      publicHost: window.location.hostname,
+    };
+    if (portMode && listenPort) body.listenPort = Number(listenPort);
+    try {
+      setTask((await post<TaskInfo>(`/api/sites/${site.id}/clone`, body)).id);
+      setRunning(true);
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  return (
+    <div className="grid cols-2">
+      <div className="card stack">
+        <h2>Nhân bản site</h2>
+        <div className="sub">
+          Tạo một site mới giống hệt <strong>{siteLabel(site)}</strong> để thử giao diện, plugin hay làm staging. Site hiện tại không bị thay đổi.
+        </div>
+        <ErrorBox error={error} />
+        <div className="form-grid">
+          <Field label="Tên miền cho bản sao" hint={<>Để trống (hoặc nhập <code>localhost</code>) để chạy qua http://{window.location.hostname}:PORT</>}>
+            <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="staging.example.com" />
+          </Field>
+          {portMode && (
+            <Field label="Port" hint="Bỏ trống để TPanel tự chọn port trống (từ 8001)">
+              <input type="number" min={1024} max={65535} value={listenPort} onChange={(e) => setListenPort(e.target.value)} placeholder="tự động" />
+            </Field>
+          )}
+        </div>
+        {!portMode && (
+          <Check checked={addWww} onChange={setAddWww}>
+            Thêm alias www.{d}
+          </Check>
+        )}
+        <div className="row end">
+          <button className="btn primary" disabled={running} onClick={submit}>
+            Nhân bản
+          </button>
+        </div>
+        {result && (
+          <Alert tone="ok">
+            Đã tạo bản sao tại{' '}
+            <a href={result.url} target="_blank" rel="noreferrer">
+              <strong>{result.url}</strong>
+            </a>
+            {result.database && (
+              <>
+                {' '}
+                · database <code>{result.database.name}</code>
+              </>
+            )}
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="btn sm primary" onClick={() => nav(`/sites/${result.site.id}`)}>
+                Quản lý site mới
+              </button>
+            </div>
+          </Alert>
+        )}
+        {task && (
+          <TaskLog
+            taskId={task}
+            onDone={(t) => {
+              setRunning(false);
+              void qc.invalidateQueries({ queryKey: ['sites'] });
+              if (t.status === 'completed') setResult(t.result as CreateSiteResult);
+            }}
+          />
+        )}
+      </div>
+      <div className="card stack">
+        <h2>Những gì được sao chép</h2>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>
+            Toàn bộ thư mục <code>{site.rootPath}</code>
+          </li>
+          {dbs.length > 0 || site.appType === 'wordpress' ? (
+            <li>Database: {dbs.map((x) => x.name).join(', ') || 'database trong wp-config.php'} → database mới, user và mật khẩu mới</li>
+          ) : null}
+          {site.phpVersion && <li>Phiên bản PHP {site.phpVersion}</li>}
+          {CLONE_NOTES[site.appType] && <li>{CLONE_NOTES[site.appType]}</li>}
+        </ul>
+        <h3>Không sao chép</h3>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>Chứng chỉ SSL: bản sao chạy HTTP, cài SSL ở tab SSL của site mới</li>
+          <li>Log traffic</li>
+          <li>Alias của site nguồn</li>
+        </ul>
+        {site.appType === 'wordpress' && (
+          <Alert tone="info">Đăng nhập wp-admin của bản sao bằng tài khoản WordPress của site nguồn.</Alert>
+        )}
       </div>
     </div>
   );

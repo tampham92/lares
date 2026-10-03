@@ -167,4 +167,11 @@ describe('WordPress URL move', async () => {
       ['http://a.vn', 'https://a.vn'],
     ]);
   });
+  it('https site cloned to a new domain without certificate goes back to http', () => {
+    expect(urlReplacePairs('https://a.vn', 'http://b.vn')).toEqual([
+      ['//a.vn', '//b.vn'],
+      ['\\/\\/a.vn', '\\/\\/b.vn'],
+      ['https://b.vn', 'http://b.vn'],
+    ]);
+  });
 });

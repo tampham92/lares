@@ -146,6 +146,8 @@ export function urlReplacePairs(from: string, to: string): Array<[string, string
   }
   // going https: links that were written as http:// would be blocked as mixed content
   if (to.startsWith('https://')) pairs.push([`http:${strip(to)}`, `https:${strip(to)}`]);
+  // leaving https (new domain / clone has no certificate yet): https:// links would hit no certificate
+  else if (to.startsWith('http://') && from.startsWith('https://')) pairs.push([`https:${strip(to)}`, `http:${strip(to)}`]);
   return pairs;
 }
 

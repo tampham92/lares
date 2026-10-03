@@ -152,6 +152,10 @@ export const createSiteSchema = z.discriminatedUnion('type', [
 ]);
 export type CreateSiteInput = z.infer<typeof createSiteSchema>;
 
+/** Copy of an existing site (files, databases, settings) under a new domain or port. */
+export const cloneSiteSchema = z.object(siteBase);
+export type CloneSiteInput = z.infer<typeof cloneSiteSchema>;
+
 export const deleteSiteSchema = z.object({
   removeFiles: z.boolean().default(false),
   removeDatabases: z.boolean().default(false),
@@ -281,6 +285,124 @@ export const logrotateSchema = z.object({
   maxSizeMb: z.coerce.number().int().min(1).max(10240).optional(),
 });
 export type LogrotateSettings = z.infer<typeof logrotateSchema>;
+
+// ---------------------------------------------------------------------------
+// AI writing (WordPress posts)
+// ---------------------------------------------------------------------------
+
+export const AI_PROVIDERS = ['anthropic', 'gemini', 'openai'] as const;
+export type AiProvider = (typeof AI_PROVIDERS)[number];
+
+export const AI_PROVIDER_LABELS: Record<AiProvider, string> = {
+  anthropic: 'Claude (Anthropic)',
+  gemini: 'Gemini (Google)',
+  openai: 'OpenAI / API tương thích OpenAI',
+};
+
+export const ANTHROPIC_MODELS = [
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (khuyên dùng)' },
+  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (chất lượng cao nhất)' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (nhanh, rẻ)' },
+] as const;
+
+export const GEMINI_MODELS = [
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (khuyên dùng)' },
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview (chất lượng cao nhất)' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (nhanh, rẻ)' },
+] as const;
+
+/** Model choices offered in Settings; OpenAI-compatible endpoints take a free-form model name. */
+export const AI_MODELS: Partial<Record<AiProvider, ReadonlyArray<{ id: string; label: string }>>> = { anthropic: ANTHROPIC_MODELS, gemini: GEMINI_MODELS };
+
+export const aiSettingsSchema = z.object({
+  provider: z.enum(AI_PROVIDERS),
+  /** Empty = keep the stored key. */
+  apiKey: z
+    .string()
+    .trim()
+    .max(500)
+    .regex(/^[^\s]*$/, 'API key không được chứa khoảng trắng')
+    .optional(),
+  model: z.string().trim().regex(/^[\w.:\-/]{1,100}$/, 'Tên model không hợp lệ'),
+  /** OpenAI-compatible endpoint (DeepSeek, OpenRouter, Gemini...). Empty = api.openai.com */
+  baseUrl: z
+    .string()
+    .trim()
+    .regex(/^https:\/\/[^\s'"`<>]+$/, 'Base URL phải bắt đầu bằng https://')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+});
+export type AiSettingsInput = z.infer<typeof aiSettingsSchema>;
+
+/** What the browser gets back: never the key itself. */
+export interface AiSettingsView {
+  provider: AiProvider;
+  model: string;
+  baseUrl: string | null;
+  hasKey: boolean;
+  keyHint: string | null;
+}
+
+export const ARTICLE_TONES = {
+  'chuyen-nghiep': 'Chuyên nghiệp',
+  'than-thien': 'Thân thiện, gần gũi',
+  'thuyet-phuc': 'Thuyết phục (bán hàng)',
+  'chuyen-gia': 'Chuyên gia, chuyên sâu',
+} as const;
+export type ArticleTone = keyof typeof ARTICLE_TONES;
+
+export const articleRequestSchema = z.object({
+  topic: z.string().trim().min(3, 'Nhập chủ đề bài viết').max(500),
+  keyword: z.string().trim().min(2, 'Nhập từ khoá chính').max(100),
+  secondaryKeywords: z.array(z.string().trim().min(1).max(100)).max(10).default([]),
+  language: z.enum(['vi', 'en']).default('vi'),
+  tone: z.enum(Object.keys(ARTICLE_TONES) as [ArticleTone, ...ArticleTone[]]).default('chuyen-nghiep'),
+  words: z.coerce.number().int().min(300).max(4000).default(1200),
+  audience: z.string().trim().max(200).optional(),
+  instructions: z.string().trim().max(2000).optional(),
+  includeFaq: z.boolean().default(true),
+});
+export type ArticleRequest = z.infer<typeof articleRequestSchema>;
+
+export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export const articleSchema = z.object({
+  title: z.string().trim().min(1, 'Thiếu tiêu đề').max(200),
+  slug: z.string().trim().max(190).regex(SLUG_RE, 'Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang').or(z.literal('')),
+  metaDescription: z.string().trim().max(320).default(''),
+  focusKeyword: z.string().trim().max(100).default(''),
+  excerpt: z.string().trim().max(1000).default(''),
+  contentHtml: z.string().trim().min(1, 'Thiếu nội dung').max(300_000),
+  tags: z.array(z.string().trim().min(1).max(60).regex(/^[^,<>]+$/)).max(20).default([]),
+});
+export type Article = z.infer<typeof articleSchema>;
+
+export const publishArticleSchema = articleSchema.extend({
+  categoryIds: z.array(z.number().int().positive()).max(20).default([]),
+  status: z.enum(['draft', 'publish']).default('draft'),
+});
+export type PublishArticleInput = z.infer<typeof publishArticleSchema>;
+
+export interface WpCategory {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export interface PublishedPost {
+  id: number;
+  url: string;
+  editUrl: string;
+  status: string;
+}
+
+/** wp-admin page to land on after a one-click login, relative to /wp-admin/ (e.g. "post.php?post=5&action=edit"). */
+export const wpAdminTargetSchema = z
+  .string()
+  .trim()
+  .max(200)
+  .regex(/^[\w.\-]*(\?[\w.\-=&%]*)?$/, 'Trang quản trị không hợp lệ')
+  .default('');
 
 // ---------------------------------------------------------------------------
 // Databases

@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { LOG_TYPES, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@tpanel/shared';
+import { LOCALHOST, LOG_TYPES, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@tpanel/shared';
 import { requireAuth } from '../auth/index.js';
 import { badRequest } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
+import { cloneSite } from '../services/clone.js';
 import * as databases from '../services/databases.js';
 import { tailFile, trafficStats, truncateLog } from '../services/logs.js';
 import { siteLogPaths } from '../services/nginx.js';
@@ -45,6 +46,16 @@ export async function siteRoutes(app: FastifyInstance) {
     // Port-based sites are opened as http://<the host the admin is using>:<port>
     input.publicHost ||= req.hostname.replace(/:\d+$/, '');
     return startTask(`Tạo site ${input.domain}`, (log) => sites.createSite(input, log));
+  });
+
+  app.post('/api/sites/:id/clone', async (req) => {
+    const id = idParam(req.params);
+    const input = parse(cloneSiteSchema, req.body);
+    const site = sites.getSite(id);
+    if (sites.findSiteByHostname(input.domain)) throw badRequest(`${input.domain} đã tồn tại`);
+    input.publicHost ||= req.hostname.replace(/:\d+$/, '');
+    const target = input.domain === LOCALHOST ? `port ${input.listenPort ?? 'mới'}` : input.domain;
+    return startTask(`Nhân bản ${site.domain} → ${target}`, (log) => cloneSite(id, input, log));
   });
 
   app.patch('/api/sites/:id', async (req) => {

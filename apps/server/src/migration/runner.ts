@@ -15,7 +15,7 @@ import { nowIso } from '../db/index.js';
 import { localExecutor, type Executor } from '../executors/index.js';
 import { randomSuffix, sha256File } from '../lib/crypto.js';
 import { errorMessage } from '../lib/errors.js';
-import { shq } from '../lib/shell.js';
+import { duKb, shq, tarCreate, tarExcludes } from '../lib/shell.js';
 import { UndoStack } from '../lib/undo.js';
 import * as databases from '../services/databases.js';
 import { host } from '../services/host.js';
@@ -80,25 +80,6 @@ const fmtBytes = (n: number) => {
   }
   return `${n.toFixed(i ? 1 : 0)} ${u[i]}`;
 };
-
-/**
- * `tar -cf - .` of a live site. GNU tar exits 1 when files change while being read, which is fine for a
- * running site; the flag and the tolerance only apply to GNU tar (BSD tar uses exit 1 for real errors).
- */
-function tarCreate(root: string, excludes: string): string {
-  return `( if tar --version 2>/dev/null | grep -q GNU; then tar --warning=no-file-changed -C ${shq(root)} ${excludes} -cf - .; rc=$?; [ $rc -eq 1 ] && exit 0; exit $rc; else tar -C ${shq(root)} ${excludes} -cf - .; fi )`;
-}
-
-const duKb = (dir: string) =>
-  `{ if command -v timeout >/dev/null 2>&1; then timeout 120 du -sk ${shq(dir)}; else du -sk ${shq(dir)}; fi; } 2>/dev/null | cut -f1`;
-
-function tarExcludes(patterns: string[]): string {
-  return patterns
-    .map((p) => p.replace(/^\.?\/+/, '').replace(/\/+$/, ''))
-    .filter(Boolean)
-    .map((p) => `--exclude=${shq(p.startsWith('*') ? p : `./${p}`)}`)
-    .join(' ');
-}
 
 export class MigrationRunner {
   private active = new Map<number, AbortController>();
