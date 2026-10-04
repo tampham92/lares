@@ -9,8 +9,7 @@ import { host, type HostLogger } from './host.js';
 type PM = Exclude<PackageManager, 'auto'>;
 export type NodeAppConfig = Omit<NextjsConfig, 'gitUrl' | 'branch'> & { gitUrl?: string; branch?: string };
 
-// Old prefix kept from before the rename to Lares: running apps' systemd units already use it.
-export const serviceName = (domain: string) => `tpanel-app-${domain.replace(/[^a-z0-9.-]/gi, '-')}`;
+export const serviceName = (domain: string) => `lares-app-${domain.replace(/[^a-z0-9.-]/gi, '-')}`;
 const unitPath = (domain: string) => path.join(config.systemdDir, `${serviceName(domain)}.service`);
 const startScriptPath = (domain: string) => path.join(config.appsConfDir, `${domain}.start.sh`);
 

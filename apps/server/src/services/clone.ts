@@ -18,7 +18,7 @@ import * as sites from './sites.js';
 import { ensurePortHostFix, rewriteWpConfig, wordpressReplaceUrl } from './wordpress.js';
 
 /** Caches in the site's home dir (HOME of the web user) and Next.js build cache: rebuilt on demand. */
-const CLONE_EXCLUDES = ['.npm', '.cache', '.pnpm-store', 'app/.next/cache', '.tpanel-sso.json'];
+const CLONE_EXCLUDES = ['.npm', '.cache', '.pnpm-store', 'app/.next/cache', '.lares-sso.json'];
 
 type DbTarget = { name: string; user: string; password: string; host: string };
 

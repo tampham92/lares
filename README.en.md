@@ -2,8 +2,6 @@
 
 **Lares Panel by [ThoCode](https://thocode.dev)** · Tiếng Việt: [README.md](README.md)
 
-> Formerly TPanel. On a server that runs TPanel, just run the install command again: the installer moves the data to Lares (`/etc/lares`, `/var/lib/lares`, service `lares`) and keeps every site.
-
 A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **WordPress** and **Next.js** websites (plus plain PHP and static HTML), SSL, traffic logs, databases, and **migrate sites from another VPS/panel**.
 
 ## Installation
@@ -83,7 +81,7 @@ Neither mode removes nginx/MariaDB/MySQL/PHP/Node.js, and neither touches sites 
 | Sites without a domain | Enter `localhost` (or leave it empty) instead of a domain: Lares assigns a port (from 8001), nginx listens on it, and the site is reachable at `http://VPS-IP:8001`. The port is opened in ufw if it is active. Once the design is done, click **Assign a domain** on the site page: the vhost switches to the domain, the port is closed, traffic logs are kept, and every WordPress URL is rewritten. Then install SSL (WordPress switches its URLs to `https://` automatically) |
 | Clone site | The **Clone** tab on the site page: copy the site to another domain or a new port (for staging, trying plugins/themes). The whole site directory and database are copied to a new database (new user/password). WordPress: wp-config points to the new database and every URL is changed to the new address. Laravel/PHP: `DB_*` and `APP_URL` in `.env` are updated. Next.js: its own service on a new internal port. The source site is not modified; a failure midway rolls back automatically |
 | AI Writer (WordPress) | The **AI Writer** tab of a WordPress site: enter a topic + keyword and the AI (Claude, Gemini or OpenAI/compatible API) writes an SEO-ready article: title ≤ 60 characters, slug, meta description, H2/H3, FAQ, internal links to existing posts. Preview, edit, watch the SEO checklist update live, then save as draft or publish directly (with categories, tags, and meta for Yoast SEO / Rank Math). Publishing needs wp-cli |
-| One-click WP Admin login | The **WP Admin** button in the site list and on the site page opens wp-admin already logged in (as the first administrator), no password needed. The link is single-use and expires after 60 seconds (mu-plugin `tpanel-sso.php`, the token is stored only as SHA-256 outside the web root) |
+| One-click WP Admin login | The **WP Admin** button in the site list and on the site page opens wp-admin already logged in (as the first administrator), no password needed. The link is single-use and expires after 60 seconds (mu-plugin `lares-sso.php`, the token is stored only as SHA-256 outside the web root) |
 | AI API key | **Settings → AI Writer**: choose the provider and model, enter the API key (encrypted with AES-256-GCM in SQLite, never sent back to the browser), connection test button |
 | Next.js | No database required; JSON data lives in the app directory and is kept across redeploys. Detects npm/yarn/pnpm from the lockfile, lets you edit the install/build/start commands and environment variables (`.env.production.local`, values encrypted in the DB), and shows the application log (journald) |
 | SSL | Let's Encrypt (shared HTTP-01 webroot, works with Next.js proxy sites too), including aliases, staging, renewal; or upload your own certificate (checks that the key matches). Toggle forced HTTPS + HSTS, warnings when DNS does not point here yet or a certificate is about to expire |
@@ -147,7 +145,7 @@ apps/web             React 19 + Vite + TanStack Query
 install.sh           One-command installer
 ```
 
-Locations on the VPS: data `/var/lib/lares` (SQLite, secret), sites `/var/www/<domain>/{public_html|app}`, logs `/var/log/lares/sites/<domain>/`, vhosts `/etc/nginx/sites-available/<domain>.conf`, Next.js services `tpanel-app-<domain>.service`.
+Locations on the VPS: data `/var/lib/lares` (SQLite, secret), sites `/var/www/<domain>/{public_html|app}`, logs `/var/log/lares/sites/<domain>/`, vhosts `/etc/nginx/sites-available/<domain>.conf`, Next.js services `lares-app-<domain>.service`.
 
 ## Security
 

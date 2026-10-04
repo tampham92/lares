@@ -11,9 +11,8 @@ for (const f of [envFile, rootEnvFile]) {
   }
 }
 
-// Installs from before the rename to Lares use TPANEL_* names. install.sh renames them; a local .env may not.
 const env = (key: string, fallback = ''): string => {
-  const v = process.env[key] ?? process.env[key.replace(/^LARES_/, 'TPANEL_')];
+  const v = process.env[key];
   return v === undefined || v === '' ? fallback : v;
 };
 

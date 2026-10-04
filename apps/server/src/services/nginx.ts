@@ -29,23 +29,17 @@ export const siteLogPaths = (domain: string) => {
   return { dir, access: path.join(dir, 'access.log'), error: path.join(dir, 'error.log') };
 };
 
-/**
- * http{}-level config shared by every Lares vhost (log format with $request_time, websocket map).
- * The `tpanel` names predate the rename to Lares and stay: existing vhosts reference them.
- */
+/** http{}-level config shared by every Lares vhost (log format with $request_time, websocket map). */
 export const GLOBAL_CONF = `# Managed by Lares
-log_format tpanel '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time';
+log_format lares '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time';
 
-map $http_upgrade $tpanel_connection_upgrade {
+map $http_upgrade $lares_connection_upgrade {
     default upgrade;
     ''      close;
 }
 `;
 
 export async function ensureGlobalConfig(log?: HostLogger) {
-  // Installs from before the rename to Lares wrote 00-tpanel.conf; a second copy would define log_format twice.
-  const legacy = path.join(path.dirname(config.nginxGlobalConf), path.basename(config.nginxGlobalConf).replace('lares', 'tpanel'));
-  if (legacy !== config.nginxGlobalConf && (await fs.stat(legacy).catch(() => null))) await host.mutate(`rm -f ${shq(legacy)}`);
   const current = await fs.readFile(config.nginxGlobalConf, 'utf8').catch(() => '');
   if (current === GLOBAL_CONF) return;
   await host.writeFile(config.nginxGlobalConf, GLOBAL_CONF);
@@ -69,7 +63,7 @@ function acmeLocation(): string {
 function appBody(spec: VhostSpec): string {
   const logs = siteLogPaths(spec.domain);
   const common = [
-    spec.accessLog ? `access_log ${logs.access} tpanel;` : 'access_log off;',
+    spec.accessLog ? `access_log ${logs.access} lares;` : 'access_log off;',
     `error_log ${logs.error} warn;`,
     'client_max_body_size 256m;',
     '',
@@ -91,7 +85,7 @@ proxy_set_header X-Real-IP $remote_addr;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header Upgrade $http_upgrade;
-proxy_set_header Connection $tpanel_connection_upgrade;
+proxy_set_header Connection $lares_connection_upgrade;
 proxy_read_timeout 300s;`;
     return [
       ...common,

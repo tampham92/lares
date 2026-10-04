@@ -2,8 +2,6 @@
 
 **Lares Panel by [ThoCode](https://thocode.dev)** · English: [README.en.md](README.en.md)
 
-> Trước đây tên là TPanel. Máy đã cài TPanel chỉ cần chạy lại lệnh cài đặt: installer tự chuyển dữ liệu sang Lares (`/etc/lares`, `/var/lib/lares`, service `lares`) và giữ nguyên các site.
-
 Hosting control panel viết bằng TypeScript cho VPS Ubuntu/Debian: quản lý website **WordPress** và **Next.js** (cùng PHP thuần, HTML tĩnh), SSL, log traffic, database, và **chuyển site từ VPS/panel khác về**.
 
 ## Cài đặt
@@ -85,7 +83,7 @@ Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và kh�
 | Site không cần tên miền | Nhập `localhost` (hoặc để trống) thay cho tên miền: Lares tự cấp port (từ 8001), nginx lắng nghe port đó, truy cập qua `http://IP-VPS:8001`. Tự mở port trên ufw nếu đang bật. Khi giao diện đã xong, bấm **Gán tên miền thật** trong trang site: vhost chuyển sang tên miền, port được đóng, log traffic giữ nguyên, WordPress được đổi lại toàn bộ URL. Sau đó cài SSL (WordPress tự chuyển URL sang `https://`) |
 | Nhân bản site | Tab **Nhân bản** trong trang site: tạo bản sao sang tên miền khác hoặc port mới (làm staging, thử plugin/giao diện). Sao chép toàn bộ thư mục site và database sang database mới (user/mật khẩu mới). WordPress: wp-config trỏ sang database mới, toàn bộ URL đổi sang địa chỉ mới. Laravel/PHP: cập nhật `DB_*`, `APP_URL` trong `.env`. Next.js: service riêng trên port nội bộ mới. Site nguồn không bị thay đổi, lỗi giữa chừng thì tự rollback |
 | Viết bài AI (WordPress) | Tab **Viết bài AI** trong site WordPress: nhập chủ đề + từ khoá, AI (Claude, Gemini hoặc OpenAI/API tương thích) viết bài chuẩn SEO: tiêu đề ≤ 60 ký tự, slug, meta description, H2/H3, FAQ, liên kết nội bộ tới bài sẵn có. Xem trước, sửa, bảng kiểm tra SEO cập nhật trực tiếp, rồi lưu nháp hoặc đăng thẳng (kèm danh mục, thẻ, meta cho Yoast SEO / Rank Math). Cần wp-cli để đăng |
-| Đăng nhập WP Admin một chạm | Nút **WP Admin** ở danh sách site và trang site: mở wp-admin đã đăng nhập sẵn (tài khoản administrator đầu tiên), không cần mật khẩu. Link dùng một lần, hết hạn sau 60 giây (mu-plugin `tpanel-sso.php`, token chỉ lưu dạng SHA-256 ngoài web root) |
+| Đăng nhập WP Admin một chạm | Nút **WP Admin** ở danh sách site và trang site: mở wp-admin đã đăng nhập sẵn (tài khoản administrator đầu tiên), không cần mật khẩu. Link dùng một lần, hết hạn sau 60 giây (mu-plugin `lares-sso.php`, token chỉ lưu dạng SHA-256 ngoài web root) |
 | API key AI | **Cài đặt → AI viết bài**: chọn nhà cung cấp, model, nhập API key (mã hoá AES-256-GCM trong SQLite, không bao giờ trả về trình duyệt), nút kiểm tra kết nối |
 | Next.js      | Không cần database; dữ liệu JSON nằm trong thư mục app và được giữ nguyên khi deploy lại. Tự nhận npm/yarn/pnpm theo lockfile, cho sửa lệnh install/build/start, biến môi trường (`.env.production.local`, giá trị được mã hoá trong DB), xem log ứng dụng (journald)                                  |
 | SSL          | Let's Encrypt (HTTP-01 webroot dùng chung, chạy được cả với site proxy Next.js), bao gồm alias, staging, gia hạn; hoặc upload certificate riêng (kiểm tra key có khớp cert). Bật/tắt bắt buộc HTTPS + HSTS, cảnh báo khi DNS chưa trỏ về hoặc cert sắp hết hạn                                               |
@@ -149,7 +147,7 @@ apps/web             React 19 + Vite + TanStack Query
 install.sh           Bộ cài 1 lệnh
 ```
 
-Nơi lưu trên VPS: dữ liệu `/var/lib/lares` (SQLite, secret), site `/var/www/<domain>/{public_html|app}`, log `/var/log/lares/sites/<domain>/`, vhost `/etc/nginx/sites-available/<domain>.conf`, service Next.js `tpanel-app-<domain>.service`.
+Nơi lưu trên VPS: dữ liệu `/var/lib/lares` (SQLite, secret), site `/var/www/<domain>/{public_html|app}`, log `/var/log/lares/sites/<domain>/`, vhost `/etc/nginx/sites-available/<domain>.conf`, service Next.js `lares-app-<domain>.service`.
 
 ## Bảo mật
 

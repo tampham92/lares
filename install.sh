@@ -47,8 +47,8 @@ for a in "$@"; do
   prev="$a"
 done
 LANG_UI="$LANG_ARG"
-if [[ -z "$LANG_UI" ]]; then   # /etc/tpanel/tpanel.env: an install from before the rename to Lares
-  LANG_UI=$(grep -hE '^(LARES|TPANEL)_LANG=' "$ENV_FILE" /etc/tpanel/tpanel.env 2>/dev/null | tail -1 | cut -d= -f2- || true)
+if [[ -z "$LANG_UI" && -r "$ENV_FILE" ]]; then
+  LANG_UI=$(grep -E '^LARES_LANG=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)
 fi
 LANG_UI=$(printf '%s' "${LANG_UI:-vi}" | tr '[:upper:]' '[:lower:]'); LANG_UI="${LANG_UI:0:2}"
 case "$LANG_UI" in
@@ -185,33 +185,6 @@ esac
 command -v apt-get >/dev/null || die "$(L 'Cần apt-get (Debian/Ubuntu)' 'apt-get is required (Debian/Ubuntu)')"
 ARCH=$(dpkg --print-architecture)
 [[ "$ARCH" == amd64 || "$ARCH" == arm64 ]] || die "$(L "Kiến trúc $ARCH không được hỗ trợ" "Architecture $ARCH is not supported")"
-# ---- Installs made before the rename TPanel -> Lares ----------------------------
-# Move /etc, /var/lib, /var/log and /opt/tpanel to their Lares names, rename the TPANEL_* env keys and
-# replace tpanel.service. The old paths stay behind as symlinks: existing nginx vhosts, Next.js units and
-# the logrotate rule still point at them until Lares rewrites them.
-if [[ -d /etc/tpanel && ! -L /etc/tpanel && ! -e "$CONF_DIR" ]]; then
-  step "$(L 'Chuyển bản cài TPanel sang Lares' 'Migrating the TPanel install to Lares')"
-  systemctl stop tpanel 2>/dev/null || true
-  systemctl disable tpanel >/dev/null 2>&1 || true
-  rm -f /etc/systemd/system/tpanel.service
-  for pair in "/etc/tpanel:$CONF_DIR" "/var/lib/tpanel:$DATA_DIR" "/var/log/tpanel:/var/log/lares" "/opt/tpanel:$INSTALL_DIR"; do
-    old=${pair%%:*}; new=${pair#*:}
-    if [[ -d "$old" && ! -L "$old" && ! -e "$new" ]]; then mv "$old" "$new" && ln -s "$new" "$old"; fi
-  done
-  [[ -f "$CONF_DIR/tpanel.env" ]] && mv "$CONF_DIR/tpanel.env" "$ENV_FILE"
-  if [[ -f "$ENV_FILE" ]]; then
-    sed -i "s/^TPANEL_/LARES_/; s#/etc/tpanel#$CONF_DIR#g; s#/var/lib/tpanel#$DATA_DIR#g; s#/opt/tpanel#$INSTALL_DIR#g" "$ENV_FILE"
-  fi
-  for f in "$DATA_DIR"/tpanel.db*; do [[ -e "$f" ]] && mv "$f" "${f/tpanel.db/lares.db}"; done
-  # Renamed, not deleted: vhosts use the map in 00-*.conf, and nginx is reloaded before Lares rewrites it.
-  [[ -f /etc/nginx/conf.d/00-tpanel.conf ]] && mv /etc/nginx/conf.d/00-tpanel.conf /etc/nginx/conf.d/00-lares.conf
-  [[ -f /etc/nginx/conf.d/99-tpanel-default.conf ]] && mv /etc/nginx/conf.d/99-tpanel-default.conf /etc/nginx/conf.d/99-lares-default.conf
-  [[ -f /etc/logrotate.d/tpanel ]] && mv /etc/logrotate.d/tpanel /etc/logrotate.d/lares
-  ln -sfn /usr/local/bin/lares /usr/local/bin/tpanel   # the old command keeps working
-  systemctl daemon-reload
-  ok "$(L 'Đã chuyển sang /etc/lares, /var/lib/lares, /opt/lares; service mới: lares' 'Moved to /etc/lares, /var/lib/lares, /opt/lares; new service: lares')"
-fi
-
 if [[ -n "$(port_pids "$LARES_PORT")" ]] && ! systemctl is-active --quiet lares; then
   die "$(L "Port $LARES_PORT đang được dùng. Chọn port khác" "Port $LARES_PORT is already in use. Pick another port"): ... | sudo bash -s -- --port 9443"
 fi

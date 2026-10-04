@@ -63,7 +63,7 @@ describe.skipIf(!hasPhp)('generated PHP', () => {
   function runSso(opts: { token: string; host: string; record?: object | null }) {
     const tokenFile = path.join(dir, `sso-${crypto.randomBytes(4).toString('hex')}.json`);
     if (opts.record) fs.writeFileSync(tokenFile, JSON.stringify(opts.record));
-    const plugin = path.join(dir, 'tpanel-sso.php');
+    const plugin = path.join(dir, 'lares-sso.php');
     fs.writeFileSync(plugin, renderSsoPlugin(tokenFile));
     const harness = path.join(dir, 'harness.php');
     fs.writeFileSync(
@@ -86,7 +86,7 @@ function admin_url( $p = '' ) { return 'http://site.vn/wp-admin/' . $p; }
 function wp_redirect( $u ) { echo "REDIRECT:$u\\n"; }
 function wp_safe_redirect( $u ) { echo "REDIRECT:$u\\n"; }
 function wp_die( $m, $t = '', $a = array() ) { echo 'DIE:' . $a['response'] . "\\n"; exit; }
-$_GET = $argv[1] === 'PING' ? array( 'tpanel_sso_ping' => '1' ) : array( 'tpanel_sso' => $argv[1] );
+$_GET = $argv[1] === 'PING' ? array( 'lares_sso_ping' => '1' ) : array( 'lares_sso' => $argv[1] );
 $_SERVER['HTTP_HOST'] = $argv[2];
 require '${plugin}';
 foreach ( $GLOBALS['hooks'] as $cb ) { $cb(); }
@@ -101,7 +101,7 @@ foreach ( $GLOBALS['hooks'] as $cb ) { $cb(); }
   const future = () => Math.floor(Date.now() / 1000) + 60;
 
   it('mu-plugin is valid PHP', () => {
-    expect(lint(renderSsoPlugin("/var/www/it's/.tpanel-sso.json"))).toContain('No syntax errors');
+    expect(lint(renderSsoPlugin("/var/www/it's/.lares-sso.json"))).toContain('No syntax errors');
   });
   it('valid token logs in the first admin and opens the requested page, once', () => {
     const r = runSso({ token, host: 'site.vn', record: { hash, exp: future(), to: 'post.php?post=5&action=edit' } });
@@ -115,7 +115,7 @@ foreach ( $GLOBALS['hooks'] as $cb ) { $cb(); }
   });
   it('answers the health check with the site marker only', () => {
     const r = runSso({ token: 'PING', host: 'site.vn', record: { hash, exp: future() } });
-    expect(r.out).toMatch(/^tpanel-sso:[0-9a-f]{32}$/);
+    expect(r.out).toMatch(/^lares-sso:[0-9a-f]{32}$/);
     expect(r.consumed).toBe(false);
   });
   it('ignores normal requests', () => {
@@ -123,7 +123,7 @@ foreach ( $GLOBALS['hooks'] as $cb ) { $cb(); }
   });
   it('hops to the WordPress host first without consuming the token', () => {
     const r = runSso({ token, host: 'www.site.vn', record: { hash, exp: future() } });
-    expect(r.out).toBe(`REDIRECT:http://site.vn/?tpanel_hop=1&tpanel_sso=${token}`);
+    expect(r.out).toBe(`REDIRECT:http://site.vn/?lares_hop=1&lares_sso=${token}`);
     expect(r.consumed).toBe(false);
   });
 });

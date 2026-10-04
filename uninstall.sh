@@ -20,10 +20,6 @@ DATA_DIR="/var/lib/lares"
 CONF_DIR="/etc/lares"
 ENV_FILE="$CONF_DIR/lares.env"
 SITES_ROOT="/var/www"
-# An install from before the rename to Lares that was never upgraded still lives under the TPanel names.
-if [[ ! -e "$CONF_DIR" && -d /etc/tpanel ]]; then
-  INSTALL_DIR="/opt/tpanel"; DATA_DIR="/var/lib/tpanel"; CONF_DIR="/etc/tpanel"; ENV_FILE="$CONF_DIR/tpanel.env"
-fi
 
 # ---- Language (vi | en) - resolved first so every message below is translated ---
 # --lang wins, then the panel's LARES_LANG from $ENV_FILE, then vi.
@@ -35,7 +31,7 @@ for a in "$@"; do
 done
 LANG_UI="$LANG_ARG"
 if [[ -z "$LANG_UI" && -r "$ENV_FILE" ]]; then
-  LANG_UI=$(grep -E '^(LARES|TPANEL)_LANG=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)
+  LANG_UI=$(grep -E '^LARES_LANG=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)
 fi
 LANG_UI=$(printf '%s' "${LANG_UI:-vi}" | tr '[:upper:]' '[:lower:]'); LANG_UI="${LANG_UI:0:2}"
 case "$LANG_UI" in
@@ -121,12 +117,12 @@ confirm() {
   [[ "$answer" == "$2" ]]
 }
 
-env_get() { [[ -f "$ENV_FILE" ]] && grep -E "^(LARES|TPANEL)_${1#LARES_}=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
+env_get() { [[ -f "$ENV_FILE" ]] && grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
 
 # ---- Inventory (read Lares's SQLite before the code that can read it is gone) -----
 SITES=()      # domain \t root_path \t app_type \t ssl_type
 DATABASES=()  # name \t username   (only databases Lares created: managed = 1)
-DB_FILE="$DATA_DIR/lares.db"; [[ -f "$DB_FILE" ]] || DB_FILE="$DATA_DIR/tpanel.db"
+DB_FILE="$DATA_DIR/lares.db"
 SQLITE_MOD="$INSTALL_DIR/src/node_modules/better-sqlite3"
 if [[ $PURGE == 1 && -f "$DB_FILE" ]]; then
   if [[ -x /usr/bin/node && -d "$SQLITE_MOD" ]]; then
@@ -150,7 +146,7 @@ if [[ $PURGE == 1 && -f "$DB_FILE" ]]; then
   fi
   # Fallback / complement: vhosts carrying Lares's header
   for f in /etc/nginx/sites-available/*.conf; do
-    [[ -f "$f" ]] && grep -qE '^# Managed by (Lares|TPanel)' "$f" || continue
+    [[ -f "$f" ]] && grep -q '^# Managed by Lares' "$f" || continue
     d=$(sed -n 's/^# site: \([^ ]*\) (.*/\1/p' "$f" | head -1)
     [[ -n "$d" ]] || continue
     known=0
@@ -191,8 +187,7 @@ fi
 # ---- Panel service & code (both modes) ------------------------------------------
 step "$(L 'Gỡ service lares' 'Removing the lares service')"
 systemctl disable --now lares >/dev/null 2>&1 || true
-systemctl disable --now tpanel >/dev/null 2>&1 || true
-rm -f /etc/systemd/system/lares.service /etc/systemd/system/tpanel.service /usr/local/bin/lares /usr/local/bin/tpanel
+rm -f /etc/systemd/system/lares.service /usr/local/bin/lares
 systemctl daemon-reload
 ok "$(L 'Đã dừng và gỡ lares.service' 'Stopped and removed lares.service')"
 
@@ -202,13 +197,13 @@ if [[ $PURGE == 1 ]]; then
   for s in "${SITES[@]+"${SITES[@]}"}"; do
     IFS=$'\t' read -r domain root type ssl <<<"$s"
     [[ "$domain" =~ $DOMAIN_RE ]] || { warn "$(L 'Bỏ qua tên miền không hợp lệ' 'Skipping invalid domain'): $domain"; continue; }
-    unit="tpanel-app-$domain"
+    unit="lares-app-$domain"
     if [[ -f "/etc/systemd/system/$unit.service" ]]; then
       systemctl disable --now "$unit" >/dev/null 2>&1 || true
       rm -f "/etc/systemd/system/$unit.service"
     fi
     rm -f "/etc/nginx/sites-enabled/$domain.conf"
-    grep -qsE '^# Managed by (Lares|TPanel)' "/etc/nginx/sites-available/$domain.conf" && rm -f "/etc/nginx/sites-available/$domain.conf"
+    grep -qs '^# Managed by Lares' "/etc/nginx/sites-available/$domain.conf" && rm -f "/etc/nginx/sites-available/$domain.conf"
     [[ "$ssl" == letsencrypt ]] && command -v certbot >/dev/null && certbot delete --cert-name "$domain" --non-interactive >/dev/null 2>&1 || true
     # Only ever delete a direct child of /var/www - guards against a corrupted DB row.
     real=$(readlink -f "$root" 2>/dev/null || echo "")
@@ -240,7 +235,7 @@ if [[ $PURGE == 1 ]]; then
   fi
 
   step "$(L 'Xoá cấu hình, dữ liệu và log của Lares' "Deleting Lares's configuration, data and logs")"
-  rm -f /etc/nginx/conf.d/{00-lares,99-lares-default,00-tpanel,99-tpanel-default}.conf /etc/logrotate.d/{lares,tpanel}
+  rm -f /etc/nginx/conf.d/00-lares.conf /etc/nginx/conf.d/99-lares-default.conf /etc/logrotate.d/lares
   if command -v nginx >/dev/null && nginx -t >/dev/null 2>&1; then
     systemctl is-active --quiet nginx && systemctl reload nginx || true
   else
@@ -248,14 +243,12 @@ if [[ $PURGE == 1 ]]; then
   fi
   # MySQL admin account last: it was needed to drop the site databases above.
   if command -v mysql >/dev/null; then
-    # 'lares' on fresh installs, 'tpanel' on servers installed before the rename.
     MU=$(env_get LARES_MYSQL_USER); [[ "$MU" =~ ^[A-Za-z0-9_]{1,32}$ ]] || MU=lares
     mysql -e "DROP USER IF EXISTS '$MU'@'localhost'; DROP USER IF EXISTS '$MU'@'127.0.0.1';" 2>/dev/null \
       || { [[ -n "$TMP_CNF" ]] && mysql --defaults-extra-file="$TMP_CNF" -e "DROP USER IF EXISTS '$MU'@'127.0.0.1'; DROP USER IF EXISTS '$MU'@'localhost';" 2>/dev/null; } \
       || warn "$(L "Không xoá được user MySQL '$MU' - xoá thủ công" "Could not delete MySQL user '$MU' - drop it manually"): DROP USER '$MU'@'localhost';"
   fi
-  rm -rf "$DATA_DIR" "$CONF_DIR" /var/log/lares /var/log/tpanel
-  for link in /etc/tpanel /var/lib/tpanel; do [[ -L "$link" ]] && rm -f "$link"; done   # left by the TPanel -> Lares migration
+  rm -rf "$DATA_DIR" "$CONF_DIR" /var/log/lares
   ok "$(L 'Đã xoá' 'Deleted') $DATA_DIR, $CONF_DIR, /var/log/lares"
 else
   # Keep the sites alive: their vhosts reference $DATA_DIR/acme, /etc/lares/ssl and /etc/lares/apps.
@@ -264,7 +257,6 @@ fi
 
 step "$(L 'Xoá mã nguồn Lares' 'Deleting Lares source code')"
 rm -rf "$INSTALL_DIR"
-[[ -L /opt/tpanel ]] && rm -f /opt/tpanel
 ok "$(L 'Đã xoá' 'Deleted') $INSTALL_DIR"
 
 echo

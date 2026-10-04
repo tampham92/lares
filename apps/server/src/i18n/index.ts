@@ -10,7 +10,7 @@ import { EN } from './en/index.js';
  */
 const store = new AsyncLocalStorage<Lang>();
 
-export const defaultLang: Lang = normalizeLang(process.env.LARES_LANG ?? process.env.TPANEL_LANG) ?? DEFAULT_LANG;
+export const defaultLang: Lang = normalizeLang(process.env.LARES_LANG) ?? DEFAULT_LANG;
 
 export const currentLang = (): Lang => store.getStore() ?? defaultLang;
 

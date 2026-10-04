@@ -87,8 +87,8 @@ function lastJson<T>(stdout: string): T {
 /** Run a PHP snippet inside the site's WordPress, with an optional JSON payload. */
 async function wpEval<T>(site: Site, php: string, payload?: unknown): Promise<T> {
   const tag = crypto.randomBytes(8).toString('hex');
-  const script = path.join(site.rootPath, `.tpanel-${tag}.php`);
-  const data = path.join(site.rootPath, `.tpanel-${tag}.json`);
+  const script = path.join(site.rootPath, `.lares-${tag}.php`);
+  const data = path.join(site.rootPath, `.lares-${tag}.json`);
   try {
     await host.writeFile(script, php, 0o640);
     if (payload !== undefined) await host.writeFile(data, JSON.stringify(payload), 0o640);
@@ -156,12 +156,10 @@ export async function publishArticle(site: Site, input: PublishArticleInput, log
 // ---------------------------------------------------------------------------
 
 const SSO_TTL_SECONDS = 60;
-// tpanel-* names (plugin file, marker, ?tpanel_sso params) predate the rename to Lares and stay:
-// the plugin is already installed on customers' sites.
-const SSO_PLUGIN = 'tpanel-sso.php';
+const SSO_PLUGIN = 'lares-sso.php';
 
 /** Identifies one site's copy of the plugin, so a health check cannot be answered by another WordPress. */
-const ssoMarker = (tokenFile: string) => `tpanel-sso:${crypto.createHash('md5').update(tokenFile).digest('hex')}`;
+const ssoMarker = (tokenFile: string) => `lares-sso:${crypto.createHash('md5').update(tokenFile).digest('hex')}`;
 
 /**
  * mu-plugin that turns a one-time token into a login as the first administrator.
@@ -180,25 +178,25 @@ export function renderSsoPlugin(tokenFile: string): string {
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-// Health check: Lares requests ?tpanel_sso_ping before handing out a link.
-if ( isset( $_GET['tpanel_sso_ping'] ) ) {
+// Health check: Lares requests ?lares_sso_ping before handing out a link.
+if ( isset( $_GET['lares_sso_ping'] ) ) {
 	header( 'Content-Type: text/plain; charset=utf-8' );
 	header( 'Cache-Control: no-store' );
 	echo '${ssoMarker(tokenFile)}';
 	exit;
 }
-if ( empty( $_GET['tpanel_sso'] ) || ! is_string( $_GET['tpanel_sso'] ) ) {
+if ( empty( $_GET['lares_sso'] ) || ! is_string( $_GET['lares_sso'] ) ) {
 	return;
 }
 add_action( 'plugins_loaded', function () {
 	nocache_headers();
-	$token = preg_replace( '/[^a-f0-9]/', '', strtolower( wp_unslash( $_GET['tpanel_sso'] ) ) );
+	$token = preg_replace( '/[^a-f0-9]/', '', strtolower( wp_unslash( $_GET['lares_sso'] ) ) );
 	// The auth cookie belongs to the host wp-admin lives on: hop there first (token not consumed yet).
 	$site    = wp_parse_url( site_url() );
 	$current = ( is_ssl() ? 'https' : 'http' ) . '://' . strtolower( $_SERVER['HTTP_HOST'] ?? '' );
 	$wanted  = ( $site['scheme'] ?? 'http' ) . '://' . strtolower( ( $site['host'] ?? '' ) . ( isset( $site['port'] ) ? ':' . $site['port'] : '' ) );
-	if ( $current !== $wanted && empty( $_GET['tpanel_hop'] ) ) {
-		wp_redirect( site_url( '/?tpanel_hop=1&tpanel_sso=' . $token ) );
+	if ( $current !== $wanted && empty( $_GET['lares_hop'] ) ) {
+		wp_redirect( site_url( '/?lares_hop=1&lares_sso=' . $token ) );
 		exit;
 	}
 	$file = ${file};
@@ -219,10 +217,10 @@ add_action( 'plugins_loaded', function () {
 `;
 }
 
-/** Fetch `<base>/?tpanel_sso_ping` like a browser would, or through this machine's own web server (`local`). */
+/** Fetch `<base>/?lares_sso_ping` like a browser would, or through this machine's own web server (`local`). */
 async function probeSso(base: string, marker: string, local: boolean): Promise<{ ok: boolean; status: string }> {
   const url = new URL(`${base}/`);
-  url.searchParams.set('tpanel_sso_ping', '1');
+  url.searchParams.set('lares_sso_ping', '1');
   const ports = new Set([url.port || (url.protocol === 'https:' ? '443' : '80'), '80', '443']);
   const resolve = local ? [...ports].map((p) => `--resolve ${shq(`${url.hostname}:${p}:127.0.0.1`)}`).join(' ') : '';
   const r = await host.exec(`curl -sS -k -L --max-redirs 3 -m 10 ${resolve} -o - -w '\\n%{http_code}' ${shq(url.toString())}`);
@@ -231,7 +229,7 @@ async function probeSso(base: string, marker: string, local: boolean): Promise<{
   const body = lines.join('\n');
   if (body.includes(marker)) return { ok: true, status: `HTTP ${code}` };
   if (r.code !== 0) return { ok: false, status: r.stderr.trim().split('\n').pop() || t('curl lỗi {code}', { code: r.code }) };
-  return { ok: false, status: `HTTP ${code}${body.includes('tpanel-sso:') ? ` (${t('trả lời từ một site WordPress khác')})` : ''}` };
+  return { ok: false, status: `HTTP ${code}${body.includes('lares-sso:') ? ` (${t('trả lời từ một site WordPress khác')})` : ''}` };
 }
 
 async function portOwner(port: string): Promise<string | null> {
@@ -264,7 +262,7 @@ export async function wpLoginUrl(site: Site, baseUrl: string, target: string, lo
   const base = baseUrl.replace(/\/+$/, '');
   const content = path.join(site.webRoot, 'wp-content');
   if (!(await host.exists(content))) throw conflict(t('Không tìm thấy {path} - site chưa cài WordPress xong?', { path: content }));
-  const tokenFile = path.join(site.rootPath, '.tpanel-sso.json');
+  const tokenFile = path.join(site.rootPath, '.lares-sso.json');
   const marker = ssoMarker(tokenFile);
   await installSsoPlugin(path.join(content, 'mu-plugins'), tokenFile, log);
 
@@ -306,5 +304,5 @@ export async function wpLoginUrl(site: Site, baseUrl: string, target: string, lo
   await host.writeFile(tokenFile, JSON.stringify(record), 0o600);
   // PHP runs as the web user: it must read (and delete) the token file
   await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(tokenFile)}`, { log });
-  return `${base}/?tpanel_sso=${token}`;
+  return `${base}/?lares_sso=${token}`;
 }
