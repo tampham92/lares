@@ -1,0 +1,24 @@
+# Lares anonymous install counter - deploy with: npx wrangler deploy  (see README.md)
+name = "lares-telemetry"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Only https://lares.thocode.dev/ping goes to this Worker. /install and /uninstall stay with the
+# zone's Redirect Rules (they do not match /ping, and this route does not match them).
+workers_dev = false
+routes = [
+  { pattern = "lares.thocode.dev/ping", zone_name = "thocode.dev" },
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lares-telemetry"
+database_id = "REPLACE_WITH_THE_ID_PRINTED_BY_wrangler_d1_create"
+
+# Daily clean-up of old per-day rows
+[triggers]
+crons = ["17 3 * * *"]
+
+# No Workers Logs / traces: invocation logs would contain request metadata (incl. client IP).
+[observability]
+enabled = false

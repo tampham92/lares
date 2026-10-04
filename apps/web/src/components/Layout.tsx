@@ -3,6 +3,7 @@ import { auth } from '../api';
 import { msg } from '@lares/shared';
 import { t } from '../i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
+import { VersionBadge } from './VersionBadge';
 
 const NAV: Array<[string, string]> = [
   ['/', msg('Tổng quan')],
@@ -25,6 +26,7 @@ export function Layout() {
             {t(label)}
           </NavLink>
         ))}
+        <VersionBadge />
       </aside>
       <main className="main">
         <div className="topbar">

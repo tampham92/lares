@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash # = bash --noprofile --norc -eo pipefail
+
+jobs:
+  checks:
+    name: Typecheck, tests, build, shell lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Shell syntax
+        run: |
+          bash -n install.sh
+          bash -n uninstall.sh
+
+      - name: ShellCheck
+        run: |
+          command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q shellcheck; }
+          shellcheck --version
+          shellcheck -S warning install.sh uninstall.sh
+
+      - name: Telemetry worker syntax
+        run: node --check ops/telemetry-worker/src/index.js
+
+  install-smoke:
+    # Runs the real install.sh (from a tarball of this checkout) on a clean GitHub-hosted VM,
+    # checks the panel answers, upgrades in place, then purges everything with uninstall.sh.
+    name: Install smoke test (${{ matrix.os }}, ${{ matrix.db }})
+    needs: checks
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # "fresh": the preinstalled MySQL is purged first, like a new VPS -> installer installs MariaDB
+          - os: ubuntu-22.04
+            db: fresh
+          - os: ubuntu-24.04
+            db: fresh
+          # "existing-mysql": reuse the runner's MySQL 8 (root password "root" on GitHub images)
+          - os: ubuntu-24.04
+            db: existing-mysql
+    env:
+      PANEL: https://127.0.0.1:8686
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare the runner
+        run: |
+          set -x
+          # GitHub images ship MySQL, Apache, nginx and PHP preinstalled (services stopped).
+          # Apache/nginx/PHP are fine: nothing listens on 80/443, so the installer reuses or ignores them.
+          if [ "${{ matrix.db }}" = fresh ]; then
+            sudo systemctl stop mysql 2>/dev/null || true
+            pkgs=$(dpkg-query -W -f='${Package} ${Status}\n' 'mysql-*' 2>/dev/null | awk '/install ok installed/ {print $1}')
+            if [ -n "$pkgs" ]; then sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y -q $pkgs; fi
+            sudo rm -rf /var/lib/mysql /etc/mysql
+          else
+            sudo systemctl start mysql
+            mysql -uroot -proot -e 'SELECT VERSION()'
+          fi
+          sudo ss -ltnp | grep -E ':(80|443|3306|8686) ' || true
+
+      - name: Build a tarball of this checkout
+        run: git archive --format=tar.gz --prefix=lares/ -o "$RUNNER_TEMP/lares.tar.gz" HEAD
+
+      - name: Install
+        run: |
+          extra=""
+          if [ "${{ matrix.db }}" = existing-mysql ]; then extra="--mysql-root-password root"; fi
+          # --no-telemetry: CI must never be counted as an install
+          sudo bash ./install.sh --tarball "$RUNNER_TEMP/lares.tar.gz" --php 8.3 --lang en --no-telemetry $extra
+
+      - name: Panel answers (401 from /api/auth/me)
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "$PANEL/api/auth/me")
+          echo "HTTP $code"
+          test "$code" = 401
+          systemctl is-active lares
+          sudo nginx -t
+
+      - name: Log in and read the version
+        run: |
+          sudo lares reset-password admin --password 'CiSmokeTest-12345' >/dev/null
+          token=$(curl -skf -X POST -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"CiSmokeTest-12345"}' "$PANEL/api/auth/login" | jq -r .token)
+          if [ -z "$token" ] || [ "$token" = null ]; then echo "login failed"; exit 1; fi
+          got=$(curl -skf -H "Authorization: Bearer $token" "$PANEL/api/system/version" | jq -r .version)
+          want=$(node -p "require('./package.json').version")
+          echo "panel reports $got, package.json says $want"
+          test "$got" = "$want"
+
+      - name: Telemetry opt-out was saved
+        run: |
+          sudo grep -qx 'LARES_TELEMETRY=0' /etc/lares/lares.env
+          sudo test ! -e /etc/lares/install-id
+
+      - name: Upgrade in place
+        run: |
+          sudo bash ./install.sh --tarball "file://$RUNNER_TEMP/lares.tar.gz" --php 8.3
+          test "$(curl -sk -o /dev/null -w '%{http_code}' "$PANEL/api/auth/me")" = 401
+          sudo sh -c 'ls -1 /var/lib/lares/backups/lares-*.tar.gz'
+          # an upgrade keeps the saved choices
+          sudo grep -qx 'LARES_TELEMETRY=0' /etc/lares/lares.env
+          sudo grep -qx 'LARES_LANG=en' /etc/lares/lares.env
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          sudo journalctl -u lares -n 200 --no-pager || true
+          sudo nginx -t || true
+          sudo ss -ltnp || true
+          sudo cat /etc/lares/lares.env 2>/dev/null | sed -E 's/(SECRET|PASSWORD)=.*/\1=***/' || true
+
+      - name: Uninstall (--purge, non-interactive)
+        run: |
+          sudo bash ./uninstall.sh --purge --yes --lang en
+          if systemctl cat lares.service >/dev/null 2>&1; then echo "lares.service still exists"; exit 1; fi
+          test ! -e /opt/lares
+          test ! -e /etc/lares
+          test ! -e /usr/local/bin/lares

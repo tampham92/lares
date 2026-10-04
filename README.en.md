@@ -2,11 +2,15 @@
 
 **Lares Panel by [ThoCode](https://thocode.dev)** · Tiếng Việt: [README.md](README.md)
 
-A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **WordPress** and **Next.js** websites (plus plain PHP and static HTML), SSL, traffic logs, databases, and **migrate sites from another VPS/panel**.
+A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **WordPress** and **Next.js** websites (plus plain PHP and static HTML), SSL, traffic logs, databases, backups, and **migrate sites from another VPS/panel**.
+
+**Docs:** [Installation](docs/en/installation.md) · [Security](docs/en/security.md) · [Troubleshooting](docs/en/troubleshooting.md) · [Backups](docs/en/backups.md) · [FAQ](docs/en/faq.md) · [Changelog](CHANGELOG.md)
+
+> **Beta**: Lares is in `0.x` beta. Take backups, and try it on a non-critical VPS before using it for important sites.
 
 ## Installation
 
-On the target VPS (Ubuntu 20.04/22.04/24.04, Debian 11/12), run as root:
+Supported systems: **Ubuntu 22.04 / 24.04, Debian 12** (x86_64, arm64). Debian 13 installs with a "not yet tested" warning. Ubuntu 20.04 and Debian 11 are end of life, and the installer refuses them unless you add `--force-unsupported`. Run as root:
 
 ```bash
 curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --lang en
@@ -16,7 +20,9 @@ curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --lang en --port 9
 
 `lares.thocode.dev/install` redirects to `install.sh` on GitHub. If that domain is unreachable, use the direct link: `https://raw.githubusercontent.com/tampham92/lares/main/install.sh`.
 
-The script installs Nginx, MariaDB, PHP-FPM (several versions), Node.js LTS, Certbot and WP-CLI. It then downloads and builds Lares, creates the `lares` service (systemd), and prints the URL `https://IP:8686` with the admin password. Run the same command again to **upgrade**; data and passwords are kept.
+The script installs Nginx, MariaDB, PHP-FPM (several versions), Node.js LTS, Certbot and WP-CLI. It then downloads and builds Lares, creates the `lares` service (systemd), and prints the URL `https://IP:8686` with the admin password. Run the same command again to **upgrade**; data and passwords are kept. All options (`--port`, `--php`, `--no-telemetry`, `--force-unsupported`…) are listed in [docs/en/installation.md](docs/en/installation.md).
+
+Right after installation, port 8686 is open to every IP. Change the password, then turn on **two-factor authentication** and the **IP allowlist**, as described in [Security](docs/en/security.md).
 
 ### Language
 
@@ -47,6 +53,8 @@ No. Run the exact install command again; the installer finds `/etc/lares/lares.e
 - Kept as is: websites in `/var/www`, MySQL databases, nginx vhosts, SSL, Next.js services, the admin account, the decryption key and the SQLite data in `/var/lib/lares`. Lares's database schema is upgraded automatically on startup.
 - Before restarting, the installer backs up `/etc/lares` + the SQLite database + your custom templates to `/var/lib/lares/backups/` (the 5 most recent are kept).
 - Don't edit files in `/opt/lares/src` directly (they are overwritten on update); put custom templates in `/var/lib/lares/templates/`.
+- The port, PHP versions, language and telemetry choice from installation are kept, unless you pass `--port`/`--php`/`--lang` again.
+- The running version is shown at the bottom of the sidebar. The panel checks GitHub once a day and shows **New version x.y.z** with the upgrade command when one is out. Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ### Admin account
 
@@ -55,7 +63,9 @@ No. Run the exact install command again; the installer finds `/etc/lares/lares.e
 ```bash
 sudo lares users                       # list accounts
 sudo lares reset-password              # reset the admin password (random, printed on screen)
-sudo lares reset-password admin --password 'NewPassword123'
+sudo lares reset-password admin --password 'NewPassword123'   # also clears the login lockout and logs that user out everywhere
+sudo lares disable-2fa [user]          # turn off two-factor auth (lost phone)
+sudo lares allowlist show|add <ip/cidr>|remove <ip/cidr>|clear   # panel IP allowlist
 ```
 
 To change the password in the UI: **Settings → Change admin password**.
@@ -70,7 +80,17 @@ curl -sSL https://lares.thocode.dev/uninstall | sudo bash -s -- --lang en
 curl -sSL https://lares.thocode.dev/uninstall | sudo bash -s -- --lang en --purge
 ```
 
-Neither mode removes nginx/MariaDB/MySQL/PHP/Node.js, and neither touches sites or databases Lares did not create (including databases "shared" with another panel).
+Neither mode removes nginx/MariaDB/MySQL/PHP/Node.js, and neither touches sites or databases Lares did not create (including databases "shared" with another panel). Site backups in `/var/backups/lares` are always kept; delete them yourself if you don't need them.
+
+### Anonymous telemetry
+
+To know how many servers run Lares and which versions/OSes to support, `install.sh` sends **one ping on install and on upgrade**, and the panel sends **one heartbeat per day**, to `https://lares.thocode.dev/ping` (3-second timeout, failures are ignored). The ping contains **only**:
+
+- a random install id (UUID generated once, stored in `/etc/lares/install-id`)
+- the Lares version and the event (`install` / `upgrade` / `heartbeat`)
+- the OS id and version (e.g. `ubuntu 24.04`), the CPU architecture (`amd64`/`arm64`) and the panel language
+
+IPs, domains, hostnames, site counts and site data are never sent. **To disable it**, add `--no-telemetry` when installing or upgrading, or set `LARES_TELEMETRY=0` in `/etc/lares/lares.env` and run `systemctl restart lares`. Details and the code involved: [docs/en/installation.md](docs/en/installation.md#telemetry).
 
 ## Features
 
@@ -87,6 +107,10 @@ Neither mode removes nginx/MariaDB/MySQL/PHP/Node.js, and neither touches sites 
 | SSL | Let's Encrypt (shared HTTP-01 webroot, works with Next.js proxy sites too), including aliases, staging, renewal; or upload your own certificate (checks that the key matches). Toggle forced HTTPS + HSTS, warnings when DNS does not point here yet or a certificate is about to expire |
 | Traffic logs | Separate access/error logs per site. Stats for 1h/24h/7 days/30 days: requests, unique IPs, bandwidth, average response time, 2xx–5xx, hourly/daily charts, top URLs/IPs/referrers/user agents (rotated `.gz` logs are read too). Tail + filter, download, delete, logrotate settings |
 | Databases | Create/delete MySQL/MariaDB databases; passwords are encrypted and shown only on click |
+| Backup & restore | The **Backups** tab of each site: **Back up now**, list, download (signed link valid for 5 minutes), delete, restore (confirmed by typing the domain; an automatic safety backup is taken first and a failed restore is rolled back). Daily schedule in Settings (time HH:MM, keep N per site, default 7, per-site opt-out). Stored in `/var/backups/lares/<domain>/<timestamp>/`, local only for now. See [docs/en/backups.md](docs/en/backups.md) |
+| Panel security | Two-factor auth (TOTP + 10 recovery codes), IP allowlist (`sudo lares allowlist`), temporary lockout after repeated failed logins, **Log out everywhere**, security headers. See [docs/en/security.md](docs/en/security.md) |
+| Panel domain | A Settings card: give the panel a domain and Lares issues a Let's Encrypt certificate (`lares-panel`, auto-renewed), so there is no more self-signed warning. In Cloudflare the record must be **DNS only** (Cloudflare does not proxy port 8686) |
+| Real IP behind Cloudflare | On by default (toggle in Settings): nginx restores the visitor IP via `/etc/nginx/conf.d/lares-cloudflare.conf`, Cloudflare ranges are refreshed daily and rolled back if `nginx -t` fails |
 | Migration | See below |
 
 ## Migrating sites from another VPS / panel
@@ -142,7 +166,10 @@ apps/server          Fastify API (runs as root on the VPS)
   src/routes         REST + SSE
 templates/           Templates: _base.css, _wp.css + <id>/{template.json, style.css, index.html, wordpress/home.html}
 apps/web             React 19 + Vite + TanStack Query
-install.sh           One-command installer
+install.sh           One-command installer (uninstall.sh: uninstaller)
+docs/                Documentation (vi/, en/)
+ops/telemetry-worker Cloudflare Worker that receives the anonymous install counter (/ping)
+.github/workflows    CI: typecheck, tests, build, ShellCheck, install.sh smoke test on Ubuntu 22.04/24.04
 ```
 
 Locations on the VPS: data `/var/lib/lares` (SQLite, secret), sites `/var/www/<domain>/{public_html|app}`, logs `/var/log/lares/sites/<domain>/`, vhosts `/etc/nginx/sites-available/<domain>.conf`, Next.js services `lares-app-<domain>.service`.
@@ -153,10 +180,15 @@ Locations on the VPS: data `/var/lib/lares` (SQLite, secret), sites `/var/www/<d
 - Every shell argument is quoted; domains, paths and excludes are validated with Zod on both server and web.
 - Code and SQL dumps from migrated sites are treated as **untrusted**: SQL is imported with the site's own user (never root), wp-cli/artisan/npm run as `www-data`, setuid/setgid bits are stripped, and archives are extracted with `--no-same-owner`.
 - The SSH host key is pinned after the first *Test connection*; if the key changes, the migration stops.
-- The admin panel runs over HTTPS (self-signed certificate, replaceable via `LARES_TLS_CERT/KEY`), login is rate-limited, and SSE tokens are masked in logs.
+- The admin panel runs over HTTPS (self-signed, or Let's Encrypt once a panel domain is set), with two-factor auth, an IP allowlist, brute-force protection and session revocation; SSE tokens are masked in logs. Guide: [docs/en/security.md](docs/en/security.md).
 
 ## Current limitations
 
 - All sites run as the same `www-data` user (no per-site user/PHP-FPM pool yet).
 - Database migration supports MySQL/MariaDB only; Next.js sites using an external DB (Postgres, Mongo...) need that DB moved by hand.
 - Secret Next.js environment variables that are not in the source code (e.g. kept in the old panel's process manager) must be entered again.
+- Backups are stored on the server itself only; copy them elsewhere yourself.
+
+## License
+
+Lares Panel is free software under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). © ThoCode.

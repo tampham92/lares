@@ -1,0 +1,6 @@
+{
+  "name": "lares-telemetry-worker",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker behind https://lares.thocode.dev/ping (anonymous Lares install counter)"
+}

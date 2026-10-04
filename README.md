@@ -2,11 +2,15 @@
 
 **Lares Panel by [ThoCode](https://thocode.dev)** · English: [README.en.md](README.en.md)
 
-Hosting control panel viết bằng TypeScript cho VPS Ubuntu/Debian: quản lý website **WordPress** và **Next.js** (cùng PHP thuần, HTML tĩnh), SSL, log traffic, database, và **chuyển site từ VPS/panel khác về**.
+Hosting control panel viết bằng TypeScript cho VPS Ubuntu/Debian: quản lý website **WordPress** và **Next.js** (cùng PHP thuần, HTML tĩnh), SSL, log traffic, database, sao lưu, và **chuyển site từ VPS/panel khác về**.
+
+**Tài liệu:** [Cài đặt](docs/vi/installation.md) · [Bảo mật](docs/vi/security.md) · [Xử lý sự cố](docs/vi/troubleshooting.md) · [Sao lưu](docs/vi/backups.md) · [Câu hỏi thường gặp](docs/vi/faq.md) · [Thay đổi (CHANGELOG)](CHANGELOG.md)
+
+> **Beta**: Lares đang ở giai đoạn `0.x` beta. Hãy sao lưu và thử trên VPS không quan trọng trước khi dùng cho site thật.
 
 ## Cài đặt
 
-Trên VPS cần cài (Ubuntu 20.04/22.04/24.04, Debian 11/12), chạy bằng root:
+Hệ điều hành được hỗ trợ: **Ubuntu 22.04 / 24.04, Debian 12** (x86_64, arm64). Debian 13 cài được nhưng kèm cảnh báo "chưa kiểm thử". Ubuntu 20.04 và Debian 11 đã hết vòng đời nên installer từ chối cài, trừ khi thêm `--force-unsupported`. Chạy bằng root:
 
 ```bash
 curl -sSL https://lares.thocode.dev/install | sudo bash
@@ -18,7 +22,9 @@ curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --lang en
 
 `lares.thocode.dev/install` chuyển hướng tới `install.sh` trên GitHub. Nếu không truy cập được tên miền này, dùng link gốc: `https://raw.githubusercontent.com/tampham92/lares/main/install.sh`.
 
-Script cài Nginx, MariaDB, PHP-FPM (nhiều phiên bản), Node.js LTS, Certbot, WP-CLI. Sau đó nó tải và build Lares, tạo service `lares` (systemd), rồi in ra URL `https://IP:8686` cùng mật khẩu admin. Chạy lại cùng lệnh để **nâng cấp**; dữ liệu và mật khẩu vẫn được giữ.
+Script cài Nginx, MariaDB, PHP-FPM (nhiều phiên bản), Node.js LTS, Certbot, WP-CLI. Sau đó nó tải và build Lares, tạo service `lares` (systemd), rồi in ra URL `https://IP:8686` cùng mật khẩu admin. Chạy lại cùng lệnh để **nâng cấp**; dữ liệu và mật khẩu vẫn được giữ. Danh sách đầy đủ các tuỳ chọn (`--port`, `--php`, `--no-telemetry`, `--force-unsupported`…) có trong [docs/vi/installation.md](docs/vi/installation.md).
+
+Ngay sau khi cài, port 8686 mở cho mọi IP. Hãy đổi mật khẩu, bật **xác thực 2 lớp** và **giới hạn IP** theo hướng dẫn [Bảo mật](docs/vi/security.md).
 
 ### Ngôn ngữ
 
@@ -49,6 +55,8 @@ Không. Chạy lại đúng lệnh cài đặt; installer nhận ra `/etc/lares/
 - Giữ nguyên: website trong `/var/www`, database MySQL, vhost nginx, SSL, service Next.js, tài khoản admin, khoá giải mã và dữ liệu SQLite trong `/var/lib/lares`. Cấu trúc database của Lares được tự nâng cấp khi khởi động.
 - Trước khi khởi động lại, installer tự sao lưu `/etc/lares` + database SQLite + template riêng vào `/var/lib/lares/backups/` (giữ 5 bản gần nhất).
 - Đừng sửa trực tiếp file trong `/opt/lares/src` (bị ghi đè khi cập nhật); template riêng đặt ở `/var/lib/lares/templates/`.
+- Port, phiên bản PHP, ngôn ngữ và lựa chọn thống kê ẩn danh đã chọn lúc cài được giữ nguyên, trừ khi bạn truyền lại `--port`/`--php`/`--lang`.
+- Phiên bản đang chạy hiện ở cuối thanh bên. Mỗi ngày panel kiểm tra GitHub một lần, khi có bản mới sẽ hiện **Có bản mới x.y.z** kèm lệnh nâng cấp. Danh sách thay đổi: [CHANGELOG.md](CHANGELOG.md).
 
 ### Tài khoản quản trị
 
@@ -57,7 +65,9 @@ Không. Chạy lại đúng lệnh cài đặt; installer nhận ra `/etc/lares/
 ```bash
 sudo lares users                       # liệt kê tài khoản
 sudo lares reset-password              # đặt lại mật khẩu admin (ngẫu nhiên, in ra màn hình)
-sudo lares reset-password admin --password 'MatKhauMoi123'
+sudo lares reset-password admin --password 'MatKhauMoi123'   # cũng mở khoá đăng nhập và đăng xuất các phiên của user đó
+sudo lares disable-2fa [user]          # tắt xác thực 2 lớp khi mất điện thoại
+sudo lares allowlist show|add <ip/cidr>|remove <ip/cidr>|clear   # giới hạn IP vào trang quản trị
 ```
 
 Đổi mật khẩu trên giao diện: **Cài đặt → Đổi mật khẩu quản trị**.
@@ -72,7 +82,17 @@ curl -sSL https://lares.thocode.dev/uninstall | sudo bash
 curl -sSL https://lares.thocode.dev/uninstall | sudo bash -s -- --purge
 ```
 
-Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và không động vào site hay database không do Lares tạo (kể cả database "dùng chung" với panel khác).
+Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và không động vào site hay database không do Lares tạo (kể cả database "dùng chung" với panel khác). Bản sao lưu site trong `/var/backups/lares` luôn được giữ lại; tự xoá nếu không cần.
+
+### Thống kê ẩn danh (telemetry)
+
+Để biết số máy đang dùng Lares và cần hỗ trợ phiên bản/HĐH nào, `install.sh` gửi **một ping khi cài và khi nâng cấp**, còn panel gửi **một heartbeat mỗi ngày** tới `https://lares.thocode.dev/ping` (timeout 3 giây, lỗi thì bỏ qua). Ping **chỉ** gồm:
+
+- mã cài đặt ngẫu nhiên (UUID tạo một lần, lưu ở `/etc/lares/install-id`)
+- phiên bản Lares, sự kiện (`install` / `upgrade` / `heartbeat`)
+- tên và phiên bản HĐH (vd `ubuntu 24.04`), kiến trúc CPU (`amd64`/`arm64`), ngôn ngữ panel
+
+Không bao giờ gửi IP, tên miền, hostname, số lượng site hay bất kỳ dữ liệu nào của site. **Cách tắt:** thêm `--no-telemetry` khi cài/nâng cấp, hoặc đặt `LARES_TELEMETRY=0` trong `/etc/lares/lares.env` rồi `systemctl restart lares`. Chi tiết và mã nguồn liên quan: [docs/vi/installation.md](docs/vi/installation.md#thống-kê-ẩn-danh-telemetry).
 
 ## Tính năng
 
@@ -89,6 +109,10 @@ Cả hai chế độ đều không gỡ nginx/MariaDB/MySQL/PHP/Node.js, và kh�
 | SSL          | Let's Encrypt (HTTP-01 webroot dùng chung, chạy được cả với site proxy Next.js), bao gồm alias, staging, gia hạn; hoặc upload certificate riêng (kiểm tra key có khớp cert). Bật/tắt bắt buộc HTTPS + HSTS, cảnh báo khi DNS chưa trỏ về hoặc cert sắp hết hạn                                               |
 | Log traffic  | Access/error log riêng cho từng site. Thống kê theo 1h/24h/7 ngày/30 ngày: số request, IP duy nhất, băng thông, thời gian phản hồi trung bình, 2xx–5xx, biểu đồ theo giờ/ngày, top URL/IP/referrer/user-agent (đọc được cả log đã xoay vòng`.gz`). Có tail + lọc, tải về, xoá, cấu hình logrotate |
 | Database     | Tạo/xoá database MySQL/MariaDB; mật khẩu được mã hoá và chỉ hiện khi bấm                                                                                                                                                                                                                                                   |
+| Sao lưu & khôi phục | Tab **Sao lưu** của từng site: **Sao lưu ngay**, danh sách, tải về (link ký số hiệu lực 5 phút), xoá, khôi phục (xác nhận bằng tên miền; tự tạo bản an toàn trước và rollback nếu lỗi). Lịch hằng ngày trong Cài đặt (giờ HH:MM, giữ N bản mỗi site, mặc định 7, tắt riêng từng site). Lưu tại `/var/backups/lares/<domain>/<thời điểm>/`, hiện chỉ lưu trên VPS, xem [docs/vi/backups.md](docs/vi/backups.md) |
+| Bảo mật trang quản trị | Xác thực 2 lớp (TOTP + 10 mã khôi phục), giới hạn IP (`sudo lares allowlist`), khoá tạm khi đăng nhập sai nhiều lần, **Đăng xuất mọi nơi**, security header. Xem [docs/vi/security.md](docs/vi/security.md) |
+| Tên miền cho trang quản trị | Card trong Cài đặt: gắn tên miền cho panel và tự cấp chứng chỉ Let's Encrypt (tên `lares-panel`, tự gia hạn), hết cảnh báo chứng chỉ tự ký. Bản ghi DNS phải để **DNS only** trên Cloudflare (Cloudflare không proxy port 8686) |
+| IP thật sau Cloudflare | Bật sẵn (có công tắc trong Cài đặt): nginx nhận IP thật của khách qua `/etc/nginx/conf.d/lares-cloudflare.conf`, dải IP Cloudflare cập nhật mỗi ngày, tự hoàn tác nếu `nginx -t` lỗi |
 | Chuyển site | Xem phần dưới                                                                                                                                                                                                                                                                                                                        |
 
 ## Chuyển site từ VPS / panel khác
@@ -144,7 +168,10 @@ apps/server          Fastify API (chạy bằng root trên VPS)
   src/routes         REST + SSE
 templates/           Giao diện mẫu: _base.css, _wp.css + <id>/{template.json, style.css, index.html, wordpress/home.html}
 apps/web             React 19 + Vite + TanStack Query
-install.sh           Bộ cài 1 lệnh
+install.sh           Bộ cài 1 lệnh (uninstall.sh: gỡ cài đặt)
+docs/                Tài liệu (vi/, en/)
+ops/telemetry-worker Cloudflare Worker nhận bộ đếm cài đặt ẩn danh (/ping)
+.github/workflows    CI: typecheck, test, build, ShellCheck, chạy thử install.sh trên Ubuntu 22.04/24.04
 ```
 
 Nơi lưu trên VPS: dữ liệu `/var/lib/lares` (SQLite, secret), site `/var/www/<domain>/{public_html|app}`, log `/var/log/lares/sites/<domain>/`, vhost `/etc/nginx/sites-available/<domain>.conf`, service Next.js `lares-app-<domain>.service`.
@@ -155,10 +182,15 @@ Nơi lưu trên VPS: dữ liệu `/var/lib/lares` (SQLite, secret), site `/var/w
 - Mọi tham số shell đều được quote; tên miền, đường dẫn và excludes được validate bằng Zod ở cả server lẫn web.
 - Code và dump SQL từ site migrate về được coi là **không tin cậy**: import SQL bằng user riêng của site (không dùng root), wp-cli/artisan/npm chạy bằng `www-data`, gỡ bit setuid/setgid, giải nén với `--no-same-owner`.
 - Host key SSH được ghim sau lần *Kiểm tra kết nối*; nếu key đổi thì dừng lại.
-- Trang quản trị chạy HTTPS (chứng chỉ tự ký, thay được qua `LARES_TLS_CERT/KEY`), đăng nhập có rate-limit, token SSE được che trong log.
+- Trang quản trị chạy HTTPS (chứng chỉ tự ký, hoặc Let's Encrypt khi đặt tên miền cho trang quản trị), có xác thực 2 lớp, giới hạn IP, chống dò mật khẩu, thu hồi phiên đăng nhập; token SSE được che trong log. Hướng dẫn: [docs/vi/security.md](docs/vi/security.md).
 
 ## Giới hạn hiện tại
 
 - Mọi site chạy chung user `www-data` (chưa tách user/PHP-FPM pool riêng cho từng site).
 - Chuyển database chỉ hỗ trợ MySQL/MariaDB; site Next.js dùng DB ngoài (Postgres, Mongo...) cần tự chuyển DB đó.
 - Biến môi trường bí mật của Next.js không nằm trong mã nguồn (ví dụ trong process manager của panel cũ) cần được nhập lại.
+- Bản sao lưu hiện chỉ lưu trên chính VPS; hãy tự chép ra ngoài.
+
+## Giấy phép
+
+Lares Panel là phần mềm tự do theo [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). © ThoCode.

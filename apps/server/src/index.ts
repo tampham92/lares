@@ -12,6 +12,7 @@ import { failInterruptedMigrations } from './migration/repo.js';
 import { databaseRoutes } from './routes/databases.js';
 import { migrationRoutes } from './routes/migrations.js';
 import { aiRoutes } from './routes/ai.js';
+import { releaseRoutes } from './routes/release.js';
 import { siteRoutes } from './routes/sites.js';
 import { systemRoutes } from './routes/system.js';
 import { templateRoutes } from './routes/templates.js';
@@ -62,6 +63,7 @@ await app.register(databaseRoutes);
 await app.register(migrationRoutes);
 await app.register(templateRoutes);
 await app.register(aiRoutes);
+await app.register(releaseRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
