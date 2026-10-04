@@ -25,7 +25,7 @@ type DbTarget = { name: string; user: string; password: string; host: string };
 const fmtGb = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 
 /** wp-config.php sits in the web root, or one level above it (WordPress looks there too). */
-async function findWpConfig(site: Site): Promise<string | null> {
+export async function findWpConfig(site: Site): Promise<string | null> {
   for (const dir of [site.webRoot, path.dirname(site.webRoot)]) {
     if (dir !== site.rootPath && !dir.startsWith(site.rootPath + path.sep)) continue;
     const file = path.join(dir, 'wp-config.php');
@@ -34,7 +34,7 @@ async function findWpConfig(site: Site): Promise<string | null> {
   return null;
 }
 
-async function databasesSize(names: string[]): Promise<number> {
+export async function databasesSize(names: string[]): Promise<number> {
   if (!names.length) return 0;
   const rows = await mysql
     .query<Array<{ size: number | string | null }>>(

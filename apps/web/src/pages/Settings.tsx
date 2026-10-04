@@ -4,6 +4,7 @@ import { AI_MODELS, AI_PROVIDER_LABELS, AI_PROVIDERS, ANTHROPIC_MODELS, type AiP
 import { auth, del, errMsg, get, post, put } from '../api';
 import { NetworkSettings } from '../components/NetworkSettings';
 import { SecuritySettings } from '../components/SecuritySettings';
+import { BackupSettingsCard } from '../components/BackupSettingsCard';
 import { Alert, Check, Field } from '../components/ui';
 import { t } from '../i18n';
 
@@ -26,6 +27,7 @@ export function Settings() {
       <div className="grid cols-2">
         <AiSettingsCard />
         <NetworkSettings />
+        <BackupSettingsCard />
         <div className="card stack">
           <h2>{t('Lưu trữ log truy cập (logrotate)')}</h2>
           {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
