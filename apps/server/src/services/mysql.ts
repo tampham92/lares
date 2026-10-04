@@ -169,3 +169,54 @@ export async function closeMysql() {
   await pool?.end();
   pool = null;
 }
+
+// ---- Site backups (services/backups.ts) ------------------------------------
+
+/**
+ * Dump a database of this server into a gzipped file (admin account, consistent snapshot).
+ * Routines are dropped when the admin user may not read them. The dump must end with
+ * mysqldump's "Dump completed" trailer, so a truncated file is never taken for a backup.
+ */
+export async function dumpDatabaseGz(name: string, outFile: string, dumpFlags: string[], opts: { compressor?: string; log?: HostLogger } = {}) {
+  assertIdent(name, t('Tên database'));
+  const gz = opts.compressor ?? 'gzip';
+  const dump = (flags: string[]) =>
+    withDefaultsFile((cnf) =>
+      host.run(`umask 077; nice -n 10 mysqldump --defaults-extra-file=${shq(cnf)} ${flags.join(' ')} ${shq(name)} | ${gz} -c -6 > ${shq(outFile)}`, {
+        timeoutMs: 6 * 3_600_000,
+      }),
+    );
+  try {
+    await dump([...dumpFlags, '--routines']);
+  } catch (err) {
+    if (!/routine|PROCEDURE|FUNCTION|SUPER|privilege/i.test(err instanceof Error ? err.message : String(err))) throw err;
+    opts.log?.(t('Không dump được stored procedure/function của {name} → dump lại không kèm routines', { name }));
+    await dump(dumpFlags);
+  }
+  const tail = await host.run(`gzip -cd ${shq(outFile)} | tail -c 300`);
+  if (!tail.includes('Dump completed')) throw new Error(t('File dump của {name} không hoàn chỉnh (thiếu dòng "Dump completed")', { name }));
+}
+
+/**
+ * Empty a database before a restore: dropped and created again with its previous character set,
+ * and its user re-created/granted if missing. Grants on `db`.* survive DROP DATABASE in MySQL/MariaDB.
+ */
+export async function recreateDatabase(name: string, user: string, password: string, log?: HostLogger) {
+  assertIdent(name, t('Tên database'));
+  assertIdent(user, t('Tên user'));
+  if (config.dryRun) {
+    log?.(`[dry-run] DROP DATABASE \`${name}\`; CREATE DATABASE \`${name}\``);
+    return;
+  }
+  const rows = await query<Array<{ cs: string; co: string }>>(
+    'SELECT DEFAULT_CHARACTER_SET_NAME AS cs, DEFAULT_COLLATION_NAME AS co FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?',
+    [name],
+  );
+  const cs = /^\w+$/.test(rows[0]?.cs ?? '') ? rows[0]!.cs : 'utf8mb4';
+  const co = /^\w+$/.test(rows[0]?.co ?? '') ? rows[0]!.co : 'utf8mb4_unicode_ci';
+  await query(`DROP DATABASE IF EXISTS \`${name}\``);
+  await query(`CREATE DATABASE \`${name}\` CHARACTER SET ${cs} COLLATE ${co}`);
+  await query(`CREATE USER IF NOT EXISTS ?@'localhost' IDENTIFIED BY ?`, [user, password]);
+  await query(`GRANT ALL PRIVILEGES ON \`${name}\`.* TO ?@'localhost'`, [user]);
+  await query('FLUSH PRIVILEGES');
+}

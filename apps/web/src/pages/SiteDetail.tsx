@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { APP_LABELS, LOCALHOST, msg, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
 import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
 import { AiWriter } from '../components/AiWriter';
+import { BackupsTab } from '../components/BackupsTab';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
 import { locale, t } from '../i18n';
@@ -15,7 +16,7 @@ interface SiteDetailResponse {
   nodeConfig: { gitUrl?: string; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
-type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'clone' | 'danger';
+type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'backups' | 'clone' | 'danger';
 
 export function SiteDetail() {
   const id = Number(useParams().id);
@@ -35,6 +36,7 @@ function SitePage({ id }: { id: number }) {
     ['logs', t('Log traffic')],
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
     ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')]] as Array<[Tab, string]>) : []),
+    ['backups', t('Sao lưu')],
     ['clone', t('Nhân bản')],
     ['danger', t('Xoá site')],
   ];
@@ -67,6 +69,7 @@ function SitePage({ id }: { id: number }) {
       {tab === 'logs' && <LogsTab site={site} />}
       {tab === 'nextjs' && <NextTab data={q.data} />}
       {tab === 'ai' && <AiWriter site={site} />}
+      {tab === 'backups' && <BackupsTab site={site} />}
       {tab === 'clone' && <CloneTab site={site} dbs={q.data.databases} />}
       {tab === 'danger' && <DangerTab site={site} dbs={q.data.databases} />}
     </>

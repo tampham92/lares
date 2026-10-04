@@ -109,3 +109,17 @@ export function setSetting(key: string, value: unknown) {
     JSON.stringify(value),
   );
 }
+
+// ---- Site backups (services/backups.ts) ------------------------------------
+// Per-site schedule override and the last scheduled run. `last_run_date` (local YYYY-MM-DD) is
+// written before a scheduled backup starts, so a restart never runs the same site twice a day.
+db.exec(`
+CREATE TABLE IF NOT EXISTS site_backups (
+  site_id INTEGER PRIMARY KEY REFERENCES sites(id) ON DELETE CASCADE,
+  scheduled INTEGER NOT NULL DEFAULT 1,
+  last_run_date TEXT,
+  last_status TEXT,
+  last_error TEXT,
+  last_run_at TEXT
+);
+`);
