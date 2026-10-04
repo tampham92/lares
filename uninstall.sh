@@ -10,6 +10,7 @@
 #
 #  Không bao giờ gỡ nginx / MySQL / MariaDB / PHP / Node.js và không đụng tới site
 #  không do Lares tạo. Gỡ các gói đó bằng apt nếu thật sự muốn.
+#  Bản sao lưu site trong /var/backups/lares luôn được giữ lại.
 #
 #  English output: ... | sudo bash -s -- --lang en   (default: the panel's language, else vi)
 # =============================================================================
@@ -36,7 +37,7 @@ fi
 LANG_UI=$(printf '%s' "${LANG_UI:-vi}" | tr '[:upper:]' '[:lower:]'); LANG_UI="${LANG_UI:0:2}"
 case "$LANG_UI" in
   vi|en) ;;
-  *) [[ -n "$LANG_ARG" ]] && { echo "--lang: vi | en" >&2; exit 1; }; LANG_UI=vi ;;
+  *) [[ -n "$LANG_ARG" ]] && { echo "--lang: vi | en" >&2; exit 1; }; LANG_UI="vi" ;;
 esac
 # L 'Tiếng Việt' 'English' -> the text for the chosen language
 L() { if [[ $LANG_UI == en ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
@@ -60,6 +61,7 @@ Options:
 
 nginx / MySQL / MariaDB / PHP / Node.js are never removed, and sites Lares did not
 create are never touched. Remove those packages with apt if you really want to.
+Site backups in /var/backups/lares are always kept (delete them yourself).
 TXT
   else
     cat <<'TXT'
@@ -79,6 +81,7 @@ Tuỳ chọn:
 
 Không bao giờ gỡ nginx / MySQL / MariaDB / PHP / Node.js và không đụng tới site
 không do Lares tạo. Gỡ các gói đó bằng apt nếu thật sự muốn.
+Bản sao lưu site trong /var/backups/lares luôn được giữ lại (tự xoá nếu muốn).
 TXT
   fi
 }
@@ -118,6 +121,7 @@ confirm() {
 }
 
 env_get() { [[ -f "$ENV_FILE" ]] && grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
+BACKUP_ROOT=$(env_get LARES_BACKUP_DIR); BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/lares}"
 
 # ---- Inventory (read Lares's SQLite before the code that can read it is gone) -----
 SITES=()      # domain \t root_path \t app_type \t ssl_type
@@ -176,11 +180,12 @@ else
   CONFIRM_WORD=$(L XOA DELETE)
   echo -e "${c_red}$(L 'XOÁ SẠCH' 'PURGE')${c_off} - $(L 'panel và mọi thứ Lares đã tạo:' 'the panel and everything Lares created:')"
   echo "  ${#SITES[@]} website (file, vhost, log, SSL, $(L 'service Next.js' 'Next.js services')):"
-  for s in "${SITES[@]+"${SITES[@]}"}"; do IFS=$'\t' read -r d root type _ <<<"$s"; echo "     - $d  ($root)"; done
+  for s in "${SITES[@]+"${SITES[@]}"}"; do IFS=$'\t' read -r d root _ <<<"$s"; echo "     - $d  ($root)"; done
   echo "  ${#DATABASES[@]} $(L 'database do Lares tạo:' 'database(s) created by Lares:')"
   for x in "${DATABASES[@]+"${DATABASES[@]}"}"; do echo "     - ${x%%$'\t'*}"; done
   echo "  $DATA_DIR, $CONF_DIR, /var/log/lares, $(L "user MySQL 'lares'" "MySQL user 'lares'")"
   echo "  $(L "(database 'dùng chung' với panel khác và site không do Lares tạo sẽ được giữ nguyên)" "(databases 'shared' with another panel and sites Lares did not create are kept)")"
+  [[ -d "$BACKUP_ROOT" ]] && echo "  $(L "Bản sao lưu site trong $BACKUP_ROOT được GIỮ LẠI" "Site backups in $BACKUP_ROOT are KEPT")"
   confirm "$(L "Thao tác KHÔNG thể hoàn tác. Gõ $CONFIRM_WORD để xác nhận:" "This CANNOT be undone. Type $CONFIRM_WORD to confirm:")" "$CONFIRM_WORD" || die "$(L 'Đã huỷ' 'Cancelled')"
 fi
 
@@ -195,7 +200,7 @@ ok "$(L 'Đã dừng và gỡ lares.service' 'Stopped and removed lares.service'
 if [[ $PURGE == 1 ]]; then
   step "$(L 'Xoá website' 'Deleting websites')"
   for s in "${SITES[@]+"${SITES[@]}"}"; do
-    IFS=$'\t' read -r domain root type ssl <<<"$s"
+    IFS=$'\t' read -r domain root _type ssl <<<"$s"
     [[ "$domain" =~ $DOMAIN_RE ]] || { warn "$(L 'Bỏ qua tên miền không hợp lệ' 'Skipping invalid domain'): $domain"; continue; }
     unit="lares-app-$domain"
     if [[ -f "/etc/systemd/system/$unit.service" ]]; then
@@ -235,7 +240,10 @@ if [[ $PURGE == 1 ]]; then
   fi
 
   step "$(L 'Xoá cấu hình, dữ liệu và log của Lares' "Deleting Lares's configuration, data and logs")"
-  rm -f /etc/nginx/conf.d/00-lares.conf /etc/nginx/conf.d/99-lares-default.conf /etc/logrotate.d/lares
+  rm -f /etc/nginx/conf.d/00-lares.conf /etc/nginx/conf.d/99-lares-default.conf /etc/logrotate.d/lares \
+    /etc/nginx/conf.d/lares-cloudflare.conf /etc/nginx/conf.d/lares-panel.conf
+  # Let's Encrypt certificate of the panel domain (Settings -> panel domain)
+  if command -v certbot >/dev/null; then certbot delete --cert-name lares-panel --non-interactive >/dev/null 2>&1 || true; fi
   if command -v nginx >/dev/null && nginx -t >/dev/null 2>&1; then
     systemctl is-active --quiet nginx && systemctl reload nginx || true
   else
@@ -266,6 +274,9 @@ if [[ $PURGE == 0 ]]; then
   echo "  $(L 'Các website vẫn chạy. Dữ liệu còn lại' 'Websites keep running. Remaining data'): $DATA_DIR, $CONF_DIR"
   echo "  $(L 'Cài lại' 'Reinstall'): curl -sSL https://lares.thocode.dev/install | sudo bash"
   echo "  $(L 'Xoá sạch: chạy lại uninstall.sh với --purge' 'Remove everything: run uninstall.sh again with --purge')"
+fi
+if [[ -d "$BACKUP_ROOT" ]]; then
+  echo "  $(L "Bản sao lưu site vẫn còn trong $BACKUP_ROOT - xoá khi không cần nữa" "Site backups are still in $BACKUP_ROOT - delete them when no longer needed"): rm -rf $BACKUP_ROOT"
 fi
 echo "  $(L 'nginx, MariaDB/MySQL, PHP, Node.js được giữ nguyên. Muốn gỡ:' 'nginx, MariaDB/MySQL, PHP and Node.js are kept. To remove them:')"
 echo "    apt purge nginx mariadb-server 'php*-fpm' nodejs certbot   $(L '(cẩn thận nếu còn site khác)' '(careful if other sites remain)')"

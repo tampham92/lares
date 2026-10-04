@@ -5,6 +5,7 @@ export { SHARED_EN } from './i18n-en.js';
 export * from './network.js';
 export * from './security.js';
 export * from './backup.js';
+export * from './release.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)

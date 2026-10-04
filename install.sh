@@ -11,7 +11,8 @@
 #  English output + English as the panel's default language:
 #    curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --lang en
 #
-#  Supported: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12 (x86_64, arm64)
+#  Supported: Ubuntu 22.04 / 24.04, Debian 12 (x86_64, arm64). Debian 13: not yet tested (warning).
+#  Ubuntu 20.04 / Debian 11 and older (end of life) are refused unless --force-unsupported is given.
 #  Re-running the script upgrades Lares in place (keeps data, admin & DB credentials).
 #
 #  Existing services are detected and reused, never replaced:
@@ -19,23 +20,32 @@
 #   - nginx from apt: reused, existing vhosts / default site untouched
 #   - port 80/443 held by another web server (Apache, OpenLiteSpeed, a panel's nginx): Lares's nginx is
 #     installed but left stopped until you switch over ("coexist mode")
+#
+#  Anonymous install counter: one tiny ping on install/upgrade (random install id, Lares version,
+#  event, OS id+version, arch, panel language - nothing else). Opt out: --no-telemetry, or
+#  LARES_TELEMETRY=0 in /etc/lares/lares.env. Details: docs/en/installation.md#telemetry
 # =============================================================================
 set -Eeuo pipefail
 
 # ---- Configurable (env vars or flags) ---------------------------------------
 LARES_REPO="${LARES_REPO:-https://github.com/tampham92/lares.git}"
 LARES_BRANCH="${LARES_BRANCH:-main}"
-LARES_TARBALL="${LARES_TARBALL:-}"          # URL .tar.gz thay cho git (tuỳ chọn)
-LARES_PORT="${LARES_PORT:-8686}"
-PHP_VERSIONS="${PHP_VERSIONS:-8.3 8.2 8.1 7.4}"
+LARES_TARBALL="${LARES_TARBALL:-}"          # URL/đường dẫn .tar.gz thay cho git (tuỳ chọn)
+PORT_ARG="${LARES_PORT:-}"                  # empty = saved port on upgrade, else 8686
+PHP_ARG="${PHP_VERSIONS:-}"                 # empty = saved versions on upgrade, else the default list
+DEFAULT_PHP_VERSIONS="8.3 8.2 8.1 7.4"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 MYSQL_ROOT_USER="${MYSQL_ROOT_USER:-root}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 FRESH_DATA=0
+FORCE_UNSUPPORTED=0
+TELEMETRY_ARG="${LARES_TELEMETRY:-}"        # 0 = no anonymous install ping / daily heartbeat
+TELEMETRY_URL="${LARES_TELEMETRY_URL:-https://lares.thocode.dev/ping}"
 INSTALL_DIR="/opt/lares"
 DATA_DIR="/var/lib/lares"
 CONF_DIR="/etc/lares"
 ENV_FILE="$CONF_DIR/lares.env"
+INSTALL_ID_FILE="$CONF_DIR/install-id"
 NGINX_BIN="/usr/sbin/nginx"
 
 # ---- Language (vi | en) - resolved first so every message below is translated ---
@@ -53,7 +63,7 @@ fi
 LANG_UI=$(printf '%s' "${LANG_UI:-vi}" | tr '[:upper:]' '[:lower:]'); LANG_UI="${LANG_UI:0:2}"
 case "$LANG_UI" in
   vi|en) ;;
-  *) [[ -n "$LANG_ARG" ]] && { echo "--lang: vi | en" >&2; exit 1; }; LANG_UI=vi ;;
+  *) [[ -n "$LANG_ARG" ]] && { echo "--lang: vi | en" >&2; exit 1; }; LANG_UI="vi" ;;
 esac
 # L 'Tiếng Việt' 'English' -> the text for the chosen language
 L() { if [[ $LANG_UI == en ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
@@ -70,18 +80,24 @@ Usage:
 Options:
   --lang vi|en                 Installer language and panel default language
                                (default: vi; an upgrade keeps the saved language)
-  --port <port>                Panel HTTPS port (default: 8686)
-  --php "<versions>"           PHP versions to install (default: "8.3 8.2 8.1 7.4")
+  --port <port>                Panel HTTPS port (default: 8686; an upgrade keeps the saved port)
+  --php "<versions>"           PHP versions to install (default: "8.3 8.2 8.1 7.4";
+                               an upgrade keeps the saved versions)
   --node <major>               Node.js major version when Node >= 20 is missing (default: 22)
   --mysql-root-user <user>     Admin user of an existing MySQL/MariaDB (default: root)
   --mysql-root-password <pw>   Its password, when socket login does not work
   --repo <url>                 Git repository (default: https://github.com/tampham92/lares.git)
   --branch <name>              Git branch (default: main)
-  --tarball <url>              Install from a .tar.gz instead of git
+  --tarball <url|path>         Install from a .tar.gz (URL, file:// or local path) instead of git
   --fresh-data                 Old data found without its env file: back it up and install fresh
+  --no-telemetry               Do not send the anonymous install/upgrade ping or the daily
+                               heartbeat (saved as LARES_TELEMETRY=0 in /etc/lares/lares.env)
+  --force-unsupported          Install on an end-of-life / unsupported OS anyway (no support)
   -h, --help                   Show this help
 
-Supported: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12 (x86_64, arm64)
+Supported: Ubuntu 22.04 / 24.04, Debian 12 (x86_64, arm64). Debian 13: not yet tested.
+Anonymous telemetry sends only: a random install id, Lares version, event (install/upgrade/
+heartbeat), OS id + version, CPU architecture, panel language. Never IPs, domains or site data.
 TXT
   else
     cat <<'TXT'
@@ -94,18 +110,24 @@ Cách dùng:
 Tuỳ chọn:
   --lang vi|en                 Ngôn ngữ của installer và ngôn ngữ mặc định của panel
                                (mặc định: vi; khi nâng cấp giữ ngôn ngữ đã lưu)
-  --port <port>                Port HTTPS của trang quản trị (mặc định: 8686)
-  --php "<phiên bản>"          Các phiên bản PHP cần cài (mặc định: "8.3 8.2 8.1 7.4")
+  --port <port>                Port HTTPS của trang quản trị (mặc định: 8686; nâng cấp giữ port đã lưu)
+  --php "<phiên bản>"          Các phiên bản PHP cần cài (mặc định: "8.3 8.2 8.1 7.4";
+                               nâng cấp giữ các phiên bản đã lưu)
   --node <major>               Phiên bản Node.js khi chưa có Node >= 20 (mặc định: 22)
   --mysql-root-user <user>     User quản trị MySQL/MariaDB đang có (mặc định: root)
   --mysql-root-password <mk>   Mật khẩu của user đó, khi không đăng nhập được qua socket
   --repo <url>                 Kho git (mặc định: https://github.com/tampham92/lares.git)
   --branch <tên>               Nhánh git (mặc định: main)
-  --tarball <url>              Cài từ file .tar.gz thay cho git
+  --tarball <url|đường dẫn>    Cài từ file .tar.gz (URL, file:// hoặc đường dẫn trên máy) thay cho git
   --fresh-data                 Có dữ liệu cũ nhưng thiếu file env: sao lưu dữ liệu cũ rồi cài mới
+  --no-telemetry               Không gửi ping ẩn danh khi cài/nâng cấp và heartbeat hằng ngày
+                               (lưu thành LARES_TELEMETRY=0 trong /etc/lares/lares.env)
+  --force-unsupported          Vẫn cài trên HĐH đã hết hạn hỗ trợ / không được hỗ trợ (tự chịu rủi ro)
   -h, --help                   Hiện trợ giúp này
 
-Hỗ trợ: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12 (x86_64, arm64)
+Hỗ trợ: Ubuntu 22.04 / 24.04, Debian 12 (x86_64, arm64). Debian 13: chưa kiểm thử.
+Thống kê ẩn danh chỉ gửi: mã cài đặt ngẫu nhiên, phiên bản Lares, sự kiện (install/upgrade/
+heartbeat), tên + phiên bản HĐH, kiến trúc CPU, ngôn ngữ panel. Không bao giờ gửi IP, tên miền hay dữ liệu site.
 TXT
   fi
 }
@@ -114,8 +136,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --lang) [[ $# -ge 2 ]] || { echo "--lang: vi | en" >&2; exit 1; }; shift 2 ;;   # read above
     --lang=*) shift ;;
-    --port) LARES_PORT="$2"; shift 2 ;;
-    --php) PHP_VERSIONS="$2"; shift 2 ;;
+    --port) PORT_ARG="$2"; shift 2 ;;
+    --php) PHP_ARG="$2"; shift 2 ;;
     --node) NODE_MAJOR="$2"; shift 2 ;;
     --repo) LARES_REPO="$2"; shift 2 ;;
     --branch) LARES_BRANCH="$2"; shift 2 ;;
@@ -123,10 +145,24 @@ while [[ $# -gt 0 ]]; do
     --mysql-root-user) MYSQL_ROOT_USER="$2"; shift 2 ;;
     --mysql-root-password) MYSQL_ROOT_PASSWORD="$2"; shift 2 ;;
     --fresh-data) FRESH_DATA=1; shift ;;
+    --no-telemetry) TELEMETRY_ARG=0; shift ;;
+    --force-unsupported) FORCE_UNSUPPORTED=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "$(L 'Tham số không hợp lệ' 'Invalid option'): $1 ($(L 'xem' 'see') --help)"; exit 1 ;;
   esac
 done
+
+# An upgrade (often the plain one-liner shown in the panel) keeps the port and PHP versions chosen at
+# install time unless --port / --php are given again.
+saved_env() { [[ -r "$ENV_FILE" ]] && grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
+LARES_PORT="${PORT_ARG:-$(saved_env LARES_PORT)}"; LARES_PORT="${LARES_PORT:-8686}"
+[[ "$LARES_PORT" =~ ^[0-9]{2,5}$ ]] && (( LARES_PORT <= 65535 )) || { echo "--port: 1-65535" >&2; exit 1; }
+PHP_VERSIONS="${PHP_ARG:-$(saved_env LARES_PHP_VERSIONS | tr ',' ' ')}"
+if [[ -z "$PHP_VERSIONS" && -f "$ENV_FILE" ]]; then
+  # Installed before LARES_PHP_VERSIONS was saved: keep the PHP-FPM versions that are already there.
+  for d in /etc/php/*/fpm; do [[ -d "$d" ]] && PHP_VERSIONS+="$(basename "$(dirname "$d")") "; done
+fi
+PHP_VERSIONS=$(echo "${PHP_VERSIONS:-$DEFAULT_PHP_VERSIONS}" | xargs)
 
 # ---- Helpers ----------------------------------------------------------------
 c_green='\033[0;32m'; c_yellow='\033[1;33m'; c_red='\033[0;31m'; c_blue='\033[0;34m'; c_off='\033[0m'
@@ -177,10 +213,30 @@ restore_policy_rc() {
 # ---- Pre-flight -------------------------------------------------------------
 [[ $EUID -eq 0 ]] || die "$(L 'Hãy chạy với quyền root' 'Please run as root'): curl -sSL https://lares.thocode.dev/install | sudo bash"
 [[ -r /etc/os-release ]] || die "$(L 'Không xác định được hệ điều hành' 'Cannot determine the operating system')"
+# shellcheck source=/dev/null
 . /etc/os-release
-case "$ID:${VERSION_ID:-}" in
-  ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|debian:11|debian:12) ;;
-  *) warn "$(L "HĐH $PRETTY_NAME chưa được kiểm thử chính thức - tiếp tục trên cơ sở Debian/Ubuntu" "$PRETTY_NAME is not officially tested - continuing as Debian/Ubuntu")" ;;
+PRETTY_NAME="${PRETTY_NAME:-${ID:-unknown} ${VERSION_ID:-}}"
+# Refuse (unless --force-unsupported) instead of half-installing on a system we cannot support.
+unsupported_os() {
+  if [[ $FORCE_UNSUPPORTED == 1 ]]; then
+    warn "$1 - $(L 'vẫn tiếp tục vì có --force-unsupported (không được hỗ trợ)' 'continuing because of --force-unsupported (unsupported)')"
+  else
+    die "$1
+   $(L 'Hỗ trợ chính thức' 'Officially supported'): Ubuntu 22.04 / 24.04, Debian 12.
+   $(L 'Hãy dùng một trong các HĐH trên, hoặc chấp nhận rủi ro và chạy lại với' 'Use one of those, or accept the risk and run again with'): ... | sudo bash -s -- --force-unsupported"
+  fi
+}
+OS_MAJOR="${VERSION_ID:-}"; OS_MAJOR="${OS_MAJOR%%.*}"
+case "${ID:-}:${VERSION_ID:-}" in
+  ubuntu:22.04|ubuntu:24.04|debian:12) ;;
+  debian:13) warn "$(L "$PRETTY_NAME chưa được kiểm thử - Lares có thể chạy nhưng chưa được hỗ trợ chính thức" "$PRETTY_NAME is not yet tested - Lares may work but is not officially supported yet")" ;;
+  ubuntu:*|debian:*)
+    if [[ "$OS_MAJOR" =~ ^[0-9]+$ ]] && { [[ $ID == ubuntu ]] && (( OS_MAJOR < 22 )) || { [[ $ID == debian ]] && (( OS_MAJOR < 12 )); }; }; then
+      unsupported_os "$(L "$PRETTY_NAME đã hết vòng đời (end of life) - không còn bản vá bảo mật, Lares không hỗ trợ" "$PRETTY_NAME is end of life - no more security updates, Lares does not support it")"
+    else
+      warn "$(L "$PRETTY_NAME chưa được kiểm thử - Lares có thể chạy nhưng chưa được hỗ trợ chính thức" "$PRETTY_NAME is not yet tested - Lares may work but is not officially supported yet")"
+    fi ;;
+  *) unsupported_os "$(L "$PRETTY_NAME không phải Ubuntu/Debian" "$PRETTY_NAME is not Ubuntu/Debian")" ;;
 esac
 command -v apt-get >/dev/null || die "$(L 'Cần apt-get (Debian/Ubuntu)' 'apt-get is required (Debian/Ubuntu)')"
 ARCH=$(dpkg --print-architecture)
@@ -426,23 +482,32 @@ install -d -m 700 "$CONF_DIR/ssl" "$INSTALL_DIR"
 install -d -m 711 "$DATA_DIR"
 install -d -m 755 "$DATA_DIR/acme"
 install -d -m 755 "$DATA_DIR/templates"   # your own templates - kept across upgrades
+install -d -m 700 "${LARES_BACKUP_DIR:-/var/backups/lares}"   # site backups (root only)
+chmod 700 "${LARES_BACKUP_DIR:-/var/backups/lares}"
 
 # ---- Fetch & build Lares ----------------------------------------------------
 step "$(L 'Tải mã nguồn Lares' 'Downloading Lares source code')"
 SRC="$INSTALL_DIR/src"
 if [[ -n "$LARES_TARBALL" ]]; then
   tmp=$(mktemp -d)
-  curl -fsSL "$LARES_TARBALL" | tar -xz -C "$tmp"
-  inner=$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -1)
-  rsync -a --delete --exclude node_modules "${inner:-$tmp}/" "$SRC/"
+  # A local path (CI, offline installs) or any URL curl understands (https://, file://)
+  if [[ -f "$LARES_TARBALL" ]]; then tar -xzf "$LARES_TARBALL" -C "$tmp"; else curl -fsSL "$LARES_TARBALL" | tar -xz -C "$tmp"; fi
+  # GitHub/`git archive --prefix` tarballs wrap everything in one directory; a flat tarball does not.
+  top=$(find "$tmp" -mindepth 1 -maxdepth 1)
+  inner="$tmp"
+  [[ $(printf '%s\n' "$top" | wc -l) -eq 1 && -d "$top" ]] && inner="$top"
+  [[ -f "$inner/package.json" && -d "$inner/apps/server" ]] || { rm -rf "$tmp"; die "$(L 'File tarball không chứa mã nguồn Lares' 'The tarball does not contain the Lares source code'): $LARES_TARBALL"; }
+  rsync -a --delete --exclude node_modules "$inner/" "$SRC/"
   rm -rf "$tmp"
 elif [[ -d "$SRC/.git" ]]; then
   git -C "$SRC" fetch --depth 1 origin "$LARES_BRANCH"
   git -C "$SRC" reset --hard FETCH_HEAD
 else
+  rm -rf "$SRC"   # e.g. an earlier --tarball install: git clone needs an empty directory
   git clone --depth 1 --branch "$LARES_BRANCH" "$LARES_REPO" "$SRC"
 fi
-ok "$(L 'Mã nguồn tại' 'Source code in') $SRC"
+LARES_VERSION=$(/usr/bin/node -p 'require(process.argv[1]).version' "$SRC/package.json" 2>/dev/null || echo unknown)
+ok "$(L 'Mã nguồn tại' 'Source code in') $SRC (Lares $LARES_VERSION)"
 
 step "$(L 'Build Lares (có thể mất 1-2 phút)' 'Building Lares (may take 1-2 minutes)')"
 cd "$SRC"
@@ -464,6 +529,17 @@ fi
 set_env() { # add or replace KEY=VALUE in the env file
   if grep -q "^$1=" "$ENV_FILE"; then sed -i "s#^$1=.*#$1=$2#" "$ENV_FILE"; else echo "$1=$2" >> "$ENV_FILE"; fi
 }
+# Anonymous telemetry: --no-telemetry / LARES_TELEMETRY in the shell win, then the value saved by an
+# earlier install, then on. Saved in the env file so the panel's daily heartbeat follows the same choice.
+TELEMETRY="$TELEMETRY_ARG"
+if [[ -z "$TELEMETRY" && -r "$ENV_FILE" ]]; then
+  TELEMETRY=$(grep -E '^LARES_TELEMETRY=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)
+fi
+case "$(printf '%s' "$TELEMETRY" | tr '[:upper:]' '[:lower:]')" in
+  0|false|no|off) TELEMETRY=0 ;;
+  *) TELEMETRY=1 ;;
+esac
+
 ADMIN_PASS=""
 if [[ $UPGRADE == 0 ]]; then
   ADMIN_PASS=$(rand 16)
@@ -472,6 +548,7 @@ if [[ $UPGRADE == 0 ]]; then
 NODE_ENV=production
 LARES_PORT=$LARES_PORT
 LARES_HOST=0.0.0.0
+LARES_TRUST_PROXY=
 LARES_DATA_DIR=$DATA_DIR
 LARES_SECRET=$(rand 64)
 LARES_WEB_DIST=$SRC/apps/web/dist
@@ -495,6 +572,13 @@ else
   set_env LARES_NGINX_BIN "$NGINX_BIN"
   set_env LARES_LANG "$LANG_UI"   # the saved one unless --lang was given
 fi
+set_env LARES_TELEMETRY "$TELEMETRY"
+if [[ -n "${LARES_BACKUP_DIR:-}" ]]; then set_env LARES_BACKUP_DIR "$LARES_BACKUP_DIR"; fi
+set_env LARES_PHP_VERSIONS "${PHP_VERSIONS// /,}"   # commas: the env file is also sourced by the lares CLI
+# Random id that only tells installs apart (generated once, never derived from the machine).
+if [[ $TELEMETRY == 1 ]] && ! grep -Eqx '[0-9a-f-]{36}' "$INSTALL_ID_FILE" 2>/dev/null; then
+  (umask 077; cat /proc/sys/kernel/random/uuid > "$INSTALL_ID_FILE")
+fi
 
 # ---- systemd ------------------------------------------------------------------
 step "$(L 'Tạo service systemd' 'Creating the systemd service')"
@@ -509,6 +593,8 @@ Type=simple
 WorkingDirectory=$SRC/apps/server
 EnvironmentFile=$ENV_FILE
 ExecStart=/usr/bin/node dist/index.js
+# SIGHUP makes the panel reload its TLS certificate (e.g. after a Let's Encrypt renewal)
+ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=3
 LimitNOFILE=65535
@@ -527,7 +613,10 @@ if [[ $UPGRADE == 1 && -f "$DATA_DIR/lares.db" ]]; then
   install -d -m 700 "$BACKUP_DIR"
   systemctl stop lares 2>/dev/null || true   # consistent SQLite copy (WAL files included)
   BACKUP_FILE="$BACKUP_DIR/lares-$(date +%Y%m%d-%H%M%S).tar.gz"
-  (cd / && tar -czf "$BACKUP_FILE" etc/lares ${DATA_DIR#/}/lares.db* $( [[ -d "$DATA_DIR/templates" ]] && echo "${DATA_DIR#/}/templates" ))
+  backup_paths=("${CONF_DIR#/}")   # relative to / (tar runs there); lares.db + its -wal/-shm files
+  for f in "$DATA_DIR"/lares.db*; do [[ -e "$f" ]] && backup_paths+=("${f#/}"); done
+  [[ -d "$DATA_DIR/templates" ]] && backup_paths+=("${DATA_DIR#/}/templates")
+  (cd / && tar -czf "$BACKUP_FILE" "${backup_paths[@]}")
   chmod 600 "$BACKUP_FILE"
   ls -1t "$BACKUP_DIR"/lares-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f   # keep the 5 newest
   ok "$(L 'Đã sao lưu' 'Backed up to'): $BACKUP_FILE"
@@ -567,6 +656,21 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
   ok "ufw: 22, 80, 443, $LARES_PORT"
 fi
 
+# ---- Anonymous install counter (fire-and-forget, never fails the install) -------
+# Sends exactly these fields - no IP is stored, no domains, no site data. See docs/*/installation.md.
+send_ping() {
+  [[ $TELEMETRY == 1 && -r "$INSTALL_ID_FILE" ]] || return 0
+  local id ver os os_ver body
+  id=$(tr -dc '0-9a-f-' < "$INSTALL_ID_FILE" | head -c 36 || true)
+  ver=$(printf '%s' "$LARES_VERSION" | tr -dc '0-9A-Za-z.+-' | head -c 32 || true)
+  os=$(printf '%s' "${ID:-unknown}" | tr -dc 'a-z0-9._-' | head -c 32 || true)
+  os_ver=$(printf '%s' "${VERSION_ID:-}" | tr -dc '0-9A-Za-z._-' | head -c 16 || true)
+  body=$(printf '{"install_id":"%s","version":"%s","event":"%s","os":"%s","os_version":"%s","arch":"%s","lang":"%s"}' \
+    "$id" "$ver" "$1" "$os" "$os_ver" "$ARCH" "$LANG_UI")
+  curl -fsS --max-time 3 -X POST -H 'Content-Type: application/json' --data "$body" "$TELEMETRY_URL" >/dev/null 2>&1 || true
+}
+send_ping "$([[ $UPGRADE == 1 ]] && echo upgrade || echo install)"
+
 # ---- Done ---------------------------------------------------------------------
 IP=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
 echo
@@ -584,6 +688,11 @@ else
 fi
 echo -e "  $(L 'Quên mật khẩu' 'Forgot password'): sudo lares reset-password"
 echo -e "  Log:       journalctl -u lares -f"
+echo -e "  ${c_yellow}$(L 'Bảo mật' 'Security'):${c_off}  $(L "port $LARES_PORT đang mở cho mọi IP - bật xác thực 2 lớp và giới hạn IP trong Cài đặt (hoặc: sudo lares allowlist add <IP-của-bạn>)" "port $LARES_PORT is open to every IP - enable two-factor auth and the IP allowlist in Settings (or: sudo lares allowlist add <your-IP>)")"
+echo -e "  $(L 'Phiên bản' 'Version'):   $LARES_VERSION   $(L 'Tài liệu' 'Docs'): https://github.com/tampham92/lares/tree/main/docs"
+if [[ $TELEMETRY == 1 ]]; then
+  echo -e "  $(L 'Thống kê ẩn danh: bật (mã cài đặt ngẫu nhiên, phiên bản, HĐH - không IP/tên miền). Tắt: đặt LARES_TELEMETRY=0 trong' 'Anonymous stats: on (random install id, version, OS - no IPs/domains). Disable: set LARES_TELEMETRY=0 in') $ENV_FILE && systemctl restart lares"
+fi
 if [[ $COEXIST == 1 ]]; then
   echo
   echo -e "${c_yellow} $(L 'CHẾ ĐỘ CÙNG TỒN TẠI:' 'COEXIST MODE:')${c_off} $(L "port 80/443 đang do $WEB_FOREIGN giữ." "port 80/443 is held by $WEB_FOREIGN.")"
