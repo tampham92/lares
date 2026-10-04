@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { LOCALHOST, LOG_TYPES, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@tpanel/shared';
+import { LOCALHOST, LOG_TYPES, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
+import { t } from '../i18n/index.js';
 import { badRequest } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
 import { cloneSite } from '../services/clone.js';
@@ -42,20 +43,20 @@ export async function siteRoutes(app: FastifyInstance) {
 
   app.post('/api/sites', async (req) => {
     const input = parse(createSiteSchema, req.body);
-    if (sites.findSiteByHostname(input.domain)) throw badRequest(`${input.domain} đã tồn tại`);
+    if (sites.findSiteByHostname(input.domain)) throw badRequest(t('{domain} đã tồn tại', { domain: input.domain }));
     // Port-based sites are opened as http://<the host the admin is using>:<port>
     input.publicHost ||= req.hostname.replace(/:\d+$/, '');
-    return startTask(`Tạo site ${input.domain}`, (log) => sites.createSite(input, log));
+    return startTask(t('Tạo site {domain}', { domain: input.domain }), (log) => sites.createSite(input, log));
   });
 
   app.post('/api/sites/:id/clone', async (req) => {
     const id = idParam(req.params);
     const input = parse(cloneSiteSchema, req.body);
     const site = sites.getSite(id);
-    if (sites.findSiteByHostname(input.domain)) throw badRequest(`${input.domain} đã tồn tại`);
+    if (sites.findSiteByHostname(input.domain)) throw badRequest(t('{domain} đã tồn tại', { domain: input.domain }));
     input.publicHost ||= req.hostname.replace(/:\d+$/, '');
-    const target = input.domain === LOCALHOST ? `port ${input.listenPort ?? 'mới'}` : input.domain;
-    return startTask(`Nhân bản ${site.domain} → ${target}`, (log) => cloneSite(id, input, log));
+    const target = input.domain === LOCALHOST ? (input.listenPort != null ? `port ${input.listenPort}` : t('port mới')) : input.domain;
+    return startTask(t('Nhân bản {source} → {target}', { source: site.domain, target }), (log) => cloneSite(id, input, log));
   });
 
   app.patch('/api/sites/:id', async (req) => {
@@ -67,14 +68,14 @@ export async function siteRoutes(app: FastifyInstance) {
     const id = idParam(req.params);
     const input = parse(z.object({ domain: domainSchema, aliases: z.array(domainSchema).default([]) }), req.body);
     const site = sites.getSite(id);
-    return startTask(`Gán tên miền ${input.domain} cho ${site.domain}`, (log) => sites.changeDomain(id, input, log));
+    return startTask(t('Gán tên miền {domain} cho {site}', { domain: input.domain, site: site.domain }), (log) => sites.changeDomain(id, input, log));
   });
 
   app.delete('/api/sites/:id', async (req) => {
     const id = idParam(req.params);
     const opts = parse(deleteSiteSchema, req.body ?? {});
     const site = sites.getSite(id);
-    return startTask(`Xoá site ${site.domain}`, (log) => sites.deleteSite(id, opts, log));
+    return startTask(t('Xoá site {domain}', { domain: site.domain }), (log) => sites.deleteSite(id, opts, log));
   });
 
   // ---- Next.js -------------------------------------------------------------
@@ -82,7 +83,7 @@ export async function siteRoutes(app: FastifyInstance) {
   app.put('/api/sites/:id/nextjs', async (req) => {
     const id = idParam(req.params);
     const site = sites.getSite(id);
-    if (site.appType !== 'nextjs') throw badRequest('Site không phải Next.js');
+    if (site.appType !== 'nextjs') throw badRequest(t('Site không phải Next.js'));
     const input = parse(nextjsConfigSchema.partial({ branch: true }), req.body);
     const current = sites.getNodeConfig(id);
     // Empty env values from the UI mean "keep the stored secret".
@@ -101,7 +102,7 @@ export async function siteRoutes(app: FastifyInstance) {
   app.post('/api/sites/:id/service/:action', async (req) => {
     const id = idParam(req.params);
     const action = (req.params as { action: string }).action;
-    if (!['start', 'stop', 'restart'].includes(action)) throw badRequest('Hành động không hợp lệ');
+    if (!['start', 'stop', 'restart'].includes(action)) throw badRequest(t('Hành động không hợp lệ'));
     const site = sites.getSite(id);
     await nodeapp.serviceAction(site.domain, action as 'start' | 'stop' | 'restart');
     return nodeapp.serviceStatus(site.domain, site.appPort, site.webRoot);
@@ -113,12 +114,12 @@ export async function siteRoutes(app: FastifyInstance) {
     const id = idParam(req.params);
     const input = parse(issueSslSchema, req.body);
     const site = sites.getSite(id);
-    return startTask(`Cài SSL ${site.domain}`, (log) => sites.issueSsl(id, input, log));
+    return startTask(t('Cài SSL {domain}', { domain: site.domain }), (log) => sites.issueSsl(id, input, log));
   });
 
   app.post('/api/sites/:id/ssl/renew', async (req) => {
     const id = idParam(req.params);
-    return startTask(`Gia hạn SSL ${sites.getSite(id).domain}`, (log) => sites.renewSsl(id, log));
+    return startTask(t('Gia hạn SSL {domain}', { domain: sites.getSite(id).domain }), (log) => sites.renewSsl(id, log));
   });
 
   app.patch('/api/sites/:id/ssl', async (req) => {
@@ -154,7 +155,7 @@ export async function siteRoutes(app: FastifyInstance) {
     const site = sites.getSite(idParam(req.params));
     const type = parse(z.enum(['access', 'error']).default('access'), (req.query as { type?: string }).type);
     const file = siteLogPaths(site.domain)[type];
-    if (!fs.existsSync(file)) throw badRequest('Chưa có file log');
+    if (!fs.existsSync(file)) throw badRequest(t('Chưa có file log'));
     reply.header('Content-Type', 'text/plain; charset=utf-8');
     reply.header('Content-Disposition', `attachment; filename="${site.domain}-${path.basename(file)}"`);
     return reply.send(fs.createReadStream(file));

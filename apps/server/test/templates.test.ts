@@ -69,13 +69,13 @@ describe('templates', () => {
   });
 
   it('generates a valid block theme', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tpanel-theme-'));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lares-theme-'));
     try {
       const t = await getTemplate('bat-dong-san');
       const slug = await writeWordpressTheme(t, dir, templateVars(t, {}));
       const theme = path.join(dir, 'wp-content/themes', slug);
       const style = await fs.readFile(path.join(theme, 'style.css'), 'utf8');
-      expect(style).toMatch(/^\/\*\nTheme Name: TPanel Bất động sản/);
+      expect(style).toMatch(/^\/\*\nTheme Name: Lares Bất động sản/);
       expect(JSON.parse(await fs.readFile(path.join(theme, 'theme.json'), 'utf8')).version).toBe(2);
       for (const f of ['parts/header.html', 'parts/footer.html', 'templates/front-page.html', 'templates/index.html', 'templates/single.html', 'templates/page.html']) {
         const html = await fs.readFile(path.join(theme, f), 'utf8');

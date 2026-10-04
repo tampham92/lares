@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { errMsg, post } from '../api';
+import { t } from '../i18n';
 
 /**
  * Opens wp-admin already logged in (one-time link, valid 60s). The tab is opened synchronously on
@@ -23,8 +24,8 @@ export function WpAdminButton({ siteId, target = '', className = 'btn', children
     }
   };
   return (
-    <button type="button" className={className} disabled={busy} onClick={open} title="Đăng nhập trang quản trị WordPress không cần mật khẩu">
-      {busy ? 'Đang mở…' : children}
+    <button type="button" className={className} disabled={busy} onClick={open} title={t('Đăng nhập trang quản trị WordPress không cần mật khẩu')}>
+      {busy ? t('Đang mở…') : children}
     </button>
   );
 }

@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { LOCALHOST, type CloneSiteInput, type CreateSiteResult, type Site } from '@tpanel/shared';
+import { LOCALHOST, type CloneSiteInput, type CreateSiteResult, type Site } from '@lares/shared';
 import { config } from '../config.js';
 import { localExecutor } from '../executors/index.js';
+import { t } from '../i18n/index.js';
 import { conflict, errorMessage } from '../lib/errors.js';
 import { duKb, shq, tarCreate, tarExcludes } from '../lib/shell.js';
 import { UndoStack } from '../lib/undo.js';
@@ -54,19 +55,19 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
   const srcAppDir = path.join(src.rootPath, src.appType === 'nextjs' ? 'app' : 'public_html');
   const webRootSubdir = path.relative(srcAppDir, src.webRoot);
   if (webRootSubdir.startsWith('..') || path.isAbsolute(webRootSubdir)) {
-    throw conflict(`Web root ${src.webRoot} nằm ngoài thư mục site ${src.rootPath} - không nhân bản được`);
+    throw conflict(t('Web root {webRoot} nằm ngoài thư mục site {rootPath} - không nhân bản được', { webRoot: src.webRoot, rootPath: src.rootPath }));
   }
 
   // Databases to copy: the ones attached to the site, plus the one wp-config.php really points at.
   const wpConfig = src.appType === 'wordpress' ? await findWpConfig(src) : null;
   const wpDb = wpConfig ? parseWpConfig(await fs.readFile(wpConfig, 'utf8')) : null;
-  if (src.appType === 'wordpress' && !wpDb) throw conflict(`Không đọc được thông tin database trong wp-config.php của ${src.domain}`);
+  if (src.appType === 'wordpress' && !wpDb) throw conflict(t('Không đọc được thông tin database trong wp-config.php của {domain}', { domain: src.domain }));
   const dbNames: string[] = [];
   for (const name of new Set([...databases.databasesForSite(src.id).map((d) => d.name), ...(wpDb ? [wpDb.name] : [])])) {
     if (config.dryRun || (await mysql.databaseExists(name))) dbNames.push(name);
     // Without its own copy the clone would write into the source's database (URL replace) - refuse.
-    else if (name === wpDb?.name) throw conflict(`Database ${name} của ${src.domain} không nằm trên MySQL của TPanel - không nhân bản được`);
-    else log(`Bỏ qua database ${name}: không tồn tại trên MySQL của TPanel`);
+    else if (name === wpDb?.name) throw conflict(t('Database {name} của {domain} không nằm trên MySQL của Lares - không nhân bản được', { name, domain: src.domain }));
+    else log(t('Bỏ qua database {name}: không tồn tại trên MySQL của Lares', { name }));
   }
 
   const [sizeKb, free, dbBytes] = await Promise.all([
@@ -75,13 +76,13 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
     databasesSize(dbNames),
   ]);
   const needed = sizeKb * 1024 + dbBytes;
-  if (free !== null && needed > free * 0.95) throw conflict(`Không đủ dung lượng: cần khoảng ${fmtGb(needed)}, còn trống ${fmtGb(free)}`);
+  if (free !== null && needed > free * 0.95) throw conflict(t('Không đủ dung lượng: cần khoảng {needed}, còn trống {free}', { needed: fmtGb(needed), free: fmtGb(free) }));
 
   const undo = new UndoStack();
   try {
     let listenPort: number | null = null;
     if (input.domain === LOCALHOST) {
-      if (input.listenPort && !(await ports.isPortFree(input.listenPort))) throw conflict(`Port ${input.listenPort} đang được sử dụng`);
+      if (input.listenPort && !(await ports.isPortFree(input.listenPort))) throw conflict(t('Port {port} đang được sử dụng', { port: input.listenPort }));
       listenPort = input.listenPort ?? (await ports.allocatePort(config.sitePortStart));
     }
     const domain = listenPort ? sites.portSiteDomain(listenPort) : input.domain;
@@ -96,27 +97,27 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
     const appDir = sites.siteLayout(domain, src.appType, webRootSubdir).appDir;
     const inClone = (p: string) => path.join(site.rootPath, path.relative(src.rootPath, p));
 
-    log(`Đang sao chép file ${src.rootPath} → ${site.rootPath} (${fmtGb(sizeKb * 1024)})...`);
+    log(t('Đang sao chép file {from} → {to} ({size})...', { from: src.rootPath, to: site.rootPath, size: fmtGb(sizeKb * 1024) }));
     await host.run(`${tarCreate(src.rootPath, tarExcludes(CLONE_EXCLUDES))} | tar -C ${shq(site.rootPath)} -xpf -`, { timeoutMs: 12 * 3_600_000 });
-    log('Đã sao chép file');
+    log(t('Đã sao chép file'));
 
     const copies = new Map<string, DbTarget>();
     const flags = dbNames.length && !config.dryRun ? await mysqldumpFlags(localExecutor) : [];
     for (const name of dbNames) {
       const newName = databases.deriveDbName(domain);
       const created = await databases.createDatabase({ name: newName, username: newName, siteId: site.id }, log);
-      undo.push(`xoá database ${newName}`, () => databases.deleteDatabase(created.record.id, log));
-      log(`Đang sao chép database ${name} → ${newName}...`);
+      undo.push(t('xoá database {name}', { name: newName }), () => databases.deleteDatabase(created.record.id, log));
+      log(t('Đang sao chép database {from} → {to}...', { from: name, to: newName }));
       await mysql.copyDatabase(name, newName, { user: newName, password: created.password }, flags, log);
       copies.set(name, { name: newName, user: newName, password: created.password, host: 'localhost' });
-      log(`Đã sao chép database ${name} → ${newName}`);
+      log(t('Đã sao chép database {from} → {to}', { from: name, to: newName }));
     }
 
     switch (src.appType) {
       case 'wordpress': {
         const cfgFile = inClone(wpConfig!);
         await host.writeFile(cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), 0o640);
-        log('wp-config.php: trỏ sang database mới');
+        log(t('wp-config.php: trỏ sang database mới'));
         if (listenPort) await ensurePortHostFix(site.webRoot, log);
         // wp-cli runs as the web user and must be able to read the copied files
         await sites.fixPermissions(site.rootPath, log);
@@ -136,11 +137,11 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
           if (current.APP_URL) values.APP_URL = url;
           if (Object.keys(values).length) {
             await host.writeFile(envFile, rewriteDotEnv(env, values), 0o640);
-            log(`.env: cập nhật ${Object.keys(values).join(', ')}`);
+            log(t('.env: cập nhật {keys}', { keys: Object.keys(values).join(', ') }));
           }
         }
         for (const [from, to] of copies) {
-          if (to !== target) log(`CẦN KIỂM TRA: cấu hình của site vẫn có thể trỏ tới database ${from} - hãy đổi sang ${to.name} (mật khẩu xem ở mục Database)`);
+          if (to !== target) log(t('CẦN KIỂM TRA: cấu hình của site vẫn có thể trỏ tới database {from} - hãy đổi sang {to} (mật khẩu xem ở mục Database)', { from, to: to.name }));
         }
         if (src.appType === 'laravel' && (await host.has('php'))) {
           await sites.fixPermissions(site.rootPath, log);
@@ -151,15 +152,15 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
         break;
       }
       case 'nextjs': {
-        undo.push(`xoá service ${nodeapp.serviceName(domain)}`, () => nodeapp.removeService(domain, log));
+        undo.push(t('xoá service {name}', { name: nodeapp.serviceName(domain) }), () => nodeapp.removeService(domain, log));
         await nodeapp.writeServiceFiles(domain, site.webRoot, site.rootPath, site.appPort!, nodeConfig!, log);
         if (await host.exists(path.join(site.webRoot, '.next'))) {
           await sites.fixPermissions(site.rootPath, log);
           await nodeapp.serviceAction(domain, 'restart', log);
-          log(`Đã khởi động ${nodeapp.serviceName(domain)} trên 127.0.0.1:${site.appPort} (dùng bản build của site nguồn)`);
-          log('Lưu ý: biến NEXT_PUBLIC_* được đóng gói lúc build - nếu có giá trị chứa tên miền cũ, sửa ở tab Next.js rồi build lại.');
+          log(t('Đã khởi động {service} trên 127.0.0.1:{port} (dùng bản build của site nguồn)', { service: nodeapp.serviceName(domain), port: String(site.appPort) }));
+          log(t('Lưu ý: biến NEXT_PUBLIC_* được đóng gói lúc build - nếu có giá trị chứa tên miền cũ, sửa ở tab Next.js rồi build lại.'));
         } else {
-          log('Site nguồn chưa được build: bấm "Build & khởi động" trong trang site mới.');
+          log(t('Site nguồn chưa được build: bấm "Build & khởi động" trong trang site mới.'));
         }
         break;
       }
@@ -169,7 +170,7 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
 
     await sites.fixPermissions(site.rootPath, log);
     undo.clear();
-    log(`Hoàn tất nhân bản ${src.domain} - truy cập: ${url}`);
+    log(t('Hoàn tất nhân bản {domain} - truy cập: {url}', { domain: src.domain, url }));
     const first = [...copies.values()][0];
     return { site: sites.getSite(site.id), url, database: first ? { name: first.name, username: first.user, password: first.password } : null, wordpressAdmin: null };
   } catch (err) {

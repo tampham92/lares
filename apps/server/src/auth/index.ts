@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { loginSchema } from '@tpanel/shared';
+import { loginSchema } from '@lares/shared';
 import { db } from '../db/index.js';
 import { config } from '../config.js';
+import { t } from '../i18n/index.js';
 import { randomPassword } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
@@ -19,7 +20,7 @@ export function ensureAdminUser(log: (msg: string) => void) {
   const password = config.adminPassword || randomPassword(16);
   db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(config.adminUser, bcrypt.hashSync(password, 12));
   if (!config.adminPassword) {
-    log(`Đã tạo tài khoản quản trị "${config.adminUser}" với mật khẩu: ${password}  (hãy đổi mật khẩu sau khi đăng nhập)`);
+    log(t('Đã tạo tài khoản quản trị "{user}" với mật khẩu: {password}  (hãy đổi mật khẩu sau khi đăng nhập)', { user: config.adminUser, password }));
   }
 }
 
@@ -30,7 +31,7 @@ export async function requireAuth(req: FastifyRequest, _reply: FastifyReply) {
     if (q && !req.headers.authorization) req.headers.authorization = `Bearer ${q}`;
     await req.jwtVerify();
   } catch {
-    throw new HttpError(401, 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
+    throw new HttpError(401, t('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại'));
   }
 }
 
@@ -42,7 +43,7 @@ export async function authRoutes(app: FastifyInstance) {
       const { username, password } = parse(loginSchema, req.body);
       const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as UserRow | undefined;
       if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-        throw new HttpError(401, 'Sai tên đăng nhập hoặc mật khẩu');
+        throw new HttpError(401, t('Sai tên đăng nhập hoặc mật khẩu'));
       }
       const token = app.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: config.jwtExpiresIn });
       return { token, user: { id: user.id, username: user.username } };
@@ -59,9 +60,9 @@ export async function authRoutes(app: FastifyInstance) {
     const u = req.user as { sub: number };
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(u.sub) as UserRow | undefined;
     if (!row || !body.current || !(await bcrypt.compare(body.current, row.password_hash))) {
-      throw new HttpError(400, 'Mật khẩu hiện tại không đúng');
+      throw new HttpError(400, t('Mật khẩu hiện tại không đúng'));
     }
-    if (!body.next || body.next.length < 10) throw new HttpError(400, 'Mật khẩu mới tối thiểu 10 ký tự');
+    if (!body.next || body.next.length < 10) throw new HttpError(400, t('Mật khẩu mới tối thiểu 10 ký tự'));
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(body.next, 12), u.sub);
     return { ok: true };
   });

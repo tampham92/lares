@@ -1,4 +1,4 @@
-/* TPanel template base - shared by every template (static HTML and WordPress theme) */
+/* Lares template base - shared by every template (static HTML and WordPress theme) */
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{scroll-behavior:smooth}

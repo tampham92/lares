@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export * from './i18n.js';
+export { SHARED_EN } from './i18n-en.js';
+
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)
 // ---------------------------------------------------------------------------
@@ -43,7 +46,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 // Sites & databases
 // ---------------------------------------------------------------------------
 
-/** App types TPanel understands (creation + migration detection). */
+/** App types Lares understands (creation + migration detection). */
 export const APP_TYPES = ['wordpress', 'nextjs', 'laravel', 'php', 'static', 'unknown'] as const;
 export type AppType = (typeof APP_TYPES)[number];
 
@@ -99,7 +102,7 @@ export const wordpressConfigSchema = z.object({
 export type WordpressConfig = z.infer<typeof wordpressConfigSchema>;
 
 /**
- * "localhost" (or an empty value) means: no domain yet - TPanel assigns a port and the site is
+ * "localhost" (or an empty value) means: no domain yet - Lares assigns a port and the site is
  * reachable at http://<server-ip>:<port>.
  */
 export const LOCALHOST = 'localhost';
@@ -134,7 +137,7 @@ export const templateIdSchema = z.string().regex(/^[a-z0-9-]{1,40}$/, 'Template 
 const siteBase = {
   domain: siteDomainSchema,
   aliases: z.array(domainSchema).default([]),
-  /** Port-based sites only: choose the port (otherwise TPanel picks a free one). */
+  /** Port-based sites only: choose the port (otherwise Lares picks a free one). */
   listenPort: z.coerce.number().int().min(1024).max(65535).optional(),
   publicHost: publicHostSchema.optional(),
 };
@@ -422,7 +425,7 @@ export interface DatabaseRecord {
   username: string;
   siteId: number | null;
   siteDomain: string | null;
-  managed: boolean; // false = reused database that TPanel should not drop
+  managed: boolean; // false = reused database that Lares should not drop
   createdAt: string;
 }
 
@@ -517,7 +520,7 @@ export const dbCredentialsSchema = z.object({
   host: z.string().trim().min(1).default('localhost'),
   port: z.coerce.number().int().min(1).max(65535).optional(),
   socket: absPathSchema.optional(),
-  // Source databases may use characters TPanel itself never generates (e.g. '-'), but never backticks/control chars.
+  // Source databases may use characters Lares itself never generates (e.g. '-'), but never backticks/control chars.
   name: z.string().regex(/^[^\0\r\n`/\\]{1,64}$/, 'Tên database không hợp lệ'),
   user: z.string().min(1).max(80),
   password: z.string().max(256).default(''),
@@ -546,7 +549,7 @@ export interface DiscoveredSite {
   owner: string | null;
   /** Other discovered sites nested inside this root (relative paths) - suggested excludes. */
   nestedPaths: string[];
-  /** Domain already exists on TPanel. */
+  /** Domain already exists on Lares. */
   existsOnTarget: boolean;
   discoveredBy: string;
 }
@@ -582,7 +585,7 @@ export const migrationItemInputSchema = z.object({
   appType: z.enum(APP_TYPES).default('unknown'),
   configPath: absPathSchema.optional(),
   phpVersion: z.string().regex(PHP_VERSION_RE).optional(),
-  /** Next.js: build/start settings used when re-installing on TPanel. */
+  /** Next.js: build/start settings used when re-installing on Lares. */
   nextjs: nextjsConfigSchema.omit({ gitUrl: true, branch: true }).optional(),
   db: z.object({
     strategy: z.enum(DB_STRATEGIES).default('import'),
@@ -602,7 +605,7 @@ export type TransferMode = (typeof TRANSFER_MODES)[number];
 export const migrationOptionsSchema = z.object({
   /**
    * archive: compress on source into temp dir, verify sha256, download via SFTP.
-   * stream:  pipe `tar | gzip` over SSH straight into TPanel (no temp space needed on source).
+   * stream:  pipe `tar | gzip` over SSH straight into Lares (no temp space needed on source).
    * auto:    archive when source has enough free space, otherwise stream.
    */
   transferMode: z.enum(TRANSFER_MODES).default('auto'),
@@ -624,9 +627,9 @@ export const MIGRATION_STEPS = [
   { id: 'prepare', label: 'Chuẩn bị & kiểm tra' },
   { id: 'dump_db', label: 'Dump & nén database' },
   { id: 'archive_files', label: 'Nén mã nguồn' },
-  { id: 'transfer', label: 'Đồng bộ về TPanel' },
+  { id: 'transfer', label: 'Đồng bộ về Lares' },
   { id: 'verify', label: 'Kiểm tra toàn vẹn' },
-  { id: 'create_site', label: 'Tạo site trên TPanel' },
+  { id: 'create_site', label: 'Tạo site trên Lares' },
   { id: 'restore_files', label: 'Khôi phục mã nguồn' },
   { id: 'restore_db', label: 'Khôi phục database' },
   { id: 'configure', label: 'Cập nhật cấu hình ứng dụng' },

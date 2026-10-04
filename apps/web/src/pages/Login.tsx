@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, post } from '../api';
 import { ErrorBox, Field } from '../components/ui';
+import { t } from '../i18n';
+import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 
 export function Login() {
   const nav = useNavigate();
@@ -29,18 +31,19 @@ export function Login() {
     <div className="login">
       <form className="card stack" onSubmit={submit}>
         <div className="brand" style={{ color: 'var(--text)', padding: 0 }}>
-          <span style={{ color: '#fff' }}>T</span>TPanel
+          <span style={{ color: '#fff' }}>L</span>Lares
         </div>
         <ErrorBox error={error} />
-        <Field label="Tên đăng nhập">
+        <Field label={t('Tên đăng nhập')}>
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
         </Field>
-        <Field label="Mật khẩu">
+        <Field label={t('Mật khẩu')}>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
         </Field>
         <button className="btn primary" disabled={busy}>
-          {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
+          {busy ? t('Đang đăng nhập…') : t('Đăng nhập')}
         </button>
+        <LanguageSwitcher />
       </form>
     </div>
   );

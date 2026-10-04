@@ -84,7 +84,7 @@ function directive(text: string, name: string): string[] {
 export function parseNginx(dump: string): ParsedVhost[] {
   const result: ParsedVhost[] = [];
   for (const { file, content } of splitDump(dump)) {
-    if (content.includes('# Managed by TPanel')) continue; // never offer TPanel's own vhosts
+    if (/# Managed by (Lares|TPanel)/.test(content)) continue; // never offer Lares's own vhosts (TPanel = its old name)
     const s = stripComments(content);
     const re = /(?:^|[\s;{}])server\s*\{/g;
     let m: RegExpExecArray | null;
@@ -116,7 +116,7 @@ export function parseNginx(dump: string): ParsedVhost[] {
 export function parseApache(dump: string): ParsedVhost[] {
   const result: ParsedVhost[] = [];
   for (const { file, content } of splitDump(dump)) {
-    if (content.includes('# Managed by TPanel')) continue;
+    if (/# Managed by (Lares|TPanel)/.test(content)) continue;
     for (const m of content.matchAll(/<VirtualHost[^>]*>([\s\S]*?)<\/VirtualHost>/gi)) {
       const body = m[1]!.replace(/^\s*#.*$/gm, '');
       const get = (name: string) => [...body.matchAll(new RegExp(`^\\s*${name}\\s+(.+)$`, 'gim'))].map((x) => x[1]!.trim());

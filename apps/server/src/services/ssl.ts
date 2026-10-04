@@ -2,8 +2,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import dns from 'node:dns/promises';
 import os from 'node:os';
-import type { SslState } from '@tpanel/shared';
+import type { SslState } from '@lares/shared';
 import { config } from '../config.js';
+import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
 
@@ -42,17 +43,17 @@ export async function dnsWarnings(domains: string[]): Promise<string[]> {
     try {
       const ips = await dns.resolve4(d);
       if (!ips.some((ip) => local.has(ip) || ip === publicIp)) {
-        warnings.push(`${d} đang trỏ về ${ips.join(', ')}, không phải máy chủ này${publicIp ? ` (${publicIp})` : ''}`);
+        warnings.push(t('{domain} đang trỏ về {ips}, không phải máy chủ này', { domain: d, ips: ips.join(', ') }) + (publicIp ? ` (${publicIp})` : ''));
       }
     } catch {
-      warnings.push(`${d} chưa có bản ghi DNS A`);
+      warnings.push(t('{domain} chưa có bản ghi DNS A', { domain: d }));
     }
   }
   return warnings;
 }
 
 export async function issueLetsEncrypt(domain: string, domains: string[], email: string, staging: boolean, log: HostLogger) {
-  if (!config.dryRun && !(await host.has('certbot'))) throw new Error('Chưa cài certbot (apt install certbot)');
+  if (!config.dryRun && !(await host.has('certbot'))) throw new Error(t('Chưa cài certbot (apt install certbot)'));
   const args = [
     'certbot certonly --webroot',
     `-w ${shq(config.acmeDir)}`,
@@ -83,13 +84,14 @@ export async function installCustomCert(domain: string, certificate: string, pri
   const tmpKey = `${paths.privateKey}.new`;
   await fs.writeFile(tmpCert, certificate.trim() + '\n', { mode: 0o644 });
   await fs.writeFile(tmpKey, privateKey.trim() + '\n', { mode: 0o600 });
+  const mismatch = new Error(t('Private key không khớp với certificate'));
   try {
     const certPub = await host.run(`openssl x509 -noout -pubkey -in ${shq(tmpCert)}`);
     const keyPub = await host.run(`openssl pkey -pubout -in ${shq(tmpKey)}`);
-    if (certPub.trim() !== keyPub.trim()) throw new Error('Private key không khớp với certificate');
+    if (certPub.trim() !== keyPub.trim()) throw mismatch;
   } catch (err) {
     await Promise.all([fs.rm(tmpCert, { force: true }), fs.rm(tmpKey, { force: true })]);
-    throw err instanceof Error && err.message.includes('không khớp') ? err : new Error('Certificate hoặc private key không đọc được');
+    throw err === mismatch ? err : new Error(t('Certificate hoặc private key không đọc được'));
   }
   await fs.rename(tmpCert, paths.certificate);
   await fs.rename(tmpKey, paths.privateKey);

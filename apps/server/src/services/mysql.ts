@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import mysql from 'mysql2/promise';
-import { DB_IDENT_RE } from '@tpanel/shared';
+import { DB_IDENT_RE } from '@lares/shared';
 import { config } from '../config.js';
+import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
 
@@ -20,7 +21,7 @@ function getPool(): mysql.Pool {
 }
 
 function assertIdent(name: string, what = 'identifier') {
-  if (!DB_IDENT_RE.test(name)) throw new Error(`${what} không hợp lệ: ${name}`);
+  if (!DB_IDENT_RE.test(name)) throw new Error(t('{what} không hợp lệ: {name}', { what, name }));
 }
 
 export async function query<T = unknown>(sql: string, params: unknown[] = []): Promise<T> {
@@ -36,8 +37,8 @@ export async function databaseExists(name: string): Promise<boolean> {
 }
 
 export async function createDatabase(name: string, user: string, password: string, log?: HostLogger) {
-  assertIdent(name, 'Tên database');
-  assertIdent(user, 'Tên user');
+  assertIdent(name, t('Tên database'));
+  assertIdent(user, t('Tên user'));
   if (config.dryRun) {
     log?.(`[dry-run] CREATE DATABASE \`${name}\`; CREATE USER '${user}'@'localhost'; GRANT ALL`);
     return;
@@ -50,19 +51,19 @@ export async function createDatabase(name: string, user: string, password: strin
 }
 
 export async function dropDatabase(name: string, user?: string, log?: HostLogger) {
-  assertIdent(name, 'Tên database');
+  assertIdent(name, t('Tên database'));
   if (config.dryRun) {
     log?.(`[dry-run] DROP DATABASE \`${name}\``);
     return;
   }
   await query(`DROP DATABASE IF EXISTS \`${name}\``);
   if (user) {
-    assertIdent(user, 'Tên user');
+    assertIdent(user, t('Tên user'));
     await query(`DROP USER IF EXISTS ?@'localhost'`, [user]);
   }
 }
 
-/** Identify the MySQL instance so we can tell when source and TPanel share the same server. */
+/** Identify the MySQL instance so we can tell when source and Lares share the same server. */
 export async function serverIdentity(): Promise<string | null> {
   if (config.dryRun) return null;
   try {
@@ -112,7 +113,7 @@ export async function importGzipDump(
   creds: { user: string; password: string },
   opts: { signal?: AbortSignal; log?: HostLogger } = {},
 ) {
-  assertIdent(dbName, 'Tên database');
+  assertIdent(dbName, t('Tên database'));
   if (config.dryRun) {
     opts.log?.(`[dry-run] gunzip -c ${dumpFile} | sed ... | mysql ${dbName}`);
     return;
@@ -138,8 +139,8 @@ export async function copyDatabase(
   dumpFlags: string[],
   log?: HostLogger,
 ) {
-  assertIdent(src, 'Tên database');
-  assertIdent(dst, 'Tên database');
+  assertIdent(src, t('Tên database'));
+  assertIdent(dst, t('Tên database'));
   if (config.dryRun) {
     log?.(`[dry-run] mysqldump ${src} | mysql ${dst}`);
     return;
@@ -159,7 +160,7 @@ export async function copyDatabase(
     await copy([...dumpFlags, '--routines']);
   } catch (err) {
     if (!/routine|PROCEDURE|FUNCTION|SUPER|log_bin_trust/i.test(err instanceof Error ? err.message : String(err))) throw err;
-    log?.('Không tạo được stored procedure/function trong database mới → sao chép lại không kèm routines');
+    log?.(t('Không tạo được stored procedure/function trong database mới → sao chép lại không kèm routines'));
     await copy(dumpFlags);
   }
 }

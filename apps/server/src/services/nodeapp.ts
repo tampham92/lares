@@ -1,13 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { NextjsConfig, NodeAppStatus, PackageManager } from '@tpanel/shared';
+import type { NextjsConfig, NodeAppStatus, PackageManager } from '@lares/shared';
 import { config } from '../config.js';
+import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
 
 type PM = Exclude<PackageManager, 'auto'>;
 export type NodeAppConfig = Omit<NextjsConfig, 'gitUrl' | 'branch'> & { gitUrl?: string; branch?: string };
 
+// Old prefix kept from before the rename to Lares: running apps' systemd units already use it.
 export const serviceName = (domain: string) => `tpanel-app-${domain.replace(/[^a-z0-9.-]/gi, '-')}`;
 const unitPath = (domain: string) => path.join(config.systemdDir, `${serviceName(domain)}.service`);
 const startScriptPath = (domain: string) => path.join(config.appsConfDir, `${domain}.start.sh`);
@@ -55,7 +57,7 @@ async function runAsWebUser(appDir: string, homeDir: string, command: string, lo
 export function renderEnvFile(env: Record<string, string>): string {
   const esc = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
   return (
-    '# Managed by TPanel\n' +
+    '# Managed by Lares\n' +
     Object.entries(env)
       .map(([k, v]) => `${k}="${esc(v)}"`)
       .join('\n') +
@@ -64,9 +66,9 @@ export function renderEnvFile(env: Record<string, string>): string {
 }
 
 export function renderUnit(domain: string, appDir: string, homeDir: string, port: number): string {
-  return `# Managed by TPanel
+  return `# Managed by Lares
 [Unit]
-Description=TPanel Next.js app ${domain}
+Description=Lares Next.js app ${domain}
 After=network.target
 
 [Service]
@@ -93,7 +95,7 @@ export async function writeServiceFiles(domain: string, appDir: string, homeDir:
   const pm = await detectPackageManager(appDir, cfg.packageManager);
   const defaults = await defaultCommands(appDir, pm);
   const start = cfg.startCommand || defaults.start;
-  await host.writeFile(startScriptPath(domain), `#!/bin/bash\n# Managed by TPanel\ncd ${shq(appDir)} || exit 1\nexec ${start}\n`, 0o755);
+  await host.writeFile(startScriptPath(domain), `#!/bin/bash\n# Managed by Lares\ncd ${shq(appDir)} || exit 1\nexec ${start}\n`, 0o755);
   await host.writeFile(unitPath(domain), renderUnit(domain, appDir, homeDir, port));
   if (Object.keys(cfg.env ?? {}).length) {
     await host.writeFile(path.join(appDir, '.env.production.local'), renderEnvFile(cfg.env), 0o640);
@@ -111,7 +113,7 @@ export async function buildAndRestart(
 ) {
   const appDir = site.webRoot;
   if (!(await host.exists(path.join(appDir, 'package.json')))) {
-    throw new Error(`Không tìm thấy package.json trong ${appDir}. Hãy upload mã nguồn hoặc cấu hình Git URL.`);
+    throw new Error(t('Không tìm thấy package.json trong {dir}. Hãy upload mã nguồn hoặc cấu hình Git URL.', { dir: appDir }));
   }
   const pm = await detectPackageManager(appDir, cfg.packageManager);
   const defaults = await defaultCommands(appDir, pm);
@@ -121,7 +123,7 @@ export async function buildAndRestart(
   await runAsWebUser(appDir, site.rootPath, cfg.installCommand || defaults.install, log, signal);
   await runAsWebUser(appDir, site.rootPath, `NODE_ENV=production ${cfg.buildCommand || defaults.build}`, log, signal);
   await host.mutate(`systemctl restart ${shq(serviceName(site.domain))}`, { log });
-  log(`Đã khởi động ${serviceName(site.domain)} trên 127.0.0.1:${site.appPort}`);
+  log(t('Đã khởi động {service} trên 127.0.0.1:{port}', { service: serviceName(site.domain), port: String(site.appPort) }));
 }
 
 export async function gitCloneOrPull(appDir: string, homeDir: string, gitUrl: string, branch: string, log: HostLogger, signal?: AbortSignal) {
@@ -129,7 +131,7 @@ export async function gitCloneOrPull(appDir: string, homeDir: string, gitUrl: st
     await runAsWebUser(appDir, homeDir, `git fetch --depth 1 origin ${shq(branch)} && git reset --hard FETCH_HEAD`, log, signal);
     return;
   }
-  if (!(await host.isEmptyDir(appDir))) throw new Error(`${appDir} không trống, không thể git clone`);
+  if (!(await host.isEmptyDir(appDir))) throw new Error(t('{dir} không trống, không thể git clone', { dir: appDir }));
   await fs.mkdir(appDir, { recursive: true });
   await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(homeDir)}`, { log });
   await runAsWebUser(appDir, homeDir, `git clone --depth 1 --branch ${shq(branch)} ${shq(gitUrl)} .`, log, signal);
@@ -159,7 +161,7 @@ export async function removeService(domain: string, log?: HostLogger) {
 }
 
 export async function appJournal(domain: string, lines: number): Promise<string[]> {
-  if (config.dryRun) return ['[dry-run] journalctl không khả dụng'];
+  if (config.dryRun) return [`[dry-run] ${t('journalctl không khả dụng')}`];
   const r = await host.exec(`journalctl -u ${shq(serviceName(domain))} -n ${Math.min(lines, 5000)} --no-pager -o short-iso`);
   return r.stdout.split('\n').filter(Boolean);
 }

@@ -56,7 +56,6 @@ code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monosp
 .sidebar a { color: var(--sidebar-text); padding: 9px 12px; border-radius: 8px; display: block; }
 .sidebar a:hover { background: #1e293b; text-decoration: none; }
 .sidebar a.active { background: var(--primary); color: #fff; }
-.sidebar .spacer { flex: 1; }
 .main { flex: 1; min-width: 0; padding: 24px 28px 48px; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .sub { color: var(--muted); }
@@ -160,7 +159,6 @@ details summary { cursor: pointer; color: var(--primary); }
   .layout { flex-direction: column; }
   .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 10px; }
   .brand { padding: 0 8px 0 0; }
-  .sidebar .spacer { display: none; }
   .main { padding: 16px; }
   .kv { grid-template-columns: 1fr; }
 }
@@ -193,3 +191,7 @@ details summary { cursor: pointer; color: var(--primary); }
 .seo-list li.ok::before { content: '✓'; color: var(--ok); }
 .seo-list li.bad::before { content: '!'; color: var(--warn); }
 textarea.prose-input { font-family: inherit; font-size: 14px; min-height: 0; }
+.topbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: -8px 0 24px; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); color: var(--muted); cursor: pointer; }
+.icon-btn:hover { color: #ef4444; border-color: #ef4444; }
+.lang-switch { width: auto; padding: 5px 10px; font-size: 13px; cursor: pointer; }

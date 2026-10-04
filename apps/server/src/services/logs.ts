@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import readline from 'node:readline';
 import zlib from 'node:zlib';
-import type { LogTail, LogrotateSettings, TrafficStats } from '@tpanel/shared';
+import type { LogTail, LogrotateSettings, TrafficStats } from '@lares/shared';
 import { config } from '../config.js';
 import { getSetting, setSetting } from '../db/index.js';
 import { host } from './host.js';
@@ -212,7 +212,7 @@ export const DEFAULT_LOGROTATE: LogrotateSettings = { retentionDays: 14, compres
 export const getLogrotate = () => getSetting<LogrotateSettings>('logrotate', DEFAULT_LOGROTATE);
 
 export function renderLogrotate(s: LogrotateSettings): string {
-  return `# Managed by TPanel
+  return `# Managed by Lares
 ${config.siteLogDir}/*/*.log {
     daily
     rotate ${s.retentionDays}

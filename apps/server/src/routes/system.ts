@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { logrotateSchema } from '@tpanel/shared';
+import { logrotateSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
+import { t } from '../i18n/index.js';
 import { notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { getLogrotate, saveLogrotate } from '../services/logs.js';
@@ -14,9 +15,9 @@ export async function systemRoutes(app: FastifyInstance) {
 
   app.get('/api/tasks/:id', (req) => {
     const since = Number((req.query as { since?: string }).since ?? 0) || 0;
-    const t = getTask((req.params as { id: string }).id, since);
-    if (!t) throw notFound('Task không tồn tại (có thể đã hết hạn)');
-    return t;
+    const task = getTask((req.params as { id: string }).id, since);
+    if (!task) throw notFound(t('Task không tồn tại (có thể đã hết hạn)'));
+    return task;
   });
 
   app.get('/api/settings/logrotate', () => getLogrotate());

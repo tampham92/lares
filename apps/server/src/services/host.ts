@@ -7,7 +7,7 @@ import { shq } from '../lib/shell.js';
 export type HostLogger = (msg: string) => void;
 
 /**
- * Operations against the TPanel machine itself.
+ * Operations against the Lares machine itself.
  * `mutate` is for commands that change the system (nginx reload, chown, mysql import, certbot...):
  * in dry-run mode they are only logged, so the panel can be developed on a laptop.
  */
@@ -43,7 +43,7 @@ export const host = {
 
   async writeFile(file: string, content: string, mode = 0o644) {
     await fs.mkdir(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tpanel-tmp`;
+    const tmp = `${file}.lares-tmp`;
     await fs.writeFile(tmp, content, { mode });
     await fs.rename(tmp, file);
   },

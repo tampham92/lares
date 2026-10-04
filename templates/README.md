@@ -1,16 +1,18 @@
 # Giao diện mẫu (templates)
 
+English: [README.en.md](README.en.md)
+
 Mỗi thư mục con là một giao diện, dùng được cho cả site **HTML tĩnh** và **WordPress**.
 
 ## Đặt template ở đâu
 
 | Thư mục | Dùng cho |
 |---|---|
-| `templates/` trong repo này | Template có sẵn của TPanel. Bị **thay mới** mỗi lần cập nhật (`install.sh` chạy `git reset --hard`). Thêm vào đây nếu bạn muốn đóng góp vào repo |
-| `/var/lib/tpanel/templates/` trên VPS | **Template riêng của bạn**: được giữ nguyên khi cập nhật TPanel. Template ở đây có cùng `id` với template có sẵn sẽ thay thế template có sẵn |
+| `templates/` trong repo này | Template có sẵn của Lares. Bị **thay mới** mỗi lần cập nhật (`install.sh` chạy `git reset --hard`). Thêm vào đây nếu bạn muốn đóng góp vào repo |
+| `/var/lib/lares/templates/` trên VPS | **Template riêng của bạn**: được giữ nguyên khi cập nhật Lares. Template ở đây có cùng `id` với template có sẵn sẽ thay thế template có sẵn |
 | `apps/server/data/templates/` | Template riêng khi chạy dev trên máy |
 
-Đường dẫn template riêng đổi được bằng biến `TPANEL_CUSTOM_TEMPLATES_DIR`. Thêm hoặc sửa xong thì mở lại form **Thêm site**, không cần khởi động lại TPanel.
+Đường dẫn template riêng đổi được bằng biến `LARES_CUSTOM_TEMPLATES_DIR`. Thêm hoặc sửa xong thì mở lại form **Thêm site**, không cần khởi động lại Lares.
 
 ## Cấu trúc một template
 
@@ -71,7 +73,7 @@ Dùng được trong `index.html`, `wordpress/home.html` và nội dung trong `t
 
 ### Trang chủ WordPress (`wordpress/home.html`)
 
-Viết bằng block markup (`<!-- wp:group -->...`). Header, footer, trang bài viết/danh mục được TPanel tự sinh từ `nav` và thông tin liên hệ. Mẹo:
+Viết bằng block markup (`<!-- wp:group -->...`). Header, footer, trang bài viết/danh mục được Lares tự sinh từ `nav` và thông tin liên hệ. Mẹo:
 
 - Dựng trang trong trình soạn thảo WordPress, sau đó **Code editor** (Ctrl+Shift+Alt+M), copy ra `home.html` rồi thay chữ bằng `{{SITE_NAME}}`...
 - Danh sách bài viết theo danh mục: block `wp:query` với `"taxQuery":{"category":[{{CAT:slug}}]}` và `"className":"post-grid"`.

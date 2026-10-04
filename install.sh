@@ -1,53 +1,130 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  TPanel installer
+#  Lares Panel installer (Lares Panel by ThoCode - https://thocode.dev)
 #
-#    curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/install.sh | sudo bash
-#    curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/install.sh | sudo bash -s -- --port 9443 --php "8.3 8.2"
+#    curl -sSL https://lares.thocode.dev/install | sudo bash
+#    curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --port 9443 --php "8.3 8.2"
 #
 #  VPS đã có MySQL/MariaDB với mật khẩu root:
-#    curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/install.sh | sudo bash -s -- --mysql-root-password 'xxx'
+#    curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --mysql-root-password 'xxx'
+#
+#  English output + English as the panel's default language:
+#    curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --lang en
 #
 #  Supported: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12 (x86_64, arm64)
-#  Re-running the script upgrades TPanel in place (keeps data, admin & DB credentials).
+#  Re-running the script upgrades Lares in place (keeps data, admin & DB credentials).
 #
 #  Existing services are detected and reused, never replaced:
-#   - MySQL / MariaDB / Percona already installed (apt or panel-built): reused, TPanel gets its own admin user
+#   - MySQL / MariaDB / Percona already installed (apt or panel-built): reused, Lares gets its own admin user
 #   - nginx from apt: reused, existing vhosts / default site untouched
-#   - port 80/443 held by another web server (Apache, OpenLiteSpeed, a panel's nginx): TPanel's nginx is
+#   - port 80/443 held by another web server (Apache, OpenLiteSpeed, a panel's nginx): Lares's nginx is
 #     installed but left stopped until you switch over ("coexist mode")
 # =============================================================================
 set -Eeuo pipefail
 
 # ---- Configurable (env vars or flags) ---------------------------------------
-TPANEL_REPO="${TPANEL_REPO:-https://github.com/tampham92/tpanel.git}"
-TPANEL_BRANCH="${TPANEL_BRANCH:-main}"
-TPANEL_TARBALL="${TPANEL_TARBALL:-}"          # URL .tar.gz thay cho git (tuỳ chọn)
-TPANEL_PORT="${TPANEL_PORT:-8686}"
+LARES_REPO="${LARES_REPO:-https://github.com/tampham92/lares.git}"
+LARES_BRANCH="${LARES_BRANCH:-main}"
+LARES_TARBALL="${LARES_TARBALL:-}"          # URL .tar.gz thay cho git (tuỳ chọn)
+LARES_PORT="${LARES_PORT:-8686}"
 PHP_VERSIONS="${PHP_VERSIONS:-8.3 8.2 8.1 7.4}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 MYSQL_ROOT_USER="${MYSQL_ROOT_USER:-root}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 FRESH_DATA=0
-INSTALL_DIR="/opt/tpanel"
-DATA_DIR="/var/lib/tpanel"
-CONF_DIR="/etc/tpanel"
-ENV_FILE="$CONF_DIR/tpanel.env"
+INSTALL_DIR="/opt/lares"
+DATA_DIR="/var/lib/lares"
+CONF_DIR="/etc/lares"
+ENV_FILE="$CONF_DIR/lares.env"
 NGINX_BIN="/usr/sbin/nginx"
+
+# ---- Language (vi | en) - resolved first so every message below is translated ---
+# --lang wins, then LARES_LANG, then the language saved by a previous install, then vi.
+LANG_ARG="${LARES_LANG:-}"; prev=""
+for a in "$@"; do
+  case "$a" in --lang=*) LANG_ARG="${a#--lang=}" ;; esac
+  [[ "$prev" == --lang ]] && LANG_ARG="$a"
+  prev="$a"
+done
+LANG_UI="$LANG_ARG"
+if [[ -z "$LANG_UI" ]]; then   # /etc/tpanel/tpanel.env: an install from before the rename to Lares
+  LANG_UI=$(grep -hE '^(LARES|TPANEL)_LANG=' "$ENV_FILE" /etc/tpanel/tpanel.env 2>/dev/null | tail -1 | cut -d= -f2- || true)
+fi
+LANG_UI=$(printf '%s' "${LANG_UI:-vi}" | tr '[:upper:]' '[:lower:]'); LANG_UI="${LANG_UI:0:2}"
+case "$LANG_UI" in
+  vi|en) ;;
+  *) [[ -n "$LANG_ARG" ]] && { echo "--lang: vi | en" >&2; exit 1; }; LANG_UI=vi ;;
+esac
+# L 'Tiếng Việt' 'English' -> the text for the chosen language
+L() { if [[ $LANG_UI == en ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
+
+usage() {
+  if [[ $LANG_UI == en ]]; then
+    cat <<'TXT'
+Lares installer - installs Lares, or upgrades it in place when it is already installed
+(sites, data, admin account and DB credentials are kept).
+
+Usage:
+  curl -sSL https://lares.thocode.dev/install | sudo bash -s -- [options]
+
+Options:
+  --lang vi|en                 Installer language and panel default language
+                               (default: vi; an upgrade keeps the saved language)
+  --port <port>                Panel HTTPS port (default: 8686)
+  --php "<versions>"           PHP versions to install (default: "8.3 8.2 8.1 7.4")
+  --node <major>               Node.js major version when Node >= 20 is missing (default: 22)
+  --mysql-root-user <user>     Admin user of an existing MySQL/MariaDB (default: root)
+  --mysql-root-password <pw>   Its password, when socket login does not work
+  --repo <url>                 Git repository (default: https://github.com/tampham92/lares.git)
+  --branch <name>              Git branch (default: main)
+  --tarball <url>              Install from a .tar.gz instead of git
+  --fresh-data                 Old data found without its env file: back it up and install fresh
+  -h, --help                   Show this help
+
+Supported: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12 (x86_64, arm64)
+TXT
+  else
+    cat <<'TXT'
+Lares installer - cài Lares, hoặc nâng cấp tại chỗ nếu đã cài
+(giữ nguyên site, dữ liệu, tài khoản admin và thông tin database).
+
+Cách dùng:
+  curl -sSL https://lares.thocode.dev/install | sudo bash -s -- [tuỳ chọn]
+
+Tuỳ chọn:
+  --lang vi|en                 Ngôn ngữ của installer và ngôn ngữ mặc định của panel
+                               (mặc định: vi; khi nâng cấp giữ ngôn ngữ đã lưu)
+  --port <port>                Port HTTPS của trang quản trị (mặc định: 8686)
+  --php "<phiên bản>"          Các phiên bản PHP cần cài (mặc định: "8.3 8.2 8.1 7.4")
+  --node <major>               Phiên bản Node.js khi chưa có Node >= 20 (mặc định: 22)
+  --mysql-root-user <user>     User quản trị MySQL/MariaDB đang có (mặc định: root)
+  --mysql-root-password <mk>   Mật khẩu của user đó, khi không đăng nhập được qua socket
+  --repo <url>                 Kho git (mặc định: https://github.com/tampham92/lares.git)
+  --branch <tên>               Nhánh git (mặc định: main)
+  --tarball <url>              Cài từ file .tar.gz thay cho git
+  --fresh-data                 Có dữ liệu cũ nhưng thiếu file env: sao lưu dữ liệu cũ rồi cài mới
+  -h, --help                   Hiện trợ giúp này
+
+Hỗ trợ: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12 (x86_64, arm64)
+TXT
+  fi
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --port) TPANEL_PORT="$2"; shift 2 ;;
+    --lang) [[ $# -ge 2 ]] || { echo "--lang: vi | en" >&2; exit 1; }; shift 2 ;;   # read above
+    --lang=*) shift ;;
+    --port) LARES_PORT="$2"; shift 2 ;;
     --php) PHP_VERSIONS="$2"; shift 2 ;;
     --node) NODE_MAJOR="$2"; shift 2 ;;
-    --repo) TPANEL_REPO="$2"; shift 2 ;;
-    --branch) TPANEL_BRANCH="$2"; shift 2 ;;
-    --tarball) TPANEL_TARBALL="$2"; shift 2 ;;
+    --repo) LARES_REPO="$2"; shift 2 ;;
+    --branch) LARES_BRANCH="$2"; shift 2 ;;
+    --tarball) LARES_TARBALL="$2"; shift 2 ;;
     --mysql-root-user) MYSQL_ROOT_USER="$2"; shift 2 ;;
     --mysql-root-password) MYSQL_ROOT_PASSWORD="$2"; shift 2 ;;
     --fresh-data) FRESH_DATA=1; shift ;;
-    -h|--help) sed -n '2,20p' "$0" 2>/dev/null || true; exit 0 ;;
-    *) echo "Tham số không hợp lệ: $1"; exit 1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "$(L 'Tham số không hợp lệ' 'Invalid option'): $1 ($(L 'xem' 'see') --help)"; exit 1 ;;
   esac
 done
 
@@ -57,7 +134,7 @@ step() { echo -e "\n${c_blue}==>${c_off} $*"; }
 ok()   { echo -e "${c_green}✔${c_off} $*"; }
 warn() { echo -e "${c_yellow}!${c_off} $*"; WARNINGS+=("$*"); }
 die()  { echo -e "${c_red}✘ $*${c_off}" >&2; exit 1; }
-trap 'die "Cài đặt thất bại ở dòng $LINENO (lệnh: $BASH_COMMAND)"' ERR
+trap 'die "$(L "Cài đặt thất bại ở dòng $LINENO (lệnh: $BASH_COMMAND)" "Installation failed at line $LINENO (command: $BASH_COMMAND)")"' ERR
 # `|| true`: with pipefail, tr dies of SIGPIPE once head has enough bytes
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-24}" || true; }
 WARNINGS=()
@@ -98,37 +175,67 @@ restore_policy_rc() {
 }
 
 # ---- Pre-flight -------------------------------------------------------------
-[[ $EUID -eq 0 ]] || die "Hãy chạy với quyền root: curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/install.sh | sudo bash"
-[[ -r /etc/os-release ]] || die "Không xác định được hệ điều hành"
+[[ $EUID -eq 0 ]] || die "$(L 'Hãy chạy với quyền root' 'Please run as root'): curl -sSL https://lares.thocode.dev/install | sudo bash"
+[[ -r /etc/os-release ]] || die "$(L 'Không xác định được hệ điều hành' 'Cannot determine the operating system')"
 . /etc/os-release
 case "$ID:${VERSION_ID:-}" in
   ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|debian:11|debian:12) ;;
-  *) warn "HĐH $PRETTY_NAME chưa được kiểm thử chính thức - tiếp tục trên cơ sở Debian/Ubuntu" ;;
+  *) warn "$(L "HĐH $PRETTY_NAME chưa được kiểm thử chính thức - tiếp tục trên cơ sở Debian/Ubuntu" "$PRETTY_NAME is not officially tested - continuing as Debian/Ubuntu")" ;;
 esac
-command -v apt-get >/dev/null || die "Cần apt-get (Debian/Ubuntu)"
+command -v apt-get >/dev/null || die "$(L 'Cần apt-get (Debian/Ubuntu)' 'apt-get is required (Debian/Ubuntu)')"
 ARCH=$(dpkg --print-architecture)
-[[ "$ARCH" == amd64 || "$ARCH" == arm64 ]] || die "Kiến trúc $ARCH không được hỗ trợ"
-if [[ -n "$(port_pids "$TPANEL_PORT")" ]] && ! systemctl is-active --quiet tpanel; then
-  die "Port $TPANEL_PORT đang được dùng. Chọn port khác: ... | sudo bash -s -- --port 9443"
+[[ "$ARCH" == amd64 || "$ARCH" == arm64 ]] || die "$(L "Kiến trúc $ARCH không được hỗ trợ" "Architecture $ARCH is not supported")"
+# ---- Installs made before the rename TPanel -> Lares ----------------------------
+# Move /etc, /var/lib, /var/log and /opt/tpanel to their Lares names, rename the TPANEL_* env keys and
+# replace tpanel.service. The old paths stay behind as symlinks: existing nginx vhosts, Next.js units and
+# the logrotate rule still point at them until Lares rewrites them.
+if [[ -d /etc/tpanel && ! -L /etc/tpanel && ! -e "$CONF_DIR" ]]; then
+  step "$(L 'Chuyển bản cài TPanel sang Lares' 'Migrating the TPanel install to Lares')"
+  systemctl stop tpanel 2>/dev/null || true
+  systemctl disable tpanel >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/tpanel.service
+  for pair in "/etc/tpanel:$CONF_DIR" "/var/lib/tpanel:$DATA_DIR" "/var/log/tpanel:/var/log/lares" "/opt/tpanel:$INSTALL_DIR"; do
+    old=${pair%%:*}; new=${pair#*:}
+    if [[ -d "$old" && ! -L "$old" && ! -e "$new" ]]; then mv "$old" "$new" && ln -s "$new" "$old"; fi
+  done
+  [[ -f "$CONF_DIR/tpanel.env" ]] && mv "$CONF_DIR/tpanel.env" "$ENV_FILE"
+  if [[ -f "$ENV_FILE" ]]; then
+    sed -i "s/^TPANEL_/LARES_/; s#/etc/tpanel#$CONF_DIR#g; s#/var/lib/tpanel#$DATA_DIR#g; s#/opt/tpanel#$INSTALL_DIR#g" "$ENV_FILE"
+  fi
+  for f in "$DATA_DIR"/tpanel.db*; do [[ -e "$f" ]] && mv "$f" "${f/tpanel.db/lares.db}"; done
+  # Renamed, not deleted: vhosts use the map in 00-*.conf, and nginx is reloaded before Lares rewrites it.
+  [[ -f /etc/nginx/conf.d/00-tpanel.conf ]] && mv /etc/nginx/conf.d/00-tpanel.conf /etc/nginx/conf.d/00-lares.conf
+  [[ -f /etc/nginx/conf.d/99-tpanel-default.conf ]] && mv /etc/nginx/conf.d/99-tpanel-default.conf /etc/nginx/conf.d/99-lares-default.conf
+  [[ -f /etc/logrotate.d/tpanel ]] && mv /etc/logrotate.d/tpanel /etc/logrotate.d/lares
+  ln -sfn /usr/local/bin/lares /usr/local/bin/tpanel   # the old command keeps working
+  systemctl daemon-reload
+  ok "$(L 'Đã chuyển sang /etc/lares, /var/lib/lares, /opt/lares; service mới: lares' 'Moved to /etc/lares, /var/lib/lares, /opt/lares; new service: lares')"
+fi
+
+if [[ -n "$(port_pids "$LARES_PORT")" ]] && ! systemctl is-active --quiet lares; then
+  die "$(L "Port $LARES_PORT đang được dùng. Chọn port khác" "Port $LARES_PORT is already in use. Pick another port"): ... | sudo bash -s -- --port 9443"
 fi
 
 UPGRADE=0; [[ -f "$ENV_FILE" ]] && UPGRADE=1
-# Data from an earlier install without its env file: the env holds TPANEL_SECRET, which decrypts the stored
+# Data from an earlier install without its env file: the env holds LARES_SECRET, which decrypts the stored
 # DB/SSH credentials, and the admin account already exists - a "fresh" install would silently break both.
-if [[ $UPGRADE == 0 && -f "$DATA_DIR/tpanel.db" ]]; then
+if [[ $UPGRADE == 0 && -f "$DATA_DIR/lares.db" ]]; then
   if [[ $FRESH_DATA == 1 ]]; then
     mv "$DATA_DIR" "$DATA_DIR.bak-$(date +%Y%m%d%H%M%S)"
-    warn "Đã chuyển dữ liệu TPanel cũ sang $DATA_DIR.bak-* và cài mới"
+    warn "$(L "Đã chuyển dữ liệu Lares cũ sang $DATA_DIR.bak-* và cài mới" "Moved the old Lares data to $DATA_DIR.bak-* and installed fresh")"
   else
-    die "Tìm thấy dữ liệu TPanel cũ ($DATA_DIR) nhưng thiếu $ENV_FILE (chứa khoá giải mã).
+    die "$(L "Tìm thấy dữ liệu Lares cũ ($DATA_DIR) nhưng thiếu $ENV_FILE (chứa khoá giải mã).
    - Khôi phục $ENV_FILE từ bản sao lưu rồi chạy lại installer (giữ nguyên site & tài khoản), hoặc
-   - Cài mới, dữ liệu cũ được đổi tên thành bản sao lưu: ... | sudo bash -s -- --fresh-data"
+   - Cài mới, dữ liệu cũ được đổi tên thành bản sao lưu: ... | sudo bash -s -- --fresh-data" \
+"Found old Lares data ($DATA_DIR) but $ENV_FILE (which holds the decryption key) is missing.
+   - Restore $ENV_FILE from a backup and run the installer again (keeps sites & accounts), or
+   - Install fresh, renaming the old data to a backup: ... | sudo bash -s -- --fresh-data")"
   fi
 fi
-echo -e "${c_blue}TPanel installer${c_off} - $PRETTY_NAME ($ARCH) - $([[ $UPGRADE == 1 ]] && echo 'NÂNG CẤP' || echo 'CÀI MỚI')"
+echo -e "${c_blue}Lares Panel installer${c_off} - $PRETTY_NAME ($ARCH) - $([[ $UPGRADE == 1 ]] && L 'NÂNG CẤP' 'UPGRADE' || L 'CÀI MỚI' 'FRESH INSTALL')"
 
 # ---- Detect what is already on this server -----------------------------------
-step "Kiểm tra dịch vụ đang có trên VPS"
+step "$(L 'Kiểm tra dịch vụ đang có trên VPS' 'Checking existing services on this server')"
 NGINX_PREEXISTING=0; pkg_installed nginx-common && NGINX_PREEXISTING=1
 WEB_FOREIGN=""
 WEB_FOREIGN=$(foreign_listener 80 || foreign_listener 443 || true)
@@ -140,19 +247,19 @@ if any_pkg_installed mariadb-server mysql-server mysql-community-server percona-
   DB_PREEXISTING=1
 fi
 
-[[ $NGINX_PREEXISTING == 1 ]] && ok "nginx (apt) đã có - dùng lại, không đụng tới vhost hiện có"
-[[ $COEXIST == 1 ]] && warn "Port 80/443 đang do $WEB_FOREIGN giữ → nginx của TPanel sẽ được cài nhưng CHƯA chạy (chế độ cùng tồn tại)"
-[[ $DB_PREEXISTING == 1 ]] && ok "MySQL/MariaDB đã có - dùng lại, không cài đè"
+[[ $NGINX_PREEXISTING == 1 ]] && ok "$(L 'nginx (apt) đã có - dùng lại, không đụng tới vhost hiện có' 'nginx (apt) already installed - reusing it, existing vhosts untouched')"
+[[ $COEXIST == 1 ]] && warn "$(L "Port 80/443 đang do $WEB_FOREIGN giữ → nginx của Lares sẽ được cài nhưng CHƯA chạy (chế độ cùng tồn tại)" "Port 80/443 is held by $WEB_FOREIGN → Lares's nginx will be installed but NOT started (coexist mode)")"
+[[ $DB_PREEXISTING == 1 ]] && ok "$(L 'MySQL/MariaDB đã có - dùng lại, không cài đè' 'MySQL/MariaDB already installed - reusing it, not reinstalling')"
 
 # ---- Base packages ----------------------------------------------------------
-step "Cài gói hệ thống cơ bản"
-$APT update || warn "apt-get update báo lỗi (thường do repo bên thứ ba hỏng) - vẫn tiếp tục"
+step "$(L 'Cài gói hệ thống cơ bản' 'Installing base system packages')"
+$APT update || warn "$(L 'apt-get update báo lỗi (thường do repo bên thứ ba hỏng) - vẫn tiếp tục' 'apt-get update reported errors (usually a broken third-party repo) - continuing')"
 $APT install curl ca-certificates gnupg git tar gzip pigz rsync unzip openssl lsb-release cron logrotate \
   iproute2 procps sudo apt-transport-https
-ok "Gói cơ bản"
+ok "$(L 'Gói cơ bản' 'Base packages')"
 
 # ---- PHP repository (ondrej / sury) -----------------------------------------
-step "Thêm kho PHP nhiều phiên bản"
+step "$(L 'Thêm kho PHP nhiều phiên bản' 'Adding the multi-version PHP repository')"
 if [[ "$ID" == ubuntu ]]; then
   $APT install software-properties-common
   if ! grep -rqs "ondrej/php" /etc/apt/sources.list.d/; then
@@ -167,18 +274,18 @@ fi
 # Check /usr/bin/node specifically: an nvm install in root's PATH is invisible to the systemd service.
 node_major() { [[ -x /usr/bin/node ]] && /usr/bin/node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
 if (( $(node_major) < 20 )); then
-  step "Thêm kho Node.js $NODE_MAJOR.x"
-  (( $(node_major) > 0 )) && warn "Node.js $(/usr/bin/node -v) trong /usr/bin sẽ được nâng lên $NODE_MAJOR.x (TPanel cần >= 20)"
+  step "$(L "Thêm kho Node.js $NODE_MAJOR.x" "Adding the Node.js $NODE_MAJOR.x repository")"
+  (( $(node_major) > 0 )) && warn "$(L "Node.js $(/usr/bin/node -v) trong /usr/bin sẽ được nâng lên $NODE_MAJOR.x (Lares cần >= 20)" "Node.js $(/usr/bin/node -v) in /usr/bin will be upgraded to $NODE_MAJOR.x (Lares needs >= 20)")"
   mkdir -p /etc/apt/keyrings
   curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
   echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
 fi
-$APT update || warn "apt-get update báo lỗi - vẫn tiếp tục"
+$APT update || warn "$(L 'apt-get update báo lỗi - vẫn tiếp tục' 'apt-get update reported errors - continuing')"
 
 # ---- Node, certbot ------------------------------------------------------------
-step "Cài Node.js, Certbot"
+step "$(L 'Cài Node.js, Certbot' 'Installing Node.js, Certbot')"
 if (( $(node_major) < 20 )); then $APT install nodejs; fi
-(( $(node_major) >= 20 )) || die "Không cài được Node.js >= 20 vào /usr/bin/node"
+(( $(node_major) >= 20 )) || die "$(L 'Không cài được Node.js >= 20 vào /usr/bin/node' 'Could not install Node.js >= 20 into /usr/bin/node')"
 corepack enable >/dev/null 2>&1 || true
 pkg_installed certbot || command -v certbot >/dev/null || $APT install certbot
 ok "node $(/usr/bin/node -v), $(certbot --version 2>&1 | head -1)"
@@ -188,7 +295,7 @@ step "MySQL / MariaDB"
 if [[ $DB_PREEXISTING == 0 ]]; then
   $APT install mariadb-server mariadb-client
   systemctl enable --now mariadb >/dev/null
-  ok "Đã cài MariaDB $(mysql --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+  ok "$(L 'Đã cài MariaDB' 'Installed MariaDB') $(mysql --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 else
   # Never install a second server next to the existing one; only make sure a client exists.
   if ! command -v mysql >/dev/null || ! command -v mysqldump >/dev/null; then
@@ -225,10 +332,14 @@ fi
 MYSQL_ENV_CONN=""
 if [[ $UPGRADE == 0 ]]; then
   if [[ ${#MYSQL_ADMIN[@]} -eq 0 ]]; then
-    die "Không đăng nhập được MySQL/MariaDB đang có với quyền quản trị.
+    die "$(L "Không đăng nhập được MySQL/MariaDB đang có với quyền quản trị.
    Chạy lại kèm mật khẩu root của database:
-     curl -sSL https://raw.githubusercontent.com/tampham92/tpanel/main/install.sh | sudo bash -s -- --mysql-root-password 'MẬT_KHẨU'
-   (hoặc --mysql-root-user <user> nếu tài khoản quản trị không phải root)"
+     curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --mysql-root-password 'MẬT_KHẨU'
+   (hoặc --mysql-root-user <user> nếu tài khoản quản trị không phải root)" \
+"Could not log in to the existing MySQL/MariaDB as an administrator.
+   Run again with the database root password:
+     curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --lang en --mysql-root-password 'PASSWORD'
+   (or --mysql-root-user <user> if the admin account is not root)")"
   fi
   DB_VERSION=$("${MYSQL_ADMIN[@]}" -N -B -e 'SELECT VERSION()')
   DB_SOCKET=$("${MYSQL_ADMIN[@]}" -N -B -e 'SELECT @@socket' 2>/dev/null || true)
@@ -237,53 +348,53 @@ if [[ $UPGRADE == 0 ]]; then
   # 'localhost' = socket connections, '127.0.0.1' = TCP; create both so either transport works.
   # Deliberately no hardening statements (DROP DATABASE test, anonymous users...): this may be a live server.
   "${MYSQL_ADMIN[@]}" <<SQL
-CREATE USER IF NOT EXISTS 'tpanel'@'localhost' IDENTIFIED BY '${MYSQL_PASS}';
-ALTER USER 'tpanel'@'localhost' IDENTIFIED BY '${MYSQL_PASS}';
-GRANT ALL PRIVILEGES ON *.* TO 'tpanel'@'localhost' WITH GRANT OPTION;
-CREATE USER IF NOT EXISTS 'tpanel'@'127.0.0.1' IDENTIFIED BY '${MYSQL_PASS}';
-ALTER USER 'tpanel'@'127.0.0.1' IDENTIFIED BY '${MYSQL_PASS}';
-GRANT ALL PRIVILEGES ON *.* TO 'tpanel'@'127.0.0.1' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'lares'@'localhost' IDENTIFIED BY '${MYSQL_PASS}';
+ALTER USER 'lares'@'localhost' IDENTIFIED BY '${MYSQL_PASS}';
+GRANT ALL PRIVILEGES ON *.* TO 'lares'@'localhost' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'lares'@'127.0.0.1' IDENTIFIED BY '${MYSQL_PASS}';
+ALTER USER 'lares'@'127.0.0.1' IDENTIFIED BY '${MYSQL_PASS}';
+GRANT ALL PRIVILEGES ON *.* TO 'lares'@'127.0.0.1' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 SQL
   if [[ -n "$DB_SOCKET" && -S "$DB_SOCKET" ]]; then
-    MYSQL_ENV_CONN="TPANEL_MYSQL_SOCKET=$DB_SOCKET"
+    MYSQL_ENV_CONN="LARES_MYSQL_SOCKET=$DB_SOCKET"
   else
-    MYSQL_ENV_CONN=$'TPANEL_MYSQL_SOCKET=\nTPANEL_MYSQL_HOST=127.0.0.1\nTPANEL_MYSQL_PORT='"$DB_PORT"
+    MYSQL_ENV_CONN=$'LARES_MYSQL_SOCKET=\nLARES_MYSQL_HOST=127.0.0.1\nLARES_MYSQL_PORT='"$DB_PORT"
   fi
-  ok "Tài khoản 'tpanel' trên $DB_VERSION (${DB_SOCKET:-127.0.0.1:$DB_PORT})"
+  ok "$(L "Tài khoản 'lares' trên" "Account 'lares' on") $DB_VERSION (${DB_SOCKET:-127.0.0.1:$DB_PORT})"
 fi
 
 # ---- PHP-FPM ------------------------------------------------------------------
-step "Cài PHP-FPM: $PHP_VERSIONS"
+step "$(L 'Cài PHP-FPM' 'Installing PHP-FPM'): $PHP_VERSIONS"
 for v in $PHP_VERSIONS; do
   fresh=1; pkg_installed "php$v-fpm" && fresh=0
   core=()
   for p in fpm cli mysql curl gd mbstring xml zip intl bcmath opcache; do core+=("php$v-$p"); done
   if $APT install "${core[@]}"; then
-    for p in soap imagick redis; do $APT install "php$v-$p" >/dev/null 2>&1 || warn "PHP $v: thiếu extension $p"; done
+    for p in soap imagick redis; do $APT install "php$v-$p" >/dev/null 2>&1 || warn "PHP $v: $(L 'thiếu extension' 'missing extension') $p"; done
     # Only tune php.ini on versions we installed - an existing server's settings are left alone.
     if [[ $fresh == 1 ]]; then
       sed -i -E 's/^;?upload_max_filesize.*/upload_max_filesize = 256M/; s/^;?post_max_size.*/post_max_size = 256M/; s/^;?memory_limit.*/memory_limit = 512M/; s/^;?max_execution_time.*/max_execution_time = 300/' "/etc/php/$v/fpm/php.ini"
     fi
-    systemctl enable --now "php$v-fpm" >/dev/null || warn "Không khởi động được php$v-fpm"
-    ok "PHP $v$([[ $fresh == 0 ]] && echo ' (đã có)')"
+    systemctl enable --now "php$v-fpm" >/dev/null || warn "$(L "Không khởi động được php$v-fpm" "Could not start php$v-fpm")"
+    ok "PHP $v$([[ $fresh == 0 ]] && L ' (đã có)' ' (already installed)')"
   else
-    warn "Không cài được PHP $v - bỏ qua"
+    warn "$(L "Không cài được PHP $v - bỏ qua" "Could not install PHP $v - skipped")"
   fi
 done
 
-step "Cài WP-CLI"
+step "$(L 'Cài WP-CLI' 'Installing WP-CLI')"
 if ! command -v wp >/dev/null; then
   curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp
   chmod +x /usr/local/bin/wp
 fi
-wp --allow-root --version >/dev/null 2>&1 && ok "$(wp --allow-root --version)" || warn "wp-cli không chạy được (cần php-cli)"
+wp --allow-root --version >/dev/null 2>&1 && ok "$(wp --allow-root --version)" || warn "$(L 'wp-cli không chạy được (cần php-cli)' 'wp-cli does not run (needs php-cli)')"
 
 # ---- nginx --------------------------------------------------------------------
 step "Nginx"
 if [[ $NGINX_PREEXISTING == 1 ]]; then
   # Refuse to touch a config that is already broken - we could not tell our errors from existing ones.
-  "$NGINX_BIN" -t >/dev/null 2>&1 || die "Cấu hình nginx hiện tại đang lỗi ('nginx -t'). Hãy sửa trước khi cài TPanel."
+  "$NGINX_BIN" -t >/dev/null 2>&1 || die "$(L "Cấu hình nginx hiện tại đang lỗi ('nginx -t'). Hãy sửa trước khi cài Lares." "The current nginx configuration is broken ('nginx -t'). Fix it before installing Lares.")"
 else
   [[ $COEXIST == 1 ]] && block_service_start
   $APT install nginx
@@ -291,24 +402,24 @@ else
   # Stock "Welcome to nginx" site of a package we just installed - safe to remove.
   [[ -L /etc/nginx/sites-enabled/default ]] && rm -f /etc/nginx/sites-enabled/default
 fi
-[[ -x "$NGINX_BIN" ]] || die "Không tìm thấy $NGINX_BIN sau khi cài nginx"
+[[ -x "$NGINX_BIN" ]] || die "$(L "Không tìm thấy $NGINX_BIN sau khi cài nginx" "$NGINX_BIN not found after installing nginx")"
 
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/conf.d
 if ! grep -Eq '^\s*include\s+/etc/nginx/sites-enabled/' /etc/nginx/nginx.conf; then
   if grep -Eq '^\s*include\s+/etc/nginx/conf\.d/\*\.conf;' /etc/nginx/nginx.conf; then
-    cp -a /etc/nginx/nginx.conf "/etc/nginx/nginx.conf.tpanel-bak-$(date +%s)"
+    cp -a /etc/nginx/nginx.conf "/etc/nginx/nginx.conf.lares-bak-$(date +%s)"
     sed -i -E 's#^(\s*)include\s+/etc/nginx/conf\.d/\*\.conf;#&\n\1include /etc/nginx/sites-enabled/*;#' /etc/nginx/nginx.conf
-    ok "Đã thêm include sites-enabled vào nginx.conf (có bản sao lưu)"
+    ok "$(L 'Đã thêm include sites-enabled vào nginx.conf (có bản sao lưu)' 'Added the sites-enabled include to nginx.conf (backup kept)')"
   else
-    warn "nginx.conf không include conf.d/ hay sites-enabled/ - hãy tự thêm 'include /etc/nginx/conf.d/*.conf; include /etc/nginx/sites-enabled/*;' trong khối http {}"
+    warn "$(L "nginx.conf không include conf.d/ hay sites-enabled/ - hãy tự thêm 'include /etc/nginx/conf.d/*.conf; include /etc/nginx/sites-enabled/*;' trong khối http {}" "nginx.conf includes neither conf.d/ nor sites-enabled/ - add 'include /etc/nginx/conf.d/*.conf; include /etc/nginx/sites-enabled/*;' inside the http {} block yourself")"
   fi
 fi
 
 # Catch-all so unknown hostnames are dropped instead of landing on the first site.
 # Skipped automatically when the server already has its own default_server.
-CATCHALL=/etc/nginx/conf.d/99-tpanel-default.conf
+CATCHALL=/etc/nginx/conf.d/99-lares-default.conf
 cat > "$CATCHALL" <<NGX
-# Managed by TPanel
+# Managed by Lares
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -319,58 +430,58 @@ server {
 NGX
 if ! "$NGINX_BIN" -t >/dev/null 2>&1; then
   rm -f "$CATCHALL"
-  ok "Server đã có default_server riêng - bỏ qua catch-all của TPanel"
+  ok "$(L 'Server đã có default_server riêng - bỏ qua catch-all của Lares' "The server already has its own default_server - skipping Lares's catch-all")"
 fi
-"$NGINX_BIN" -t >/dev/null 2>&1 || die "nginx -t lỗi sau khi cấu hình: $("$NGINX_BIN" -t 2>&1 | tail -3)"
+"$NGINX_BIN" -t >/dev/null 2>&1 || die "$(L 'nginx -t lỗi sau khi cấu hình' 'nginx -t failed after configuration'): $("$NGINX_BIN" -t 2>&1 | tail -3)"
 
 if [[ $COEXIST == 1 ]]; then
   systemctl disable nginx >/dev/null 2>&1 || true
   systemctl stop nginx >/dev/null 2>&1 || true
-  warn "nginx của TPanel chưa chạy vì port 80/443 đang do $WEB_FOREIGN giữ"
+  warn "$(L "nginx của Lares chưa chạy vì port 80/443 đang do $WEB_FOREIGN giữ" "Lares's nginx is not started because port 80/443 is held by $WEB_FOREIGN")"
 elif systemctl is-active --quiet nginx; then
   systemctl reload nginx
-  ok "nginx đang chạy - đã reload"
+  ok "$(L 'nginx đang chạy - đã reload' 'nginx is running - reloaded')"
 else
   systemctl enable --now nginx >/dev/null
-  ok "nginx đã khởi động"
+  ok "$(L 'nginx đã khởi động' 'nginx started')"
 fi
 
 # ---- Directories ------------------------------------------------------------
-step "Tạo thư mục"
-install -d -m 755 /var/www "$CONF_DIR" "$CONF_DIR/apps" /var/log/tpanel /var/log/tpanel/sites
+step "$(L 'Tạo thư mục' 'Creating directories')"
+install -d -m 755 /var/www "$CONF_DIR" "$CONF_DIR/apps" /var/log/lares /var/log/lares/sites
 install -d -m 700 "$CONF_DIR/ssl" "$INSTALL_DIR"
 install -d -m 711 "$DATA_DIR"
 install -d -m 755 "$DATA_DIR/acme"
 install -d -m 755 "$DATA_DIR/templates"   # your own templates - kept across upgrades
 
-# ---- Fetch & build TPanel ----------------------------------------------------
-step "Tải mã nguồn TPanel"
+# ---- Fetch & build Lares ----------------------------------------------------
+step "$(L 'Tải mã nguồn Lares' 'Downloading Lares source code')"
 SRC="$INSTALL_DIR/src"
-if [[ -n "$TPANEL_TARBALL" ]]; then
+if [[ -n "$LARES_TARBALL" ]]; then
   tmp=$(mktemp -d)
-  curl -fsSL "$TPANEL_TARBALL" | tar -xz -C "$tmp"
+  curl -fsSL "$LARES_TARBALL" | tar -xz -C "$tmp"
   inner=$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -1)
   rsync -a --delete --exclude node_modules "${inner:-$tmp}/" "$SRC/"
   rm -rf "$tmp"
 elif [[ -d "$SRC/.git" ]]; then
-  git -C "$SRC" fetch --depth 1 origin "$TPANEL_BRANCH"
+  git -C "$SRC" fetch --depth 1 origin "$LARES_BRANCH"
   git -C "$SRC" reset --hard FETCH_HEAD
 else
-  git clone --depth 1 --branch "$TPANEL_BRANCH" "$TPANEL_REPO" "$SRC"
+  git clone --depth 1 --branch "$LARES_BRANCH" "$LARES_REPO" "$SRC"
 fi
-ok "Mã nguồn tại $SRC"
+ok "$(L 'Mã nguồn tại' 'Source code in') $SRC"
 
-step "Build TPanel (có thể mất 1-2 phút)"
+step "$(L 'Build Lares (có thể mất 1-2 phút)' 'Building Lares (may take 1-2 minutes)')"
 cd "$SRC"
 export PATH="/usr/bin:$PATH"   # build with the same node the service will run
 if [[ -f package-lock.json ]]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
 npm run build
-ok "Build xong"
+ok "$(L 'Build xong' 'Build finished')"
 
 # ---- Panel TLS (self-signed; replace with a real cert any time) ---------------
 if [[ ! -f "$CONF_DIR/panel.crt" ]]; then
-  step "Tạo chứng chỉ HTTPS tự ký cho trang quản trị"
-  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=TPanel" \
+  step "$(L 'Tạo chứng chỉ HTTPS tự ký cho trang quản trị' 'Creating a self-signed HTTPS certificate for the panel')"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=Lares" \
     -keyout "$CONF_DIR/panel.key" -out "$CONF_DIR/panel.crt" >/dev/null 2>&1
   chmod 600 "$CONF_DIR/panel.key"
 fi
@@ -385,35 +496,37 @@ if [[ $UPGRADE == 0 ]]; then
   umask 077
   cat > "$ENV_FILE" <<ENV
 NODE_ENV=production
-TPANEL_PORT=$TPANEL_PORT
-TPANEL_HOST=0.0.0.0
-TPANEL_DATA_DIR=$DATA_DIR
-TPANEL_SECRET=$(rand 64)
-TPANEL_WEB_DIST=$SRC/apps/web/dist
-TPANEL_TLS_CERT=$CONF_DIR/panel.crt
-TPANEL_TLS_KEY=$CONF_DIR/panel.key
-TPANEL_ADMIN_USER=admin
-TPANEL_ADMIN_PASSWORD=$ADMIN_PASS
-TPANEL_DRY_RUN=0
-TPANEL_SITES_ROOT=/var/www
-TPANEL_ACME_DIR=$DATA_DIR/acme
-TPANEL_DEFAULT_PHP=$(echo "$PHP_VERSIONS" | awk '{print $1}')
-TPANEL_NGINX_BIN=$NGINX_BIN
+LARES_PORT=$LARES_PORT
+LARES_HOST=0.0.0.0
+LARES_DATA_DIR=$DATA_DIR
+LARES_SECRET=$(rand 64)
+LARES_WEB_DIST=$SRC/apps/web/dist
+LARES_TLS_CERT=$CONF_DIR/panel.crt
+LARES_TLS_KEY=$CONF_DIR/panel.key
+LARES_ADMIN_USER=admin
+LARES_ADMIN_PASSWORD=$ADMIN_PASS
+LARES_DRY_RUN=0
+LARES_SITES_ROOT=/var/www
+LARES_ACME_DIR=$DATA_DIR/acme
+LARES_DEFAULT_PHP=$(echo "$PHP_VERSIONS" | awk '{print $1}')
+LARES_NGINX_BIN=$NGINX_BIN
+LARES_LANG=$LANG_UI
 $MYSQL_ENV_CONN
-TPANEL_MYSQL_USER=tpanel
-TPANEL_MYSQL_PASSWORD=$MYSQL_PASS
+LARES_MYSQL_USER=lares
+LARES_MYSQL_PASSWORD=$MYSQL_PASS
 ENV
   umask 022
 else
-  set_env TPANEL_PORT "$TPANEL_PORT"
-  set_env TPANEL_NGINX_BIN "$NGINX_BIN"
+  set_env LARES_PORT "$LARES_PORT"
+  set_env LARES_NGINX_BIN "$NGINX_BIN"
+  set_env LARES_LANG "$LANG_UI"   # the saved one unless --lang was given
 fi
 
 # ---- systemd ------------------------------------------------------------------
-step "Tạo service systemd"
-cat > /etc/systemd/system/tpanel.service <<UNIT
+step "$(L 'Tạo service systemd' 'Creating the systemd service')"
+cat > /etc/systemd/system/lares.service <<UNIT
 [Unit]
-Description=TPanel hosting control panel
+Description=Lares hosting control panel
 After=network-online.target mariadb.service mysql.service nginx.service
 Wants=network-online.target
 
@@ -430,53 +543,54 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable tpanel >/dev/null
+systemctl enable lares >/dev/null
 
-# Upgrade: snapshot TPanel's own state first (env/secret, certificates, SQLite, custom templates).
+# Upgrade: snapshot Lares's own state first (env/secret, certificates, SQLite, custom templates).
 # Websites, their files and MySQL databases are never touched by an upgrade.
-if [[ $UPGRADE == 1 && -f "$DATA_DIR/tpanel.db" ]]; then
-  step "Sao lưu dữ liệu TPanel trước khi cập nhật"
+if [[ $UPGRADE == 1 && -f "$DATA_DIR/lares.db" ]]; then
+  step "$(L 'Sao lưu dữ liệu Lares trước khi cập nhật' 'Backing up Lares data before upgrading')"
   BACKUP_DIR="$DATA_DIR/backups"
   install -d -m 700 "$BACKUP_DIR"
-  systemctl stop tpanel 2>/dev/null || true   # consistent SQLite copy (WAL files included)
-  BACKUP_FILE="$BACKUP_DIR/tpanel-$(date +%Y%m%d-%H%M%S).tar.gz"
-  (cd / && tar -czf "$BACKUP_FILE" etc/tpanel ${DATA_DIR#/}/tpanel.db* $( [[ -d "$DATA_DIR/templates" ]] && echo "${DATA_DIR#/}/templates" ))
+  systemctl stop lares 2>/dev/null || true   # consistent SQLite copy (WAL files included)
+  BACKUP_FILE="$BACKUP_DIR/lares-$(date +%Y%m%d-%H%M%S).tar.gz"
+  (cd / && tar -czf "$BACKUP_FILE" etc/lares ${DATA_DIR#/}/lares.db* $( [[ -d "$DATA_DIR/templates" ]] && echo "${DATA_DIR#/}/templates" ))
   chmod 600 "$BACKUP_FILE"
-  ls -1t "$BACKUP_DIR"/tpanel-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f   # keep the 5 newest
-  ok "Đã sao lưu: $BACKUP_FILE"
+  ls -1t "$BACKUP_DIR"/lares-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f   # keep the 5 newest
+  ok "$(L 'Đã sao lưu' 'Backed up to'): $BACKUP_FILE"
 fi
-systemctl restart tpanel
+systemctl restart lares
 # The server creates the admin account before it starts listening, so a 401 from the API means it is ready.
 ready=0
 for _ in $(seq 1 30); do
-  code=$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:$TPANEL_PORT/api/auth/me" || true)
+  code=$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:$LARES_PORT/api/auth/me" || true)
   [[ "$code" == 401 ]] && { ready=1; break; }
   sleep 1
 done
-[[ $ready == 1 ]] || { journalctl -u tpanel -n 40 --no-pager; die "TPanel không khởi động được (không phản hồi trên port $TPANEL_PORT sau 30s)"; }
-ok "tpanel.service đang chạy"
+[[ $ready == 1 ]] || { journalctl -u lares -n 40 --no-pager; die "$(L "Lares không khởi động được (không phản hồi trên port $LARES_PORT sau 30s)" "Lares failed to start (no response on port $LARES_PORT after 30s)")"; }
+ok "$(L 'lares.service đang chạy' 'lares.service is running')"
 
-# Admin CLI: sudo tpanel users | sudo tpanel reset-password [user]
-cat > /usr/local/bin/tpanel <<CLI
+# Admin CLI: sudo lares users | sudo lares reset-password [user]
+CLI_SUDO_MSG=$(L 'Hãy chạy bằng sudo' 'Please run with sudo')
+cat > /usr/local/bin/lares <<CLI
 #!/bin/bash
-[ "\$(id -u)" -eq 0 ] || { echo "Hãy chạy bằng sudo: sudo tpanel \$*"; exit 1; }
+[ "\$(id -u)" -eq 0 ] || { echo "$CLI_SUDO_MSG: sudo lares \$*"; exit 1; }
 set -a; . $ENV_FILE; set +a
 cd $SRC/apps/server && exec /usr/bin/node dist/cli.js "\$@"
 CLI
-chmod 755 /usr/local/bin/tpanel
+chmod 755 /usr/local/bin/lares
 
 if [[ -n "$ADMIN_PASS" ]]; then
   # Make sure the password we are about to print is really the one stored (bcrypt) in SQLite,
   # then drop the plaintext copy from the env file.
-  /usr/local/bin/tpanel reset-password admin --password "$ADMIN_PASS" >/dev/null
-  sed -i 's/^TPANEL_ADMIN_PASSWORD=.*/TPANEL_ADMIN_PASSWORD=/' "$ENV_FILE"
+  /usr/local/bin/lares reset-password admin --password "$ADMIN_PASS" >/dev/null
+  sed -i 's/^LARES_ADMIN_PASSWORD=.*/LARES_ADMIN_PASSWORD=/' "$ENV_FILE"
 fi
 
 # ---- Firewall -----------------------------------------------------------------
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
-  step "Mở port firewall (ufw)"
-  ufw allow OpenSSH >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow "$TPANEL_PORT/tcp" >/dev/null
-  ok "ufw: 22, 80, 443, $TPANEL_PORT"
+  step "$(L 'Mở port firewall (ufw)' 'Opening firewall ports (ufw)')"
+  ufw allow OpenSSH >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow "$LARES_PORT/tcp" >/dev/null
+  ok "ufw: 22, 80, 443, $LARES_PORT"
 fi
 
 # ---- Done ---------------------------------------------------------------------
@@ -484,29 +598,29 @@ IP=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I 
 echo
 echo -e "${c_green}==============================================================${c_off}"
 if [[ $UPGRADE == 1 ]]; then
-  echo -e "${c_green} TPanel đã được nâng cấp${c_off} (website và database không bị thay đổi)"
-  echo -e "  URL:  https://$IP:$TPANEL_PORT"
-  [[ -n "${BACKUP_FILE:-}" ]] && echo -e "  Bản sao lưu trước khi nâng cấp: $BACKUP_FILE"
+  echo -e "${c_green} $(L 'Lares đã được nâng cấp' 'Lares has been upgraded')${c_off} $(L '(website và database không bị thay đổi)' '(websites and databases were not changed)')"
+  echo -e "  URL:  https://$IP:$LARES_PORT"
+  [[ -n "${BACKUP_FILE:-}" ]] && echo -e "  $(L 'Bản sao lưu trước khi nâng cấp' 'Pre-upgrade backup'): $BACKUP_FILE"
 else
-  echo -e "${c_green} Cài đặt TPanel thành công!${c_off}"
-  echo -e "  URL:       https://$IP:$TPANEL_PORT   (chứng chỉ tự ký - trình duyệt sẽ cảnh báo)"
-  echo -e "  Tài khoản: admin"
-  echo -e "  Mật khẩu:  $ADMIN_PASS"
-  echo -e "  ${c_yellow}Hãy lưu mật khẩu này và đổi ngay sau khi đăng nhập.${c_off}"
+  echo -e "${c_green} $(L 'Cài đặt Lares thành công!' 'Lares installed successfully!')${c_off}"
+  echo -e "  URL:       https://$IP:$LARES_PORT   $(L '(chứng chỉ tự ký - trình duyệt sẽ cảnh báo)' '(self-signed certificate - your browser will warn)')"
+  echo -e "  $(L 'Tài khoản: admin' 'Username:  admin')"
+  echo -e "  $(L 'Mật khẩu: ' 'Password: ') $ADMIN_PASS"
+  echo -e "  ${c_yellow}$(L 'Hãy lưu mật khẩu này và đổi ngay sau khi đăng nhập.' 'Save this password and change it right after logging in.')${c_off}"
 fi
-echo -e "  Quên mật khẩu: sudo tpanel reset-password"
-echo -e "  Log:       journalctl -u tpanel -f"
+echo -e "  $(L 'Quên mật khẩu' 'Forgot password'): sudo lares reset-password"
+echo -e "  Log:       journalctl -u lares -f"
 if [[ $COEXIST == 1 ]]; then
   echo
-  echo -e "${c_yellow} CHẾ ĐỘ CÙNG TỒN TẠI:${c_off} port 80/443 đang do $WEB_FOREIGN giữ."
-  echo -e "  Dùng mục 'Chuyển site' để chuyển các site về TPanel. Khi đã sẵn sàng chuyển traffic:"
-  echo -e "    1. Dừng & tắt web server cũ (vd: systemctl disable --now apache2 / lsws / nginx của panel cũ)"
+  echo -e "${c_yellow} $(L 'CHẾ ĐỘ CÙNG TỒN TẠI:' 'COEXIST MODE:')${c_off} $(L "port 80/443 đang do $WEB_FOREIGN giữ." "port 80/443 is held by $WEB_FOREIGN.")"
+  echo -e "  $(L "Dùng mục 'Chuyển site' để chuyển các site về Lares. Khi đã sẵn sàng chuyển traffic:" "Use 'Migration' to move your sites to Lares. When you are ready to switch traffic:")"
+  echo -e "    1. $(L 'Dừng & tắt web server cũ (vd: systemctl disable --now apache2 / lsws / nginx của panel cũ)' "Stop & disable the old web server (e.g. systemctl disable --now apache2 / lsws / the old panel's nginx)")"
   echo -e "    2. systemctl enable --now nginx"
-  echo -e "    3. Cài SSL cho từng site trong TPanel"
+  echo -e "    3. $(L 'Cài SSL cho từng site trong Lares' 'Install SSL for each site in Lares')"
 fi
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
   echo
-  echo -e "${c_yellow} Lưu ý:${c_off}"
+  echo -e "${c_yellow} $(L 'Lưu ý:' 'Warnings:')${c_off}"
   for w in "${WARNINGS[@]}"; do echo "  - $w"; done
 fi
 echo -e "${c_green}==============================================================${c_off}"

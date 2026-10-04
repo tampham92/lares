@@ -1,5 +1,5 @@
 {
-  "name": "@tpanel/web",
+  "name": "@lares/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
-    "@tpanel/shared": "*",
+    "@lares/shared": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0"

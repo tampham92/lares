@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 /** LIFO stack of compensating actions, run when a multi-step operation fails half way. */
 export class UndoStack {
   private steps: Array<{ label: string; fn: () => Promise<unknown> }> = [];
@@ -13,7 +15,7 @@ export class UndoStack {
         await s.fn();
         log?.(`Rollback: ${s.label}`);
       } catch (err) {
-        log?.(`Rollback thất bại (${s.label}): ${err instanceof Error ? err.message : err}`);
+        log?.(t('Rollback thất bại ({label}): {error}', { label: s.label, error: err instanceof Error ? err.message : String(err) }));
       }
     }
   }

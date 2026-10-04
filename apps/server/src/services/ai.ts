@@ -1,5 +1,6 @@
-import { ARTICLE_TONES, articleSchema, type AiProvider, type AiSettingsInput, type AiSettingsView, type Article, type ArticleRequest } from '@tpanel/shared';
+import { ARTICLE_TONES, articleSchema, type AiProvider, type AiSettingsInput, type AiSettingsView, type Article, type ArticleRequest } from '@lares/shared';
 import { getSetting, setSetting } from '../db/index.js';
+import { currentLang, t } from '../i18n/index.js';
 import { decrypt, encrypt } from '../lib/crypto.js';
 import { badRequest, conflict } from '../lib/errors.js';
 import type { HostLogger } from './host.js';
@@ -45,7 +46,7 @@ export function deleteAiKey(): AiSettingsView {
 
 function credentials() {
   const s = stored();
-  if (!s.keyEnc) throw conflict('Chưa có API key AI - thêm key trong mục Cài đặt');
+  if (!s.keyEnc) throw conflict(t('Chưa có API key AI - thêm key trong mục Cài đặt'));
   return { ...s, key: decrypt<string>(s.keyEnc), base: (s.baseUrl ?? DEFAULT_BASE[s.provider]).replace(/\/+$/, '') };
 }
 
@@ -68,10 +69,10 @@ async function apiError(res: Response, provider: AiProvider): Promise<Error> {
   }
   const name = PROVIDER_NAMES[provider];
   // Gemini answers an invalid key with 400 API_KEY_INVALID
-  if (res.status === 401 || res.status === 403 || (res.status === 400 && /api[ _]?key/i.test(detail))) return badRequest(`${name} từ chối API key (${res.status}): ${detail}`);
-  if (res.status === 429) return badRequest(`${name} báo vượt giới hạn hoặc hết credit (429): ${detail}`);
-  if (res.status === 404) return badRequest(`${name} không tìm thấy model hoặc endpoint (404): ${detail}`);
-  return new Error(`${name} lỗi ${res.status}: ${detail}`);
+  if (res.status === 401 || res.status === 403 || (res.status === 400 && /api[ _]?key/i.test(detail))) return badRequest(t('{name} từ chối API key ({status}): {detail}', { name, status: res.status, detail }));
+  if (res.status === 429) return badRequest(t('{name} báo vượt giới hạn hoặc hết credit (429): {detail}', { name, detail }));
+  if (res.status === 404) return badRequest(t('{name} không tìm thấy model hoặc endpoint (404): {detail}', { name, detail }));
+  return new Error(t('{name} lỗi {status}: {detail}', { name, status: res.status, detail }));
 }
 
 /** Validate key + model with the free model-list endpoint. */
@@ -86,7 +87,10 @@ export async function testAi(): Promise<{ ok: true; message: string }> {
   const found = list.includes(c.model);
   return {
     ok: true,
-    message: found || !list.length ? `Kết nối thành công, model ${c.model} sẵn sàng` : `API key hợp lệ nhưng không thấy model "${c.model}" trong danh sách của tài khoản - kiểm tra lại tên model`,
+    message:
+      found || !list.length
+        ? t('Kết nối thành công, model {model} sẵn sàng', { model: c.model })
+        : t('API key hợp lệ nhưng không thấy model "{model}" trong danh sách của tài khoản - kiểm tra lại tên model', { model: c.model }),
   };
 }
 
@@ -112,6 +116,9 @@ const ARTICLE_FIELDS = {
   tags: 'Array of 3-8 short tags (no commas inside a tag)',
 } as const;
 
+/** Example FAQ headings for the prompt, one per article language (prompt text, not UI). */
+const FAQ_EXAMPLE = '"Câu hỏi thường gặp" / "Frequently asked questions"'; // i18n-ignore
+
 function systemPrompt(req: ArticleRequest): string {
   const lang = req.language === 'vi' ? 'Vietnamese (natural, fluent Vietnamese with correct diacritics)' : 'English';
   return `You are a senior SEO content writer. You write original, genuinely helpful blog posts that rank on Google and follow Google's helpful-content and E-E-A-T guidelines.
@@ -122,7 +129,7 @@ SEO rules:
 - The focus keyword appears in the title, in the first 100 words, in at least one H2, in the meta description and naturally through the text (about 1% density, never stuffed). Use the secondary keywords and close variations naturally.
 - Structure: a short engaging introduction, then logical H2 sections with H3 sub-sections where useful, then a conclusion with a clear call to action.
 - Short paragraphs (2-4 sentences), bullet or numbered lists where they help scanning, a comparison table when relevant, <strong> for key ideas.
-${req.includeFaq ? '- End with an FAQ section: an H2 (e.g. "Câu hỏi thường gặp" / "Frequently asked questions") followed by 3-5 questions as H3, each answered in a short paragraph.\n' : ''}- When an existing post of the site is clearly relevant, link to it with a descriptive anchor (2-3 internal links at most, only URLs from the list given). Never invent URLs; no external links.
+${req.includeFaq ? `- End with an FAQ section: an H2 (e.g. ${FAQ_EXAMPLE}) followed by 3-5 questions as H3, each answered in a short paragraph.\n` : ''}- When an existing post of the site is clearly relevant, link to it with a descriptive anchor (2-3 internal links at most, only URLs from the list given). Never invent URLs; no external links.
 - Do not invent statistics, studies, quotes, prices or brand claims. If a number is needed, keep it general or clearly approximate.
 
 HTML rules for contentHtml: only use <h2> <h3> <h4> <p> <ul> <ol> <li> <strong> <em> <a href> <blockquote> <table> <thead> <tbody> <tr> <th> <td> <br>. No <h1>, no inline styles, no classes, no images, no scripts, no markdown. Lists must not be nested.
@@ -194,12 +201,12 @@ async function streamAnthropic(c: ReturnType<typeof credentials>, system: string
   let json = '';
   for await (const ev of sse(res)) {
     const e = ev as { type: string; delta?: { type?: string; partial_json?: string; stop_reason?: string }; error?: { message?: string } };
-    if (e.type === 'error') throw new Error(`Anthropic: ${e.error?.message ?? 'lỗi không xác định'}`);
+    if (e.type === 'error') throw new Error(`Anthropic: ${e.error?.message ?? t('lỗi không xác định')}`);
     if (e.type === 'content_block_delta' && e.delta?.type === 'input_json_delta') {
       json += e.delta.partial_json ?? '';
       progress(json.length);
     }
-    if (e.type === 'message_delta' && e.delta?.stop_reason === 'max_tokens') throw new Error('Bài viết vượt quá giới hạn độ dài của model - hãy giảm số từ');
+    if (e.type === 'message_delta' && e.delta?.stop_reason === 'max_tokens') throw new Error(t('Bài viết vượt quá giới hạn độ dài của model - hãy giảm số từ'));
   }
   return json;
 }
@@ -226,13 +233,13 @@ async function streamOpenAi(c: ReturnType<typeof credentials>, system: string, u
   let text = '';
   for await (const ev of sse(res)) {
     const e = ev as { choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>; error?: { message?: string } };
-    if (e.error) throw new Error(`OpenAI: ${e.error.message ?? 'lỗi không xác định'}`);
+    if (e.error) throw new Error(`OpenAI: ${e.error.message ?? t('lỗi không xác định')}`);
     const choice = e.choices?.[0];
     if (choice?.delta?.content) {
       text += choice.delta.content;
       progress(text.length);
     }
-    if (choice?.finish_reason === 'length') throw new Error('Bài viết vượt quá giới hạn độ dài của model - hãy giảm số từ');
+    if (choice?.finish_reason === 'length') throw new Error(t('Bài viết vượt quá giới hạn độ dài của model - hãy giảm số từ'));
   }
   return text;
 }
@@ -264,16 +271,16 @@ async function streamGemini(c: ReturnType<typeof credentials>, system: string, u
       promptFeedback?: { blockReason?: string };
       error?: { message?: string };
     };
-    if (e.error) throw new Error(`Gemini: ${e.error.message ?? 'lỗi không xác định'}`);
-    if (e.promptFeedback?.blockReason) throw new Error(`Gemini từ chối yêu cầu (${e.promptFeedback.blockReason}) - thử diễn đạt lại chủ đề`);
+    if (e.error) throw new Error(`Gemini: ${e.error.message ?? t('lỗi không xác định')}`);
+    if (e.promptFeedback?.blockReason) throw new Error(t('Gemini từ chối yêu cầu ({reason}) - thử diễn đạt lại chủ đề', { reason: e.promptFeedback.blockReason }));
     const cand = e.candidates?.[0];
     for (const part of cand?.content?.parts ?? []) {
       if (part.text && !part.thought) text += part.text;
     }
     progress(text.length);
     const reason = cand?.finishReason;
-    if (reason === 'MAX_TOKENS') throw new Error('Bài viết vượt quá giới hạn độ dài của model - hãy giảm số từ');
-    if (reason && !['STOP', 'FINISH_REASON_UNSPECIFIED'].includes(reason)) throw new Error(`Gemini dừng giữa chừng (${reason}) - thử lại hoặc đổi chủ đề`);
+    if (reason === 'MAX_TOKENS') throw new Error(t('Bài viết vượt quá giới hạn độ dài của model - hãy giảm số từ'));
+    if (reason && !['STOP', 'FINISH_REASON_UNSPECIFIED'].includes(reason)) throw new Error(t('Gemini dừng giữa chừng ({reason}) - thử lại hoặc đổi chủ đề', { reason }));
   }
   return text;
 }
@@ -281,11 +288,11 @@ async function streamGemini(c: ReturnType<typeof credentials>, system: string, u
 /** Ask the configured model for a complete SEO article, then validate and sanitize it. */
 export async function generateArticle(req: ArticleRequest, ctx: SiteContext, log: HostLogger): Promise<Article> {
   const c = credentials();
-  log(`Đang viết bài bằng ${c.model} (${c.provider === 'openai' ? (c.baseUrl ?? 'OpenAI') : PROVIDER_NAMES[c.provider]})...`);
+  log(t('Đang viết bài bằng {model} ({provider})...', { model: c.model, provider: c.provider === 'openai' ? (c.baseUrl ?? 'OpenAI') : PROVIDER_NAMES[c.provider] }));
   let next = 2000;
   const progress: Progress = (n) => {
     if (n < next) return;
-    log(`Đã nhận ${n.toLocaleString('vi-VN')} ký tự...`);
+    log(t('Đã nhận {count} ký tự...', { count: n.toLocaleString(currentLang() === 'en' ? 'en-US' : 'vi-VN') }));
     next += 4000;
   };
   const started = Date.now();
@@ -299,7 +306,7 @@ export async function generateArticle(req: ArticleRequest, ctx: SiteContext, log
   try {
     data = JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')) as Record<string, unknown>;
   } catch {
-    throw new Error('AI trả về dữ liệu không đúng định dạng JSON - hãy thử lại');
+    throw new Error(t('AI trả về dữ liệu không đúng định dạng JSON - hãy thử lại'));
   }
   const tags = Array.isArray(data.tags) ? data.tags.map((t) => String(t).replace(/[,<>\s]+/g, ' ').trim()).filter(Boolean).slice(0, 20) : [];
   const parsed = articleSchema.safeParse({
@@ -311,7 +318,7 @@ export async function generateArticle(req: ArticleRequest, ctx: SiteContext, log
     contentHtml: sanitizeArticleHtml(String(data.contentHtml ?? '')),
     tags,
   });
-  if (!parsed.success) throw new Error(`AI trả về bài viết thiếu dữ liệu: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
-  log(`Hoàn tất sau ${((Date.now() - started) / 1000).toFixed(0)}s: "${parsed.data.title}"`);
+  if (!parsed.success) throw new Error(t('AI trả về bài viết thiếu dữ liệu: {issues}', { issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }));
+  log(t('Hoàn tất sau {seconds}s: "{title}"', { seconds: ((Date.now() - started) / 1000).toFixed(0), title: parsed.data.title }));
   return parsed.data;
 }

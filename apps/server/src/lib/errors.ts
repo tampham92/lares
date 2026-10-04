@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 export class HttpError extends Error {
   constructor(
     public statusCode: number,
@@ -8,7 +10,7 @@ export class HttpError extends Error {
 }
 
 export const badRequest = (msg: string) => new HttpError(400, msg);
-export const notFound = (msg = 'Không tìm thấy') => new HttpError(404, msg);
+export const notFound = (msg = t('Không tìm thấy')) => new HttpError(404, msg);
 export const conflict = (msg: string) => new HttpError(409, msg);
 
 export function errorMessage(err: unknown): string {

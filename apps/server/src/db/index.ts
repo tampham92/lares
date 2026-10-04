@@ -1,8 +1,18 @@
+import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import { config } from '../config.js';
 
-export const db = new Database(path.join(config.dataDir, 'tpanel.db'));
+const dbFile = path.join(config.dataDir, 'lares.db');
+// Data dirs from before the rename to Lares hold tpanel.db (install.sh renames it on servers).
+if (!fs.existsSync(dbFile) && fs.existsSync(path.join(config.dataDir, 'tpanel.db'))) {
+  for (const suffix of ['', '-wal', '-shm']) {
+    const old = path.join(config.dataDir, `tpanel.db${suffix}`);
+    if (fs.existsSync(old)) fs.renameSync(old, `${dbFile}${suffix}`);
+  }
+}
+
+export const db = new Database(dbFile);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

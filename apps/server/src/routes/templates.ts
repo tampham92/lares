@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { brandingSchema, templateIdSchema } from '@tpanel/shared';
+import { brandingSchema, templateIdSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
 import { parse } from '../lib/validate.js';
 import { getTemplate, listTemplates, renderStaticPage, templateVars } from '../services/templates.js';

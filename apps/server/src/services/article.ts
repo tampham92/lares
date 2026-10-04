@@ -43,7 +43,7 @@ export function sanitizeArticleHtml(html: string): string {
 export function slugify(s: string): string {
   return s
     .toLowerCase()
-    .replace(/đ/g, 'd')
+    .replace(/đ/g, 'd') // i18n-ignore - slug transliteration
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')

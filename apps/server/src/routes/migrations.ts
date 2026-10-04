@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { createMigrationSchema, inspectPathSchema, sourceInputSchema, type MigrationEvent } from '@tpanel/shared';
+import { createMigrationSchema, inspectPathSchema, sourceInputSchema, type MigrationEvent } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
+import { t } from '../i18n/index.js';
 import { badRequest, conflict } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
 import { subscribeMigration } from '../migration/events.js';
@@ -26,10 +27,10 @@ export async function migrationRoutes(app: FastifyInstance) {
     const input = parse(createMigrationSchema, req.body);
     const targets = input.items.map((i) => i.targetDomain);
     const dup = targets.find((d, i) => targets.indexOf(d) !== i);
-    if (dup) throw badRequest(`Tên miền đích ${dup} bị trùng`);
+    if (dup) throw badRequest(t('Tên miền đích {domain} bị trùng', { domain: dup }));
     for (const it of input.items) {
       if (it.db.strategy !== 'skip' && !it.db.source && !['nextjs', 'static'].includes(it.appType)) {
-        throw badRequest(`${it.sourceDomain}: thiếu thông tin database nguồn`);
+        throw badRequest(t('{domain}: thiếu thông tin database nguồn', { domain: it.sourceDomain }));
       }
     }
     // Re-check reachability & same-host now: the job runs in the background and must not fail on typos.
@@ -77,24 +78,24 @@ export async function migrationRoutes(app: FastifyInstance) {
 
   app.post('/api/migrations/:id/cancel', (req) => {
     const id = idParam(req.params);
-    if (!runner.cancel(id)) throw conflict('Migration không chạy');
-    repo.addLog(id, null, 'warn', 'Người dùng yêu cầu huỷ - đang dừng sau thao tác hiện tại...');
+    if (!runner.cancel(id)) throw conflict(t('Migration không chạy'));
+    repo.addLog(id, null, 'warn', t('Người dùng yêu cầu huỷ - đang dừng sau thao tác hiện tại...'));
     return { ok: true };
   });
 
   app.post('/api/migrations/:id/retry', (req) => {
     const id = idParam(req.params);
-    if (runner.isRunning(id)) throw conflict('Migration đang chạy');
+    if (runner.isRunning(id)) throw conflict(t('Migration đang chạy'));
     const n = repo.resetItemsForRetry(id);
-    if (!n) throw badRequest('Không có site nào lỗi để chạy lại');
-    repo.addLog(id, null, 'info', `Chạy lại ${n} site`);
+    if (!n) throw badRequest(t('Không có site nào lỗi để chạy lại'));
+    repo.addLog(id, null, 'info', t('Chạy lại {count} site', { count: n }));
     runner.start(id);
     return repo.getMigration(id);
   });
 
   app.delete('/api/migrations/:id', (req) => {
     const id = idParam(req.params);
-    if (runner.isRunning(id)) throw conflict('Hãy huỷ migration trước khi xoá');
+    if (runner.isRunning(id)) throw conflict(t('Hãy huỷ migration trước khi xoá'));
     repo.deleteMigration(id);
     return { ok: true };
   });

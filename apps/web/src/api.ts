@@ -1,4 +1,6 @@
-const TOKEN_KEY = 'tpanel_token';
+import { getLang, locale } from './i18n';
+
+const TOKEN_KEY = 'lares_token';
 
 export const auth = {
   get token() {
@@ -28,7 +30,7 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { 'X-Lares-Lang': getLang() };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth.token) headers.Authorization = `Bearer ${auth.token}`;
   const res = await fetch(path, { method: opts.method ?? 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
@@ -70,7 +72,7 @@ export function fmtBytes(n: number | null | undefined): string {
   return `${v.toFixed(i ? 1 : 0)} ${u[i]}`;
 }
 
-export const fmtDate = (s: string | null | undefined) => (s ? new Date(s.endsWith('Z') || s.includes('T') ? s : `${s.replace(' ', 'T')}Z`).toLocaleString('vi-VN') : '—');
+export const fmtDate = (s: string | null | undefined) => (s ? new Date(s.endsWith('Z') || s.includes('T') ? s : `${s.replace(' ', 'T')}Z`).toLocaleString(locale()) : '—');
 
 export function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);

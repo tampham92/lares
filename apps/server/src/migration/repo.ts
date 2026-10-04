@@ -12,9 +12,10 @@ import {
   type PanelType,
   type SourceInput,
   type StepState,
-} from '@tpanel/shared';
+} from '@lares/shared';
 import { db, nowIso } from '../db/index.js';
 import { decrypt, encrypt } from '../lib/crypto.js';
+import { t } from '../i18n/index.js';
 import { notFound } from '../lib/errors.js';
 import { emitMigration } from './events.js';
 
@@ -101,7 +102,7 @@ const toLog = (r: LogRow): MigrationLog => ({
 
 export function sourceLabel(source: SourceInput): string {
   const c = source.connection;
-  return c.mode === 'local' ? 'localhost (cùng VPS)' : `${c.username}@${c.host}:${c.port}`;
+  return c.mode === 'local' ? t('localhost (cùng VPS)') : `${c.username}@${c.host}:${c.port}`;
 }
 
 export function insertMigration(input: CreateMigrationInput, meta: { sameHost: boolean; panel: PanelType }): number {
@@ -110,7 +111,7 @@ export function insertMigration(input: CreateMigrationInput, meta: { sameHost: b
     const info = db
       .prepare('INSERT INTO migrations (name, source_label, source_enc, panel, same_host, options_json) VALUES (?, ?, ?, ?, ?, ?)')
       .run(
-        input.name || `Chuyển ${input.items.length} site từ ${label}`,
+        input.name || t('Chuyển {count} site từ {source}', { count: input.items.length, source: label }),
         label,
         encrypt(input.source),
         meta.panel,
@@ -146,7 +147,7 @@ export function listMigrations(): Migration[] {
 
 export function getMigration(id: number, withItems = true): Migration {
   const row = db.prepare('SELECT * FROM migrations WHERE id = ?').get(id) as MigrationRow | undefined;
-  if (!row) throw notFound('Migration không tồn tại');
+  if (!row) throw notFound(t('Migration không tồn tại'));
   const m = toMigration(row);
   if (withItems) m.items = (db.prepare('SELECT * FROM migration_items WHERE migration_id = ? ORDER BY id').all(id) as ItemRow[]).map(toItem);
   return m;
@@ -154,7 +155,7 @@ export function getMigration(id: number, withItems = true): Migration {
 
 export function getSourceInput(id: number): SourceInput {
   const row = db.prepare('SELECT source_enc FROM migrations WHERE id = ?').get(id) as { source_enc: string } | undefined;
-  if (!row) throw notFound('Migration không tồn tại');
+  if (!row) throw notFound(t('Migration không tồn tại'));
   return decrypt<SourceInput>(row.source_enc);
 }
 
@@ -165,7 +166,7 @@ export function getItemInput(itemId: number): MigrationItemInput {
 
 export function getItem(itemId: number): MigrationItem {
   const row = db.prepare('SELECT * FROM migration_items WHERE id = ?').get(itemId) as ItemRow | undefined;
-  if (!row) throw notFound('Item không tồn tại');
+  if (!row) throw notFound(t('Item không tồn tại'));
   return toItem(row);
 }
 
@@ -229,7 +230,7 @@ export function deleteMigration(id: number) {
 
 /** Jobs cannot survive a restart (open SSH sessions are gone) - mark them failed so the user can retry. */
 export function failInterruptedMigrations() {
-  const msg = 'TPanel bị khởi động lại khi migration đang chạy';
+  const msg = t('Lares bị khởi động lại khi migration đang chạy');
   db.prepare(`UPDATE migration_items SET status = 'failed', error = ? WHERE status = 'running'`).run(msg);
   db.prepare(`UPDATE migrations SET status = 'failed', error = ?, finished_at = ? WHERE status IN ('running', 'pending')`).run(msg, nowIso());
 }

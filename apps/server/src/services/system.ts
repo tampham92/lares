@@ -1,5 +1,5 @@
 import os from 'node:os';
-import type { SystemStats } from '@tpanel/shared';
+import type { SystemStats } from '@lares/shared';
 import { config } from '../config.js';
 import { host } from './host.js';
 import { installedPhpVersions } from './php.js';

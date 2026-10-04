@@ -1,4 +1,4 @@
-import type { PanelType } from '@tpanel/shared';
+import type { PanelType } from '@lares/shared';
 import type { Executor } from '../../executors/index.js';
 import {
   detectPhpVersion,

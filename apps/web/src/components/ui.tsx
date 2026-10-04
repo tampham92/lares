@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { get, type TaskInfo } from '../api';
+import { locale, t } from '../i18n';
 
 export function Badge({ tone = 'default', children }: { tone?: 'ok' | 'warn' | 'err' | 'info' | 'default'; children: ReactNode }) {
   return <span className={`badge ${tone === 'default' ? '' : tone}`}>{children}</span>;
@@ -41,10 +42,10 @@ export function Console({ lines, autoScroll = true }: { lines: Array<{ t?: strin
   }, [lines.length, autoScroll]);
   return (
     <div className="console" ref={ref}>
-      {lines.length === 0 && <span className="debug">Chưa có log…</span>}
+      {lines.length === 0 && <span className="debug">{t('Chưa có log…')}</span>}
       {lines.map((l, i) => (
         <div key={i} className={l.level ?? ''}>
-          {l.t && <span className="t">{new Date(l.t).toLocaleTimeString('vi-VN')}</span>}
+          {l.t && <span className="t">{new Date(l.t).toLocaleTimeString(locale())}</span>}
           {l.msg}
         </div>
       ))}
@@ -64,13 +65,13 @@ export function TaskLog({ taskId, onDone }: { taskId: string; onDone?: (t: TaskI
     let stopped = false;
     const tick = async () => {
       try {
-        const t = await get<TaskInfo>(`/api/tasks/${taskId}?since=${since}`);
+        const info = await get<TaskInfo>(`/api/tasks/${taskId}?since=${since}`);
         if (stopped) return;
-        since = t.totalLines;
-        if (t.logs.length) setLines((prev) => [...prev, ...t.logs]);
-        setTask(t);
-        if (t.status !== 'running') {
-          doneRef.current?.(t);
+        since = info.totalLines;
+        if (info.logs.length) setLines((prev) => [...prev, ...info.logs]);
+        setTask(info);
+        if (info.status !== 'running') {
+          doneRef.current?.(info);
           return;
         }
       } catch {
@@ -88,10 +89,10 @@ export function TaskLog({ taskId, onDone }: { taskId: string; onDone?: (t: TaskI
   return (
     <div className="stack">
       <div className="row">
-        <strong>{task?.label ?? 'Đang chạy…'}</strong>
-        {task && <Badge tone={task.status === 'completed' ? 'ok' : task.status === 'failed' ? 'err' : 'info'}>{task.status === 'running' ? 'đang chạy' : task.status === 'completed' ? 'hoàn tất' : 'lỗi'}</Badge>}
+        <strong>{task?.label ?? t('Đang chạy…')}</strong>
+        {task && <Badge tone={task.status === 'completed' ? 'ok' : task.status === 'failed' ? 'err' : 'info'}>{task.status === 'running' ? t('đang chạy') : task.status === 'completed' ? t('hoàn tất') : t('lỗi')}</Badge>}
       </div>
-      <Console lines={lines.map((l) => ({ ...l, level: l.msg.startsWith('LỖI') ? 'error' : l.msg.startsWith('Cảnh báo') ? 'warn' : l.msg.startsWith('[dry-run]') ? 'debug' : '' }))} />
+      <Console lines={lines.map((l) => ({ ...l, level: /^(LỖI|ERROR)/.test(l.msg) /* i18n-ignore */ ? 'error' : /^(Cảnh báo|Warning)/.test(l.msg) ? 'warn' : l.msg.startsWith('[dry-run]') ? 'debug' : '' }))} />
       {task?.error && <Alert tone="err">{task.error}</Alert>}
     </div>
   );

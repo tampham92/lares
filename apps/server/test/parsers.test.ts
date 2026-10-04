@@ -34,11 +34,11 @@ server {
         proxy_pass http://127.0.0.1:3000;
     }
 }
-### FILE: /etc/nginx/sites-enabled/tpanel.conf
-# Managed by TPanel - changes will be overwritten
+### FILE: /etc/nginx/sites-enabled/lares.conf
+# Managed by Lares - changes will be overwritten
 server { server_name own.com; root /var/www/own.com/public_html; }
 `;
-  it('extracts domains, roots, php version and proxies; skips TPanel vhosts', () => {
+  it('extracts domains, roots, php version and proxies; skips Lares vhosts', () => {
     const v = parseNginx(dump);
     expect(v).toHaveLength(2);
     expect(v[0]).toMatchObject({ root: '/www/wwwroot/example.com', phpVersion: '8.1' });
@@ -132,7 +132,7 @@ describe('access log parsing', () => {
   it('parses nginx time with offset', () => {
     expect(new Date(parseNginxTime('10/Oct/2026:13:55:36 +0700')!).toISOString()).toBe('2026-10-10T06:55:36.000Z');
   });
-  it('parses tpanel log format', () => {
+  it('parses lares log format', () => {
     const l = parseAccessLine('1.2.3.4 - - [10/Oct/2026:13:55:36 +0700] "GET /blog?page=2 HTTP/2.0" 200 5120 "https://google.com/" "Mozilla/5.0" 0.042');
     expect(l).toMatchObject({ ip: '1.2.3.4', method: 'GET', path: '/blog', status: 200, bytes: 5120, referrer: 'https://google.com/', responseTime: 0.042 });
     expect(parseAccessLine('garbage')).toBeNull();
@@ -143,13 +143,13 @@ describe('wp-config port fix', async () => {
   const { addPortHostFix, renderWpConfig } = await import('../src/services/wordpress.js');
   it('is part of generated configs and keeps credentials parseable', () => {
     const cfg = renderWpConfig({ name: 'd', user: 'u', password: 'p', host: 'localhost' });
-    expect(cfg).toContain('TPANEL_PORT_HOST_FIX');
+    expect(cfg).toContain('LARES_PORT_HOST_FIX');
     expect(parseWpConfig(cfg)).toMatchObject({ name: 'd', user: 'u', password: 'p' });
   });
   it('patches old configs once, right after <?php', () => {
     const old = "<?php\ndefine( 'DB_NAME', 'x' );\ndefine( 'DB_USER', 'y' );\n";
     const once = addPortHostFix(old);
-    expect(once.startsWith("<?php\n// TPANEL_PORT_HOST_FIX")).toBe(true);
+    expect(once.startsWith("<?php\n// LARES_PORT_HOST_FIX")).toBe(true);
     expect(addPortHostFix(once)).toBe(once);
     expect(parseWpConfig(once)).toMatchObject({ name: 'x', user: 'y' });
   });

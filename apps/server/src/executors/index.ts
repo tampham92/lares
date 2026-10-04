@@ -1,6 +1,7 @@
 import os from 'node:os';
 import dns from 'node:dns/promises';
-import type { SourceConnection } from '@tpanel/shared';
+import type { SourceConnection } from '@lares/shared';
+import { t } from '../i18n/index.js';
 import { localExecutor } from './local.js';
 import { SshExecutor } from './ssh.js';
 import type { Executor } from './types.js';
@@ -28,16 +29,16 @@ function localAddresses(): Set<string> {
 }
 
 /**
- * Decide whether the "source VPS" is actually this machine (another panel installed next to TPanel).
+ * Decide whether the "source VPS" is actually this machine (another panel installed next to Lares).
  * Machine-id is the authoritative signal; an IP bound to a local interface is the fallback.
  * Hostnames are deliberately NOT compared - many VPS images share names like "ubuntu".
  */
 export async function detectSameHost(conn: SourceConnection, source: Executor): Promise<{ same: boolean; reason?: string }> {
-  if (conn.mode === 'local') return { same: true, reason: 'Nguồn là chính máy chủ TPanel (chế độ local)' };
+  if (conn.mode === 'local') return { same: true, reason: t('Nguồn là chính máy chủ Lares (chế độ local)') };
   const [remoteId, localId] = await Promise.all([readMachineId(source), readMachineId(localExecutor)]);
   if (remoteId && localId) {
     return remoteId === localId
-      ? { same: true, reason: `Trùng machine-id (${localId.slice(0, 8)}…) - panel nguồn chạy chung VPS với TPanel` }
+      ? { same: true, reason: t('Trùng machine-id ({id}…) - panel nguồn chạy chung VPS với Lares', { id: localId.slice(0, 8) }) }
       : { same: false };
   }
   const locals = localAddresses();
@@ -48,5 +49,5 @@ export async function detectSameHost(conn: SourceConnection, source: Executor): 
     /* host is probably already an IP */
   }
   const hit = ips.find((ip) => locals.has(ip));
-  return hit ? { same: true, reason: `${conn.host} trỏ về IP cục bộ ${hit}` } : { same: false };
+  return hit ? { same: true, reason: t('{host} trỏ về IP cục bộ {ip}', { host: conn.host, ip: hit }) } : { same: false };
 }

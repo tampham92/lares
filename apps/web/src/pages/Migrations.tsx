@@ -1,16 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { PANEL_LABELS, type Migration, type MigrationStatus } from '@tpanel/shared';
+import { PANEL_LABELS, msg, type Migration, type MigrationStatus } from '@lares/shared';
 import { fmtDate, get } from '../api';
 import { Badge, ErrorBox } from '../components/ui';
+import { t } from '../i18n';
 
 export const STATUS_LABEL: Record<MigrationStatus, [string, 'ok' | 'warn' | 'err' | 'info' | 'default']> = {
-  pending: ['Chờ', 'default'],
-  running: ['Đang chạy', 'info'],
-  completed: ['Hoàn tất', 'ok'],
-  partial: ['Một phần', 'warn'],
-  failed: ['Lỗi', 'err'],
-  cancelled: ['Đã huỷ', 'warn'],
+  pending: [msg('Chờ'), 'default'],
+  running: [msg('Đang chạy'), 'info'],
+  completed: [msg('Hoàn tất'), 'ok'],
+  partial: [msg('Một phần'), 'warn'],
+  failed: [msg('Lỗi'), 'err'],
+  cancelled: [msg('Đã huỷ'), 'warn'],
 };
 
 export function Migrations() {
@@ -19,11 +20,13 @@ export function Migrations() {
     <>
       <div className="page-head">
         <div>
-          <h1>Chuyển site</h1>
-          <div className="sub">Di chuyển website từ VPS / panel khác (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, VPS thuần) về TPanel</div>
+          <h1>{t('Chuyển site')}</h1>
+          <div className="sub">
+            {t('Di chuyển website từ VPS / panel khác (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, VPS thuần) về Lares')}
+          </div>
         </div>
         <Link to="/migrations/new" className="btn primary">
-          + Chuyển site mới
+          {t('+ Chuyển site mới')}
         </Link>
       </div>
       <ErrorBox error={q.error} />
@@ -32,11 +35,11 @@ export function Migrations() {
           <thead>
             <tr>
               <th>#</th>
-              <th>Tên</th>
-              <th>Nguồn</th>
+              <th>{t('Tên')}</th>
+              <th>{t('Nguồn')}</th>
               <th>Site</th>
-              <th>Trạng thái</th>
-              <th>Bắt đầu</th>
+              <th>{t('Trạng thái')}</th>
+              <th>{t('Bắt đầu')}</th>
             </tr>
           </thead>
           <tbody>
@@ -53,14 +56,16 @@ export function Migrations() {
                   <td>
                     <div className="mono">{m.sourceLabel}</div>
                     <div className="sub">
-                      {PANEL_LABELS[m.panel]} {m.sameHost && <Badge tone="warn">cùng VPS</Badge>}
+                      {t(PANEL_LABELS[m.panel])} {m.sameHost && <Badge tone="warn">{t('cùng VPS')}</Badge>}
                     </div>
                   </td>
                   <td>
-                    {c.completed ?? 0}/{total} thành công{c.failed ? `, ${c.failed} lỗi` : ''}
+                    {c.failed
+                      ? t('{done}/{total} thành công, {failed} lỗi', { done: c.completed ?? 0, total, failed: c.failed })
+                      : t('{done}/{total} thành công', { done: c.completed ?? 0, total })}
                   </td>
                   <td>
-                    <Badge tone={tone}>{label}</Badge>
+                    <Badge tone={tone}>{t(label)}</Badge>
                   </td>
                   <td className="sub">{fmtDate(m.startedAt ?? m.createdAt)}</td>
                 </tr>
@@ -68,7 +73,7 @@ export function Migrations() {
             })}
           </tbody>
         </table>
-        {q.data?.length === 0 && <div className="empty">Chưa có lần chuyển site nào</div>}
+        {q.data?.length === 0 && <div className="empty">{t('Chưa có lần chuyển site nào')}</div>}
       </div>
     </>
   );

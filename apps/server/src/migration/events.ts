@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { MigrationEvent } from '@tpanel/shared';
+import type { MigrationEvent } from '@lares/shared';
 
 const bus = new EventEmitter();
 bus.setMaxListeners(200);

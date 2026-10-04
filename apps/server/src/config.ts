@@ -11,17 +11,18 @@ for (const f of [envFile, rootEnvFile]) {
   }
 }
 
+// Installs from before the rename to Lares use TPANEL_* names. install.sh renames them; a local .env may not.
 const env = (key: string, fallback = ''): string => {
-  const v = process.env[key];
+  const v = process.env[key] ?? process.env[key.replace(/^LARES_/, 'TPANEL_')];
   return v === undefined || v === '' ? fallback : v;
 };
 
 const isProd = process.env.NODE_ENV === 'production';
-const dataDir = path.resolve(env('TPANEL_DATA_DIR', isProd ? '/var/lib/tpanel' : path.resolve(process.cwd(), 'data')));
+const dataDir = path.resolve(env('LARES_DATA_DIR', isProd ? '/var/lib/lares' : path.resolve(process.cwd(), 'data')));
 fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 
 function loadSecret(): string {
-  const fromEnv = env('TPANEL_SECRET');
+  const fromEnv = env('LARES_SECRET');
   if (fromEnv) return fromEnv;
   const file = path.join(dataDir, 'secret.key');
   if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8').trim();
@@ -31,57 +32,57 @@ function loadSecret(): string {
 }
 
 // Outside Linux (developer laptops) system commands are never executed for real, whatever .env says:
-// TPanel would otherwise chown/systemctl/mysql against the developer's own machine.
-const dryRun = process.platform !== 'linux' || env('TPANEL_DRY_RUN', '0') === '1';
+// Lares would otherwise chown/systemctl/mysql against the developer's own machine.
+const dryRun = process.platform !== 'linux' || env('LARES_DRY_RUN', '0') === '1';
 
 export const config = {
   isProd,
-  port: Number(env('TPANEL_PORT', '8686')),
-  host: env('TPANEL_HOST', '0.0.0.0'),
+  port: Number(env('LARES_PORT', '8686')),
+  host: env('LARES_HOST', '0.0.0.0'),
   dataDir,
   secret: loadSecret(),
-  jwtExpiresIn: env('TPANEL_JWT_EXPIRES', '12h'),
+  jwtExpiresIn: env('LARES_JWT_EXPIRES', '12h'),
   /** Serve the panel itself over HTTPS (install.sh generates a self-signed pair). */
-  tlsCert: env('TPANEL_TLS_CERT'),
-  tlsKey: env('TPANEL_TLS_KEY'),
-  adminUser: env('TPANEL_ADMIN_USER', 'admin'),
-  adminPassword: env('TPANEL_ADMIN_PASSWORD'),
+  tlsCert: env('LARES_TLS_CERT'),
+  tlsKey: env('LARES_TLS_KEY'),
+  adminUser: env('LARES_ADMIN_USER', 'admin'),
+  adminPassword: env('LARES_ADMIN_PASSWORD'),
   dryRun,
   // In dry-run (dev) mode keep site files inside the data dir so nothing touches the real system.
-  sitesRoot: env('TPANEL_SITES_ROOT', dryRun ? path.join(dataDir, 'www') : '/var/www'),
+  sitesRoot: env('LARES_SITES_ROOT', dryRun ? path.join(dataDir, 'www') : '/var/www'),
   /** Absolute path set by install.sh so a panel-built nginx earlier in PATH is never picked up. */
-  nginxBin: env('TPANEL_NGINX_BIN', 'nginx'),
-  nginxAvailable: env('TPANEL_NGINX_AVAILABLE', dryRun ? path.join(dataDir, 'nginx/sites-available') : '/etc/nginx/sites-available'),
-  nginxEnabled: env('TPANEL_NGINX_ENABLED', dryRun ? path.join(dataDir, 'nginx/sites-enabled') : '/etc/nginx/sites-enabled'),
-  phpFpmSocket: env('TPANEL_PHP_FPM_SOCKET', '/run/php/php{version}-fpm.sock'),
-  defaultPhp: env('TPANEL_DEFAULT_PHP', '8.2'),
-  webUser: env('TPANEL_WEB_USER', 'www-data'),
+  nginxBin: env('LARES_NGINX_BIN', 'nginx'),
+  nginxAvailable: env('LARES_NGINX_AVAILABLE', dryRun ? path.join(dataDir, 'nginx/sites-available') : '/etc/nginx/sites-available'),
+  nginxEnabled: env('LARES_NGINX_ENABLED', dryRun ? path.join(dataDir, 'nginx/sites-enabled') : '/etc/nginx/sites-enabled'),
+  phpFpmSocket: env('LARES_PHP_FPM_SOCKET', '/run/php/php{version}-fpm.sock'),
+  defaultPhp: env('LARES_DEFAULT_PHP', '8.2'),
+  webUser: env('LARES_WEB_USER', 'www-data'),
   /** Per-site logs live outside /var/log/nginx so they don't collide with the distro's nginx logrotate rule. */
-  siteLogDir: env('TPANEL_SITE_LOG_DIR', dryRun ? path.join(dataDir, 'logs') : '/var/log/tpanel/sites'),
+  siteLogDir: env('LARES_SITE_LOG_DIR', dryRun ? path.join(dataDir, 'logs') : '/var/log/lares/sites'),
   /** Shared webroot for ACME http-01 challenges; every vhost (incl. Next.js proxies) serves it. */
-  acmeDir: env('TPANEL_ACME_DIR', path.join(dataDir, 'acme')),
+  acmeDir: env('LARES_ACME_DIR', path.join(dataDir, 'acme')),
   /** Custom (uploaded) certificates. */
-  sslDir: env('TPANEL_SSL_DIR', dryRun ? path.join(dataDir, 'ssl') : '/etc/tpanel/ssl'),
+  sslDir: env('LARES_SSL_DIR', dryRun ? path.join(dataDir, 'ssl') : '/etc/lares/ssl'),
   /** Start scripts for Node apps - must be readable by the web user, so not inside dataDir. */
-  appsConfDir: env('TPANEL_APPS_CONF_DIR', dryRun ? path.join(dataDir, 'apps') : '/etc/tpanel/apps'),
-  systemdDir: env('TPANEL_SYSTEMD_DIR', dryRun ? path.join(dataDir, 'systemd') : '/etc/systemd/system'),
-  logrotateFile: env('TPANEL_LOGROTATE_FILE', dryRun ? path.join(dataDir, 'logrotate-tpanel') : '/etc/logrotate.d/tpanel'),
-  nginxGlobalConf: env('TPANEL_NGINX_GLOBAL_CONF', dryRun ? path.join(dataDir, 'nginx/tpanel-global.conf') : '/etc/nginx/conf.d/00-tpanel.conf'),
-  nodeAppPortStart: Number(env('TPANEL_NODE_PORT_START', '3100')),
+  appsConfDir: env('LARES_APPS_CONF_DIR', dryRun ? path.join(dataDir, 'apps') : '/etc/lares/apps'),
+  systemdDir: env('LARES_SYSTEMD_DIR', dryRun ? path.join(dataDir, 'systemd') : '/etc/systemd/system'),
+  logrotateFile: env('LARES_LOGROTATE_FILE', dryRun ? path.join(dataDir, 'logrotate-lares') : '/etc/logrotate.d/lares'),
+  nginxGlobalConf: env('LARES_NGINX_GLOBAL_CONF', dryRun ? path.join(dataDir, 'nginx/lares-global.conf') : '/etc/nginx/conf.d/00-lares.conf'),
+  nodeAppPortStart: Number(env('LARES_NODE_PORT_START', '3100')),
   /** Port-based sites (domain "localhost") get public ports from here upward. */
-  sitePortStart: Number(env('TPANEL_SITE_PORT_START', '8001')),
-  /** Built-in templates shipped with TPanel (replaced on every upgrade). */
-  templatesDir: path.resolve(env('TPANEL_TEMPLATES_DIR', path.resolve(process.cwd(), '../../templates'))),
+  sitePortStart: Number(env('LARES_SITE_PORT_START', '8001')),
+  /** Built-in templates shipped with Lares (replaced on every upgrade). */
+  templatesDir: path.resolve(env('LARES_TEMPLATES_DIR', path.resolve(process.cwd(), '../../templates'))),
   /** Your own templates - survive upgrades; a template here overrides a built-in one with the same id. */
-  customTemplatesDir: path.resolve(env('TPANEL_CUSTOM_TEMPLATES_DIR', path.join(dataDir, 'templates'))),
+  customTemplatesDir: path.resolve(env('LARES_CUSTOM_TEMPLATES_DIR', path.join(dataDir, 'templates'))),
   stagingDir: path.join(dataDir, 'migrations'),
-  webDist: path.resolve(env('TPANEL_WEB_DIST', path.resolve(process.cwd(), '../web/dist'))),
+  webDist: path.resolve(env('LARES_WEB_DIST', path.resolve(process.cwd(), '../web/dist'))),
   mysql: {
-    host: env('TPANEL_MYSQL_HOST', 'localhost'),
-    port: Number(env('TPANEL_MYSQL_PORT', '3306')),
-    socketPath: env('TPANEL_MYSQL_SOCKET', ''),
-    user: env('TPANEL_MYSQL_USER', 'root'),
-    password: env('TPANEL_MYSQL_PASSWORD'),
+    host: env('LARES_MYSQL_HOST', 'localhost'),
+    port: Number(env('LARES_MYSQL_PORT', '3306')),
+    socketPath: env('LARES_MYSQL_SOCKET', ''),
+    user: env('LARES_MYSQL_USER', 'root'),
+    password: env('LARES_MYSQL_PASSWORD'),
   },
 };
 

@@ -1,5 +1,6 @@
-import type { DatabaseRecord } from '@tpanel/shared';
+import type { DatabaseRecord } from '@lares/shared';
 import { db } from '../db/index.js';
+import { t } from '../i18n/index.js';
 import { decrypt, encrypt, randomPassword, randomSuffix } from '../lib/crypto.js';
 import { conflict, notFound } from '../lib/errors.js';
 import type { HostLogger } from './host.js';
@@ -38,7 +39,7 @@ export function databasesForSite(siteId: number): DatabaseRecord[] {
 
 export function getDatabaseCredentials(id: number) {
   const row = db.prepare('SELECT * FROM databases WHERE id = ?').get(id) as DbRow | undefined;
-  if (!row) throw notFound('Database không tồn tại');
+  if (!row) throw notFound(t('Database không tồn tại'));
   return { name: row.name, username: row.username, password: decrypt<string>(row.password_enc) };
 }
 
@@ -53,7 +54,7 @@ export async function createDatabase(
   log?: HostLogger,
 ): Promise<{ record: DatabaseRecord; password: string }> {
   if (db.prepare('SELECT 1 FROM databases WHERE name = ?').get(input.name) || (await mysql.databaseExists(input.name))) {
-    throw conflict(`Database ${input.name} đã tồn tại`);
+    throw conflict(t('Database {name} đã tồn tại', { name: input.name }));
   }
   const password = input.password ?? randomPassword();
   await mysql.createDatabase(input.name, input.username, password, log);
@@ -64,7 +65,7 @@ export async function createDatabase(
   return { record: toRecord(row), password };
 }
 
-/** Register a database TPanel did not create (reused from a co-located panel). It is never dropped. */
+/** Register a database Lares did not create (reused from a co-located panel). It is never dropped. */
 export function registerExternalDatabase(name: string, username: string, password: string, siteId: number) {
   db.prepare(
     `INSERT INTO databases (name, username, password_enc, site_id, managed) VALUES (?, ?, ?, ?, 0)
@@ -78,7 +79,7 @@ export function attachDatabaseToSite(name: string, siteId: number) {
 
 export async function deleteDatabase(id: number, log?: HostLogger) {
   const row = db.prepare('SELECT * FROM databases WHERE id = ?').get(id) as DbRow | undefined;
-  if (!row) throw notFound('Database không tồn tại');
+  if (!row) throw notFound(t('Database không tồn tại'));
   if (row.managed) await mysql.dropDatabase(row.name, row.username, log);
   db.prepare('DELETE FROM databases WHERE id = ?').run(id);
 }

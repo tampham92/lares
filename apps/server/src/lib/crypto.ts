@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { config } from '../config.js';
 
+// Salt from before the rename to Lares: changing it would make every stored credential undecryptable.
 const key = crypto.scryptSync(config.secret, 'tpanel-credential-store', 32);
 
 /** AES-256-GCM encrypt a JSON-serialisable value. Output: base64(iv|tag|ciphertext). */

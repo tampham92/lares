@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { APP_LABELS, LOCALHOST, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@tpanel/shared';
+import { APP_LABELS, LOCALHOST, msg, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
 import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
 import { AiWriter } from '../components/AiWriter';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
+import { locale, t } from '../i18n';
 
 interface SiteDetailResponse {
   site: Site;
@@ -26,16 +27,16 @@ function SitePage({ id }: { id: number }) {
   const q = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetailResponse>(`/api/sites/${id}`) });
   const [tab, setTab] = useState<Tab>('overview');
   if (q.error) return <ErrorBox error={q.error} />;
-  if (!q.data) return <div className="sub">Đang tải…</div>;
+  if (!q.data) return <div className="sub">{t('Đang tải…')}</div>;
   const { site } = q.data;
   const tabs: Array<[Tab, string]> = [
-    ['overview', 'Tổng quan'],
+    ['overview', t('Tổng quan')],
     ['ssl', 'SSL'],
-    ['logs', 'Log traffic'],
+    ['logs', t('Log traffic')],
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
-    ...(site.appType === 'wordpress' ? ([['ai', 'Viết bài AI']] as Array<[Tab, string]>) : []),
-    ['clone', 'Nhân bản'],
-    ['danger', 'Xoá site'],
+    ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')]] as Array<[Tab, string]>) : []),
+    ['clone', t('Nhân bản')],
+    ['danger', t('Xoá site')],
   ];
   return (
     <>
@@ -47,15 +48,15 @@ function SitePage({ id }: { id: number }) {
             </a>
           </h1>
           <div className="row sub">
-            <Badge tone="info">{APP_LABELS[site.appType]}</Badge>
-            {site.status === 'active' ? <Badge tone="ok">Hoạt động</Badge> : <Badge tone="warn">Tạm ngưng</Badge>}
+            <Badge tone="info">{t(APP_LABELS[site.appType])}</Badge>
+            {site.status === 'active' ? <Badge tone="ok">{t('Hoạt động')}</Badge> : <Badge tone="warn">{t('Tạm ngưng')}</Badge>}
             {site.ssl.enabled ? <Badge tone="ok">HTTPS</Badge> : <Badge>HTTP</Badge>}
-            {site.listenPort && <Badge tone="info">chạy theo port {site.listenPort}</Badge>}
+            {site.listenPort && <Badge tone="info">{t('chạy theo port {port}', { port: site.listenPort })}</Badge>}
           </div>
         </div>
         <div className="row">
           <a className="btn" href={siteHref(site)} target="_blank" rel="noreferrer">
-            Mở website ↗
+            {t('Mở website ↗')}
           </a>
           {site.appType === 'wordpress' && <WpAdminButton siteId={site.id} className="btn primary" />}
         </div>
@@ -101,7 +102,7 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
     setMsg(null);
     try {
       await patch(`/api/sites/${site.id}`, body);
-      setMsg({ tone: 'ok', text: 'Đã lưu và reload nginx' });
+      setMsg({ tone: 'ok', text: t('Đã lưu và reload nginx') });
       refresh();
     } catch (e) {
       setMsg({ tone: 'err', text: errMsg(e) });
@@ -111,11 +112,11 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
   return (
     <div className="grid cols-2">
       <div className="card">
-        <h2>Thông tin</h2>
+        <h2>{t('Thông tin')}</h2>
         <div className="kv">
-          <div>Thư mục site</div>
+          <div>{t('Thư mục site')}</div>
           <div className="mono">{site.rootPath}</div>
-          <div>{site.appType === 'nextjs' ? 'Thư mục app' : 'Web root'}</div>
+          <div>{site.appType === 'nextjs' ? t('Thư mục app') : 'Web root'}</div>
           <div className="mono">{site.webRoot}</div>
           {site.phpVersion && (
             <>
@@ -125,15 +126,15 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
           )}
           {site.appPort && (
             <>
-              <div>Port nội bộ</div>
+              <div>{t('Port nội bộ')}</div>
               <div className="mono">127.0.0.1:{site.appPort}</div>
             </>
           )}
-          <div>Tạo lúc</div>
+          <div>{t('Tạo lúc')}</div>
           <div>{fmtDate(site.createdAt)}</div>
           {site.migrationId && (
             <>
-              <div>Nguồn</div>
+              <div>{t('Nguồn')}</div>
               <div>
                 <a href={`/migrations/${site.migrationId}`}>Migration #{site.migrationId}</a>
               </div>
@@ -145,22 +146,22 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
             <h3>Database</h3>
             {databases.map((d) => (
               <div key={d.id} className="mono">
-                {d.name} / {d.username} {!d.managed && <Badge tone="warn">dùng chung</Badge>}
+                {d.name} / {d.username} {!d.managed && <Badge tone="warn">{t('dùng chung')}</Badge>}
               </div>
             ))}
           </>
         )}
       </div>
       <div className="card stack">
-        <h2>Cấu hình</h2>
+        <h2>{t('Cấu hình')}</h2>
         {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
         {!site.listenPort && (
-        <Field label="Alias (cách nhau bởi dấu phẩy)">
+        <Field label={t('Alias (cách nhau bởi dấu phẩy)')}>
           <input value={aliases} onChange={(e) => setAliases(e.target.value)} />
         </Field>
         )}
         {site.phpVersion && (
-          <Field label="Phiên bản PHP">
+          <Field label={t('Phiên bản PHP')}>
             <select value={php} onChange={(e) => setPhp(e.target.value)}>
               {(stats.data?.phpVersions ?? [site.phpVersion]).map((v) => (
                 <option key={v} value={v}>
@@ -184,15 +185,15 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
               })
             }
           >
-            Lưu
+            {t('Lưu')}
           </button>
         </div>
         )}
         <Check checked={site.accessLog} onChange={(v) => save({ accessLog: v })}>
-          Ghi access log (cần cho thống kê traffic)
+          {t('Ghi access log (cần cho thống kê traffic)')}
         </Check>
         <Check checked={site.status === 'disabled'} onChange={(v) => save({ status: v ? 'disabled' : 'active' })}>
-          Tạm ngưng site (trả về 503)
+          {t('Tạm ngưng site (trả về 503)')}
         </Check>
       </div>
     </div>
@@ -210,7 +211,7 @@ function DomainCard({ site }: { site: Site }) {
 
   const submit = async () => {
     setError(null);
-    if (!confirm(site.listenPort ? `Gán tên miền ${d}? Site sẽ không còn chạy ở port ${site.listenPort}.` : `Đổi tên miền ${site.domain} → ${d}? Chứng chỉ SSL của tên miền cũ sẽ bị gỡ.`)) return;
+    if (!confirm(site.listenPort ? t('Gán tên miền {domain}? Site sẽ không còn chạy ở port {port}.', { domain: d, port: site.listenPort }) : t('Đổi tên miền {old} → {domain}? Chứng chỉ SSL của tên miền cũ sẽ bị gỡ.', { old: site.domain, domain: d }))) return;
     try {
       const aliases = addWww && !d.startsWith('www.') ? [`www.${d}`] : [];
       setTask((await put<TaskInfo>(`/api/sites/${site.id}/domain`, { domain: d, aliases })).id);
@@ -221,27 +222,30 @@ function DomainCard({ site }: { site: Site }) {
 
   return (
     <div className="card stack">
-      <h2>{site.listenPort ? 'Gán tên miền thật' : 'Tên miền'}</h2>
+      <h2>{site.listenPort ? t('Gán tên miền thật') : t('Tên miền')}</h2>
       {site.listenPort ? (
         <div className="sub">
-          Site đang chạy tạm ở <strong>{siteHref(site)}</strong>. Khi giao diện đã ổn, nhập tên miền để đưa site lên chính thức: TPanel đổi vhost sang tên miền
-          {site.appType === 'wordpress' ? ', cập nhật lại toàn bộ URL trong WordPress' : ''} và đóng port {site.listenPort}.
+          {t('Site đang chạy tạm ở')} <strong>{siteHref(site)}</strong>.{' '}
+          {site.appType === 'wordpress'
+            ? t('Khi giao diện đã ổn, nhập tên miền để đưa site lên chính thức: Lares đổi vhost sang tên miền, cập nhật lại toàn bộ URL trong WordPress và đóng port {port}.', { port: site.listenPort })
+            : t('Khi giao diện đã ổn, nhập tên miền để đưa site lên chính thức: Lares đổi vhost sang tên miền và đóng port {port}.', { port: site.listenPort })}
         </div>
       ) : (
-        <div className="sub">Đổi tên miền chính của site. File và database được giữ nguyên.</div>
+        <div className="sub">{t('Đổi tên miền chính của site. File và database được giữ nguyên.')}</div>
       )}
       <ErrorBox error={error} />
       <div className="row">
         <input style={{ flex: 1, minWidth: 220 }} value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" />
         <button className="btn primary" disabled={!changed || !!task} onClick={submit}>
-          {site.listenPort ? 'Gán tên miền' : 'Đổi tên miền'}
+          {site.listenPort ? t('Gán tên miền') : t('Đổi tên miền')}
         </button>
       </div>
       <Check checked={addWww} onChange={setAddWww}>
-        Thêm alias www.{d || 'example.com'}
+        {t('Thêm alias www.{domain}', { domain: d || 'example.com' })}
       </Check>
       <Alert tone="info">
-        Trước hoặc sau khi gán: tạo bản ghi DNS <strong>A</strong> cho {d || 'tên miền'} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab <strong>SSL</strong>.
+        {t('Trước hoặc sau khi gán: tạo bản ghi DNS')} <strong>A</strong>{' '}
+        {t('cho {domain} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab', { domain: d || t('tên miền') })} <strong>SSL</strong>.
       </Alert>
       {task && <TaskLog taskId={task} onDone={(t) => t.status === 'completed' && refresh()} />}
     </div>
@@ -281,22 +285,22 @@ function SslTab({ site }: { site: Site }) {
   return (
     <div className="grid cols-2">
       <div className="card stack">
-        <h2>Trạng thái SSL</h2>
+        <h2>{t('Trạng thái SSL')}</h2>
         <ErrorBox error={error} />
-        {site.listenPort && <Alert tone="warn">Site chạy theo port (chưa có tên miền) nên không cài được SSL. Let&apos;s Encrypt chỉ cấp chứng chỉ cho tên miền thật.</Alert>}
+        {site.listenPort && <Alert tone="warn">{t("Site chạy theo port (chưa có tên miền) nên không cài được SSL. Let's Encrypt chỉ cấp chứng chỉ cho tên miền thật.")}</Alert>}
         {site.ssl.enabled ? (
           <>
             <div className="kv">
-              <div>Loại</div>
-              <div>{site.ssl.type === 'letsencrypt' ? "Let's Encrypt (tự gia hạn)" : 'Certificate tự upload'}</div>
-              <div>Nhà phát hành</div>
+              <div>{t('Loại')}</div>
+              <div>{site.ssl.type === 'letsencrypt' ? t("Let's Encrypt (tự gia hạn)") : t('Certificate tự upload')}</div>
+              <div>{t('Nhà phát hành')}</div>
               <div>{site.ssl.issuer ?? '—'}</div>
-              <div>Tên miền</div>
+              <div>{t('Tên miền')}</div>
               <div>{site.ssl.domains.join(', ') || '—'}</div>
-              <div>Hết hạn</div>
+              <div>{t('Hết hạn')}</div>
               <div>
-                {site.ssl.expiresAt ? new Date(site.ssl.expiresAt).toLocaleDateString('vi-VN') : '—'}{' '}
-                {daysLeft !== null && <Badge tone={daysLeft < 14 ? 'warn' : 'ok'}>còn {daysLeft} ngày</Badge>}
+                {site.ssl.expiresAt ? new Date(site.ssl.expiresAt).toLocaleDateString(locale()) : '—'}{' '}
+                {daysLeft !== null && <Badge tone={daysLeft < 14 ? 'warn' : 'ok'}>{t('còn {n} ngày', { n: daysLeft })}</Badge>}
               </div>
             </div>
             <Check
@@ -310,18 +314,18 @@ function SslTab({ site }: { site: Site }) {
                 }
               }}
             >
-              Bắt buộc HTTPS (redirect 301 + HSTS)
+              {t('Bắt buộc HTTPS (redirect 301 + HSTS)')}
             </Check>
             <div className="row">
               {site.ssl.type === 'letsencrypt' && (
                 <button className="btn" onClick={() => run(() => post<TaskInfo>(`/api/sites/${site.id}/ssl/renew`))}>
-                  Gia hạn ngay
+                  {t('Gia hạn ngay')}
                 </button>
               )}
               <button
                 className="btn danger"
                 onClick={async () => {
-                  if (!confirm('Tắt SSL cho site này?')) return;
+                  if (!confirm(t('Tắt SSL cho site này?'))) return;
                   try {
                     await del(`/api/sites/${site.id}/ssl`, { revoke: true });
                     refresh();
@@ -330,20 +334,20 @@ function SslTab({ site }: { site: Site }) {
                   }
                 }}
               >
-                Tắt SSL
+                {t('Tắt SSL')}
               </button>
             </div>
           </>
         ) : (
-          <Alert tone="warn">Site chưa có SSL.</Alert>
+          <Alert tone="warn">{t('Site chưa có SSL.')}</Alert>
         )}
         {task && <TaskLog taskId={task} onDone={refresh} />}
       </div>
       <div className="card stack">
-        <h2>{site.ssl.enabled ? 'Cài lại / thay chứng chỉ' : 'Cài SSL'}</h2>
+        <h2>{site.ssl.enabled ? t('Cài lại / thay chứng chỉ') : t('Cài SSL')}</h2>
         <Tabs
           tabs={[
-            ['letsencrypt', "Let's Encrypt (miễn phí)"],
+            ['letsencrypt', t("Let's Encrypt (miễn phí)")],
             ['custom', 'Upload certificate'],
           ]}
           value={mode}
@@ -351,22 +355,22 @@ function SslTab({ site }: { site: Site }) {
         />
         {mode === 'letsencrypt' ? (
           <>
-            <Alert tone="info">Tên miền phải trỏ DNS về máy chủ này. TPanel dùng xác thực HTTP-01 qua /.well-known/acme-challenge/.</Alert>
-            <Field label="Email nhận thông báo hết hạn">
+            <Alert tone="info">{t('Tên miền phải trỏ DNS về máy chủ này. Lares dùng xác thực HTTP-01 qua /.well-known/acme-challenge/.')}</Alert>
+            <Field label={t('Email nhận thông báo hết hạn')}>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@example.com" />
             </Field>
             {site.aliases.length > 0 && (
               <Check checked={includeAliases} onChange={setIncludeAliases}>
-                Bao gồm alias: {site.aliases.join(', ')}
+                {t('Bao gồm alias: {aliases}', { aliases: site.aliases.join(', ') })}
               </Check>
             )}
             <Check checked={staging} onChange={setStaging}>
-              Dùng môi trường staging (thử nghiệm, không bị giới hạn rate-limit)
+              {t('Dùng môi trường staging (thử nghiệm, không bị giới hạn rate-limit)')}
             </Check>
           </>
         ) : (
           <>
-            <Field label="Certificate (PEM, gồm cả chain)">
+            <Field label={t('Certificate (PEM, gồm cả chain)')}>
               <textarea value={cert} onChange={(e) => setCert(e.target.value)} placeholder="-----BEGIN CERTIFICATE-----" />
             </Field>
             <Field label="Private key (PEM)">
@@ -375,11 +379,11 @@ function SslTab({ site }: { site: Site }) {
           </>
         )}
         <Check checked={forceHttps} onChange={setForceHttps}>
-          Bắt buộc HTTPS
+          {t('Bắt buộc HTTPS')}
         </Check>
         <div className="row end">
           <button className="btn primary" onClick={issue} disabled={mode === 'letsencrypt' ? !email : !cert || !key}>
-            {mode === 'letsencrypt' ? 'Cấp chứng chỉ' : 'Cài certificate'}
+            {mode === 'letsencrypt' ? t('Cấp chứng chỉ') : t('Cài certificate')}
           </button>
         </div>
       </div>
@@ -392,7 +396,7 @@ function TopList({ title, rows }: { title: string; rows: Array<{ key: string; co
   return (
     <div className="card">
       <h2>{title}</h2>
-      {rows.length === 0 && <div className="sub">Không có dữ liệu</div>}
+      {rows.length === 0 && <div className="sub">{t('Không có dữ liệu')}</div>}
       <div className="hbar">
         {rows.map((r) => (
           <FragmentRow key={r.key} k={r.key} v={r.count} pct={r.count / max} />
@@ -409,7 +413,7 @@ function FragmentRow({ k, v, pct }: { k: string; v: number; pct: number }) {
         <i style={{ width: `${pct * 100}%` }} />
         <span>{k}</span>
       </div>
-      <div className="v">{v.toLocaleString('vi-VN')}</div>
+      <div className="v">{v.toLocaleString(locale())}</div>
     </>
   );
 }
@@ -442,21 +446,21 @@ function LogsTab({ site }: { site: Site }) {
 
   return (
     <>
-      {!site.accessLog && <Alert tone="warn">Access log đang tắt cho site này — bật lại ở tab Tổng quan để thu thập số liệu.</Alert>}
+      {!site.accessLog && <Alert tone="warn">{t('Access log đang tắt cho site này — bật lại ở tab Tổng quan để thu thập số liệu.')}</Alert>}
       <div className="row" style={{ marginBottom: 12 }}>
-        <strong>Khoảng thời gian:</strong>
+        <strong>{t('Khoảng thời gian:')}</strong>
         {[
-          [1, '1 giờ'],
-          [24, '24 giờ'],
-          [168, '7 ngày'],
-          [720, '30 ngày'],
+          [1, t('1 giờ')],
+          [24, t('24 giờ')],
+          [168, t('7 ngày')],
+          [720, t('30 ngày')],
         ].map(([h, l]) => (
           <button key={h} className={`btn sm ${hours === h ? 'primary' : ''}`} onClick={() => setHours(h as number)}>
             {l}
           </button>
         ))}
         <button className="btn sm" onClick={() => void stats.refetch()}>
-          Làm mới
+          {t('Làm mới')}
         </button>
       </div>
       <ErrorBox error={stats.error} />
@@ -465,24 +469,24 @@ function LogsTab({ site }: { site: Site }) {
           <div className="grid cols-4">
             <div className="card stat">
               <div className="label">Requests</div>
-              <div className="value">{s.totalRequests.toLocaleString('vi-VN')}</div>
+              <div className="value">{s.totalRequests.toLocaleString(locale())}</div>
             </div>
             <div className="card stat">
-              <div className="label">IP duy nhất</div>
-              <div className="value">{s.uniqueIps.toLocaleString('vi-VN')}</div>
+              <div className="label">{t('IP duy nhất')}</div>
+              <div className="value">{s.uniqueIps.toLocaleString(locale())}</div>
             </div>
             <div className="card stat">
-              <div className="label">Băng thông</div>
+              <div className="label">{t('Băng thông')}</div>
               <div className="value">{fmtBytes(s.bytesSent)}</div>
             </div>
             <div className="card stat">
-              <div className="label">Phản hồi TB</div>
+              <div className="label">{t('Phản hồi TB')}</div>
               <div className="value">{s.avgResponseMs !== null ? `${s.avgResponseMs} ms` : '—'}</div>
             </div>
           </div>
           <div className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h2>Requests theo {hours <= 48 ? 'giờ' : 'ngày'}</h2>
+              <h2>{hours <= 48 ? t('Requests theo giờ') : t('Requests theo ngày')}</h2>
               <div className="row">
                 <Badge tone="ok">2xx {s.statusClasses['2xx']}</Badge>
                 <Badge tone="info">3xx {s.statusClasses['3xx']}</Badge>
@@ -491,14 +495,14 @@ function LogsTab({ site }: { site: Site }) {
               </div>
             </div>
             <div className="bars">
-              {s.timeline.map((t) => (
+              {s.timeline.map((p) => (
                 <div
-                  key={t.t}
+                  key={p.t}
                   className="bar"
-                  style={{ height: `${(t.requests / maxReq) * 100}%` }}
-                  title={`${new Date(t.t).toLocaleString('vi-VN')}: ${t.requests} requests, ${fmtBytes(t.bytes)}, ${t.errors} lỗi 5xx`}
+                  style={{ height: `${(p.requests / maxReq) * 100}%` }}
+                  title={t('{time}: {requests} requests, {bytes}, {errors} lỗi 5xx', { time: new Date(p.t).toLocaleString(locale()), requests: p.requests, bytes: fmtBytes(p.bytes), errors: p.errors })}
                 >
-                  {t.errors > 0 && <div className="bar err" style={{ height: `${(t.errors / Math.max(1, t.requests)) * 100}%` }} />}
+                  {p.errors > 0 && <div className="bar err" style={{ height: `${(p.errors / Math.max(1, p.requests)) * 100}%` }} />}
                 </div>
               ))}
             </div>
@@ -513,38 +517,38 @@ function LogsTab({ site }: { site: Site }) {
       )}
       <div className="card stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h2>Xem log</h2>
+          <h2>{t('Xem log')}</h2>
           <div className="row">
             <select value={type} onChange={(e) => setType(e.target.value as LogType)} style={{ width: 'auto' }}>
               <option value="access">Access log</option>
               <option value="error">Error log</option>
-              {site.appType === 'nextjs' && <option value="app">Log ứng dụng Next.js</option>}
+              {site.appType === 'nextjs' && <option value="app">{t('Log ứng dụng Next.js')}</option>}
             </select>
             <select value={lines} onChange={(e) => setLines(Number(e.target.value))} style={{ width: 'auto' }}>
               {[100, 200, 500, 1000, 5000].map((n) => (
                 <option key={n} value={n}>
-                  {n} dòng
+                  {t('{n} dòng', { n })}
                 </option>
               ))}
             </select>
-            <input placeholder="Lọc (IP, URL, status...)" value={filter} onChange={(e) => setFilter(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && setApplied(filter)} style={{ width: 220 }} />
+            <input placeholder={t('Lọc (IP, URL, status...)')} value={filter} onChange={(e) => setFilter(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && setApplied(filter)} style={{ width: 220 }} />
             <button className="btn sm" onClick={() => setApplied(filter)}>
-              Lọc
+              {t('Lọc')}
             </button>
             {type !== 'app' && (
               <>
                 <button className="btn sm" onClick={download}>
-                  Tải về
+                  {t('Tải về')}
                 </button>
                 <button
                   className="btn sm danger"
                   onClick={async () => {
-                    if (!confirm(`Xoá toàn bộ nội dung ${type} log?`)) return;
+                    if (!confirm(t('Xoá toàn bộ nội dung {type} log?', { type }))) return;
                     await del(`/api/sites/${site.id}/logs?type=${type}`);
                     void tail.refetch();
                   }}
                 >
-                  Xoá log
+                  {t('Xoá log')}
                 </button>
               </>
             )}
@@ -616,19 +620,19 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
           <div className="kv">
             <div>systemd unit</div>
             <div className="mono">{nodeApp.service}</div>
-            <div>Trạng thái</div>
+            <div>{t('Trạng thái')}</div>
             <div>
               <Badge tone={nodeApp.active === 'active' ? 'ok' : nodeApp.active === 'failed' ? 'err' : 'warn'}>{nodeApp.active}</Badge>
             </div>
             <div>Port</div>
             <div className="mono">127.0.0.1:{nodeApp.port}</div>
             <div>Package manager</div>
-            <div>{nodeApp.packageManager ?? 'chưa có package.json'}</div>
+            <div>{nodeApp.packageManager ?? t('chưa có package.json')}</div>
           </div>
         )}
         <div className="row">
           <button className="btn primary" onClick={async () => setTask((await post<TaskInfo>(`/api/sites/${site.id}/deploy`)).id)}>
-            {form.gitUrl ? 'Pull & Build & khởi động' : 'Build & khởi động'}
+            {form.gitUrl ? t('Pull & Build & khởi động') : t('Build & khởi động')}
           </button>
           <button className="btn" onClick={() => action('restart')}>
             Restart
@@ -641,13 +645,14 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
           </button>
         </div>
         <Alert tone="info">
-          Dữ liệu JSON và file của ứng dụng nằm trong <code>{site.webRoot}</code>. Khi deploy lại qua Git, các file không được Git theo dõi (vd. data/*.json đã .gitignore) vẫn được giữ.
+          {t('Dữ liệu JSON và file của ứng dụng nằm trong')} <code>{site.webRoot}</code>.{' '}
+          {t('Khi deploy lại qua Git, các file không được Git theo dõi (vd. data/*.json đã .gitignore) vẫn được giữ.')}
         </Alert>
         {task && <TaskLog taskId={task} onDone={refresh} />}
       </div>
       <div className="card stack">
-        <h2>Cấu hình build</h2>
-        {saved && <Alert tone="ok">Đã lưu. Bấm “Build &amp; khởi động” để áp dụng.</Alert>}
+        <h2>{t('Cấu hình build')}</h2>
+        {saved && <Alert tone="ok">{t('Đã lưu. Bấm “Build & khởi động” để áp dụng.')}</Alert>}
         <div className="form-grid">
           <Field label="Git URL">
             <input value={form.gitUrl} onChange={(e) => setForm({ ...form, gitUrl: e.target.value })} />
@@ -657,28 +662,28 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
           </Field>
           <Field label="Package manager">
             <select value={form.packageManager} onChange={(e) => setForm({ ...form, packageManager: e.target.value })}>
-              <option value="auto">Tự nhận</option>
+              <option value="auto">{t('Tự nhận')}</option>
               <option value="npm">npm</option>
               <option value="yarn">yarn</option>
               <option value="pnpm">pnpm</option>
             </select>
           </Field>
           <Field label="Install command">
-            <input value={form.installCommand} onChange={(e) => setForm({ ...form, installCommand: e.target.value })} placeholder="mặc định" />
+            <input value={form.installCommand} onChange={(e) => setForm({ ...form, installCommand: e.target.value })} placeholder={t('mặc định')} />
           </Field>
           <Field label="Build command">
-            <input value={form.buildCommand} onChange={(e) => setForm({ ...form, buildCommand: e.target.value })} placeholder="mặc định" />
+            <input value={form.buildCommand} onChange={(e) => setForm({ ...form, buildCommand: e.target.value })} placeholder={t('mặc định')} />
           </Field>
           <Field label="Start command">
-            <input value={form.startCommand} onChange={(e) => setForm({ ...form, startCommand: e.target.value })} placeholder="mặc định" />
+            <input value={form.startCommand} onChange={(e) => setForm({ ...form, startCommand: e.target.value })} placeholder={t('mặc định')} />
           </Field>
         </div>
-        <h3>Biến môi trường</h3>
-        <div className="sub">Giá trị đã lưu được ẩn; để trống = giữ nguyên giá trị cũ.</div>
+        <h3>{t('Biến môi trường')}</h3>
+        <div className="sub">{t('Giá trị đã lưu được ẩn; để trống = giữ nguyên giá trị cũ.')}</div>
         {envRows.map((r, i) => (
           <div className="row" key={i}>
             <input style={{ flex: 1 }} value={r.k} placeholder="KEY" onChange={(e) => setEnvRows(envRows.map((x, j) => (j === i ? { ...x, k: e.target.value } : x)))} />
-            <input style={{ flex: 2 }} value={r.v} placeholder="(giữ nguyên)" onChange={(e) => setEnvRows(envRows.map((x, j) => (j === i ? { ...x, v: e.target.value } : x)))} />
+            <input style={{ flex: 2 }} value={r.v} placeholder={t('(giữ nguyên)')} onChange={(e) => setEnvRows(envRows.map((x, j) => (j === i ? { ...x, v: e.target.value } : x)))} />
             <button className="btn sm danger" onClick={() => setEnvRows(envRows.filter((_, j) => j !== i))}>
               ✕
             </button>
@@ -686,12 +691,12 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
         ))}
         <div className="row">
           <button className="btn sm" onClick={() => setEnvRows([...envRows, { k: '', v: '' }])}>
-            + Thêm biến
+            {t('+ Thêm biến')}
           </button>
         </div>
         <div className="row end">
           <button className="btn primary" onClick={save}>
-            Lưu cấu hình
+            {t('Lưu cấu hình')}
           </button>
         </div>
       </div>
@@ -700,10 +705,10 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
 }
 
 const CLONE_NOTES: Partial<Record<Site['appType'], string>> = {
-  wordpress: 'WordPress: database được sao chép sang database mới, wp-config.php trỏ sang database đó và toàn bộ URL được đổi sang địa chỉ mới.',
-  nextjs: 'Next.js: chạy bằng service riêng trên port nội bộ mới, dùng lại bản build và biến môi trường của site nguồn.',
-  laravel: 'Laravel: .env được cập nhật DB_* và APP_URL theo database và địa chỉ mới.',
-  php: 'PHP: nếu dùng .env, DB_* và APP_URL được cập nhật; cấu hình database ở file khác cần sửa tay.',
+  wordpress: msg('WordPress: database được sao chép sang database mới, wp-config.php trỏ sang database đó và toàn bộ URL được đổi sang địa chỉ mới.'),
+  nextjs: msg('Next.js: chạy bằng service riêng trên port nội bộ mới, dùng lại bản build và biến môi trường của site nguồn.'),
+  laravel: msg('Laravel: .env được cập nhật DB_* và APP_URL theo database và địa chỉ mới.'),
+  php: msg('PHP: nếu dùng .env, DB_* và APP_URL được cập nhật; cấu hình database ở file khác cần sửa tay.'),
 };
 
 function CloneTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
@@ -718,6 +723,7 @@ function CloneTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
   const [error, setError] = useState<unknown>(null);
   const d = domain.trim().toLowerCase();
   const portMode = d === '' || d === LOCALHOST;
+  const note = CLONE_NOTES[site.appType];
 
   const submit = async () => {
     setError(null);
@@ -739,34 +745,43 @@ function CloneTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
   return (
     <div className="grid cols-2">
       <div className="card stack">
-        <h2>Nhân bản site</h2>
+        <h2>{t('Nhân bản site')}</h2>
         <div className="sub">
-          Tạo một site mới giống hệt <strong>{siteLabel(site)}</strong> để thử giao diện, plugin hay làm staging. Site hiện tại không bị thay đổi.
+          {t('Tạo một site mới giống hệt')} <strong>{siteLabel(site)}</strong>{' '}
+          {t('để thử giao diện, plugin hay làm staging. Site hiện tại không bị thay đổi.')}
         </div>
         <ErrorBox error={error} />
         <div className="form-grid">
-          <Field label="Tên miền cho bản sao" hint={<>Để trống (hoặc nhập <code>localhost</code>) để chạy qua http://{window.location.hostname}:PORT</>}>
+          <Field
+            label={t('Tên miền cho bản sao')}
+            hint={
+              <>
+                {t('Để trống (hoặc nhập')} <code>localhost</code>
+                {t(') để chạy qua {url}', { url: `http://${window.location.hostname}:PORT` })}
+              </>
+            }
+          >
             <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="staging.example.com" />
           </Field>
           {portMode && (
-            <Field label="Port" hint="Bỏ trống để TPanel tự chọn port trống (từ 8001)">
-              <input type="number" min={1024} max={65535} value={listenPort} onChange={(e) => setListenPort(e.target.value)} placeholder="tự động" />
+            <Field label="Port" hint={t('Bỏ trống để Lares tự chọn port trống (từ 8001)')}>
+              <input type="number" min={1024} max={65535} value={listenPort} onChange={(e) => setListenPort(e.target.value)} placeholder={t('tự động')} />
             </Field>
           )}
         </div>
         {!portMode && (
           <Check checked={addWww} onChange={setAddWww}>
-            Thêm alias www.{d}
+            {t('Thêm alias www.{domain}', { domain: d })}
           </Check>
         )}
         <div className="row end">
           <button className="btn primary" disabled={running} onClick={submit}>
-            Nhân bản
+            {t('Nhân bản')}
           </button>
         </div>
         {result && (
           <Alert tone="ok">
-            Đã tạo bản sao tại{' '}
+            {t('Đã tạo bản sao tại')}{' '}
             <a href={result.url} target="_blank" rel="noreferrer">
               <strong>{result.url}</strong>
             </a>
@@ -778,7 +793,7 @@ function CloneTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
             )}
             <div className="row" style={{ marginTop: 8 }}>
               <button className="btn sm primary" onClick={() => nav(`/sites/${result.site.id}`)}>
-                Quản lý site mới
+                {t('Quản lý site mới')}
               </button>
             </div>
           </Alert>
@@ -795,25 +810,25 @@ function CloneTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
         )}
       </div>
       <div className="card stack">
-        <h2>Những gì được sao chép</h2>
+        <h2>{t('Những gì được sao chép')}</h2>
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>
-            Toàn bộ thư mục <code>{site.rootPath}</code>
+            {t('Toàn bộ thư mục')} <code>{site.rootPath}</code>
           </li>
           {dbs.length > 0 || site.appType === 'wordpress' ? (
-            <li>Database: {dbs.map((x) => x.name).join(', ') || 'database trong wp-config.php'} → database mới, user và mật khẩu mới</li>
+            <li>{t('Database: {dbs} → database mới, user và mật khẩu mới', { dbs: dbs.map((x) => x.name).join(', ') || t('database trong wp-config.php') })}</li>
           ) : null}
-          {site.phpVersion && <li>Phiên bản PHP {site.phpVersion}</li>}
-          {CLONE_NOTES[site.appType] && <li>{CLONE_NOTES[site.appType]}</li>}
+          {site.phpVersion && <li>{t('Phiên bản PHP {version}', { version: site.phpVersion })}</li>}
+          {note && <li>{t(note)}</li>}
         </ul>
-        <h3>Không sao chép</h3>
+        <h3>{t('Không sao chép')}</h3>
         <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>Chứng chỉ SSL: bản sao chạy HTTP, cài SSL ở tab SSL của site mới</li>
-          <li>Log traffic</li>
-          <li>Alias của site nguồn</li>
+          <li>{t('Chứng chỉ SSL: bản sao chạy HTTP, cài SSL ở tab SSL của site mới')}</li>
+          <li>{t('Log traffic')}</li>
+          <li>{t('Alias của site nguồn')}</li>
         </ul>
         {site.appType === 'wordpress' && (
-          <Alert tone="info">Đăng nhập wp-admin của bản sao bằng tài khoản WordPress của site nguồn.</Alert>
+          <Alert tone="info">{t('Đăng nhập wp-admin của bản sao bằng tài khoản WordPress của site nguồn.')}</Alert>
         )}
       </div>
     </div>
@@ -839,30 +854,30 @@ function DangerTab({ site, dbs }: { site: Site; dbs: DatabaseRecord[] }) {
 
   return (
     <div className="card stack" style={{ maxWidth: 640 }}>
-      <h2>Xoá site {site.domain}</h2>
+      <h2>{t('Xoá site {domain}', { domain: site.domain })}</h2>
       <ErrorBox error={error} />
       <Check checked={opts.removeFiles} onChange={(v) => setOpts({ ...opts, removeFiles: v })}>
-        Xoá toàn bộ file trong <code>{site.rootPath}</code>
+        {t('Xoá toàn bộ file trong')} <code>{site.rootPath}</code>
       </Check>
       {dbs.length > 0 && (
         <Check checked={opts.removeDatabases} onChange={(v) => setOpts({ ...opts, removeDatabases: v })}>
-          Xoá database: {dbs.filter((d) => d.managed).map((d) => d.name).join(', ') || '(không có database do TPanel quản lý)'}
+          {t('Xoá database: {names}', { names: dbs.filter((d) => d.managed).map((d) => d.name).join(', ') || t('(không có database do Lares quản lý)') })}
         </Check>
       )}
       <Check checked={opts.removeLogs} onChange={(v) => setOpts({ ...opts, removeLogs: v })}>
-        Xoá log truy cập
+        {t('Xoá log truy cập')}
       </Check>
       {site.ssl.type === 'letsencrypt' && (
         <Check checked={opts.revokeSsl} onChange={(v) => setOpts({ ...opts, revokeSsl: v })}>
-          Xoá chứng chỉ Let&apos;s Encrypt
+          {t("Xoá chứng chỉ Let's Encrypt")}
         </Check>
       )}
-      <Field label={`Gõ "${site.domain}" để xác nhận`}>
+      <Field label={t('Gõ "{domain}" để xác nhận', { domain: site.domain })}>
         <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
       </Field>
       <div className="row end">
         <button className="btn danger solid" disabled={confirmText !== site.domain || !!task} onClick={remove}>
-          Xoá vĩnh viễn
+          {t('Xoá vĩnh viễn')}
         </button>
       </div>
       {task && (

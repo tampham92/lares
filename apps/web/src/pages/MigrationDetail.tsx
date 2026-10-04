@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { APP_LABELS, MIGRATION_STEPS, PANEL_LABELS, type Migration, type MigrationEvent, type MigrationItem, type MigrationLog } from '@tpanel/shared';
+import { APP_LABELS, MIGRATION_STEPS, PANEL_LABELS, msg, type Migration, type MigrationEvent, type MigrationItem, type MigrationLog } from '@lares/shared';
 import { auth, del, fmtDate, post } from '../api';
 import { Alert, Badge, Console, ErrorBox, Progress } from '../components/ui';
+import { getLang, t } from '../i18n';
 import { STATUS_LABEL } from './Migrations';
 
 const ITEM_TONE: Record<MigrationItem['status'], 'ok' | 'err' | 'warn' | 'info' | 'default'> = {
@@ -12,7 +13,13 @@ const ITEM_TONE: Record<MigrationItem['status'], 'ok' | 'err' | 'warn' | 'info' 
   failed: 'err',
   cancelled: 'warn',
 };
-const ITEM_LABEL: Record<MigrationItem['status'], string> = { pending: 'Chờ', running: 'Đang chạy', completed: 'Hoàn tất', failed: 'Lỗi', cancelled: 'Đã huỷ' };
+const ITEM_LABEL: Record<MigrationItem['status'], string> = {
+  pending: msg('Chờ'),
+  running: msg('Đang chạy'),
+  completed: msg('Hoàn tất'),
+  failed: msg('Lỗi'),
+  cancelled: msg('Đã huỷ'),
+};
 
 function useMigrationStream(id: number) {
   const [migration, setMigration] = useState<Migration | null>(null);
@@ -20,7 +27,7 @@ function useMigrationStream(id: number) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const es = new EventSource(`/api/migrations/${id}/events?token=${encodeURIComponent(auth.token ?? '')}`);
+    const es = new EventSource(`/api/migrations/${id}/events?token=${encodeURIComponent(auth.token ?? '')}&lang=${getLang()}`);
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false); // EventSource reconnects on its own and receives a fresh snapshot
     es.onmessage = (msg) => {
@@ -53,10 +60,10 @@ function ItemCard({ item, onFilter, active }: { item: MigrationItem; onFilter: (
           <div className="sub mono">{item.sourceRoot}</div>
         </div>
         <div className="row">
-          <Badge>{APP_LABELS[item.appType]}</Badge>
-          <Badge tone={ITEM_TONE[item.status]}>{ITEM_LABEL[item.status]}</Badge>
+          <Badge>{t(APP_LABELS[item.appType])}</Badge>
+          <Badge tone={ITEM_TONE[item.status]}>{t(ITEM_LABEL[item.status])}</Badge>
           <button className="btn sm" onClick={onFilter}>
-            {active ? 'Xem tất cả log' : 'Log site này'}
+            {active ? t('Xem tất cả log') : t('Log site này')}
           </button>
         </div>
       </div>
@@ -70,7 +77,7 @@ function ItemCard({ item, onFilter, active }: { item: MigrationItem; onFilter: (
             <div key={s.id} className={`step ${st.status}`}>
               <div className="dot">{st.status === 'done' ? '✓' : st.status === 'failed' ? '✕' : st.status === 'skipped' ? '–' : ''}</div>
               <div>
-                <div>{s.label}</div>
+                <div>{t(s.label)}</div>
                 {st.detail && <div className="detail">{st.detail}</div>}
                 {st.status === 'running' && st.progress !== undefined && (
                   <div style={{ marginTop: 4, maxWidth: 360 }}>
@@ -95,7 +102,7 @@ function ItemCard({ item, onFilter, active }: { item: MigrationItem; onFilter: (
       {item.siteId && item.status === 'completed' && (
         <div className="row end">
           <Link className="btn primary sm" to={`/sites/${item.siteId}`}>
-            Mở site trên TPanel →
+            {t('Mở site trên Lares →')}
           </Link>
         </div>
       )}
@@ -116,7 +123,7 @@ export function MigrationDetail() {
     [logs, filter, showDebug],
   );
 
-  if (!m) return <div className="sub">Đang kết nối…</div>;
+  if (!m) return <div className="sub">{t('Đang kết nối…')}</div>;
   const [label, tone] = STATUS_LABEL[m.status];
   const running = m.status === 'running';
   const act = async (fn: () => Promise<unknown>) => {
@@ -134,24 +141,24 @@ export function MigrationDetail() {
         <div>
           <h1>{m.name}</h1>
           <div className="row sub">
-            <span className="mono">{m.sourceLabel}</span>· {PANEL_LABELS[m.panel]}
-            {m.sameHost && <Badge tone="warn">cùng VPS với TPanel</Badge>}
-            <Badge tone={tone}>{label}</Badge>
-            {!connected && <Badge tone="warn">mất kết nối realtime…</Badge>}
+            <span className="mono">{m.sourceLabel}</span>· {t(PANEL_LABELS[m.panel])}
+            {m.sameHost && <Badge tone="warn">{t('cùng VPS với Lares')}</Badge>}
+            <Badge tone={tone}>{t(label)}</Badge>
+            {!connected && <Badge tone="warn">{t('mất kết nối realtime…')}</Badge>}
           </div>
           <div className="sub">
-            Bắt đầu {fmtDate(m.startedAt)} {m.finishedAt && `· kết thúc ${fmtDate(m.finishedAt)}`}
+            {t('Bắt đầu {time}', { time: fmtDate(m.startedAt) })} {m.finishedAt && t('· kết thúc {time}', { time: fmtDate(m.finishedAt) })}
           </div>
         </div>
         <div className="row">
           {running && (
             <button className="btn danger" onClick={() => act(() => post(`/api/migrations/${id}/cancel`))}>
-              Huỷ
+              {t('Huỷ')}
             </button>
           )}
           {!running && m.items?.some((i) => i.status === 'failed' || i.status === 'cancelled') && (
             <button className="btn primary" onClick={() => act(() => post(`/api/migrations/${id}/retry`))}>
-              Chạy lại site lỗi
+              {t('Chạy lại site lỗi')}
             </button>
           )}
           {!running && (
@@ -159,13 +166,13 @@ export function MigrationDetail() {
               className="btn"
               onClick={() =>
                 act(async () => {
-                  if (!confirm('Xoá lịch sử migration này? (site đã chuyển không bị ảnh hưởng)')) return;
+                  if (!confirm(t('Xoá lịch sử migration này? (site đã chuyển không bị ảnh hưởng)'))) return;
                   await del(`/api/migrations/${id}`);
                   nav('/migrations');
                 })
               }
             >
-              Xoá lịch sử
+              {t('Xoá lịch sử')}
             </button>
           )}
         </div>
@@ -180,9 +187,9 @@ export function MigrationDetail() {
         </div>
         <div className="card stack" style={{ alignSelf: 'start', position: 'sticky', top: 16 }}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
-            <h2>Nhật ký</h2>
+            <h2>{t('Nhật ký')}</h2>
             <label className="check">
-              <input type="checkbox" checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)} /> Chi tiết (debug)
+              <input type="checkbox" checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)} /> {t('Chi tiết (debug)')}
             </label>
           </div>
           <Console lines={visible.map((l) => ({ t: l.createdAt, msg: l.message, level: l.level }))} />

@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { AppType } from '@tpanel/shared';
+import type { AppType } from '@lares/shared';
 import { config } from '../config.js';
+import { t, tDefault } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { syncDevNginx } from './devNginx.js';
 import { host, type HostLogger } from './host.js';
@@ -28,8 +29,11 @@ export const siteLogPaths = (domain: string) => {
   return { dir, access: path.join(dir, 'access.log'), error: path.join(dir, 'error.log') };
 };
 
-/** http{}-level config shared by every TPanel vhost (log format with $request_time, websocket map). */
-export const GLOBAL_CONF = `# Managed by TPanel
+/**
+ * http{}-level config shared by every Lares vhost (log format with $request_time, websocket map).
+ * The `tpanel` names predate the rename to Lares and stay: existing vhosts reference them.
+ */
+export const GLOBAL_CONF = `# Managed by Lares
 log_format tpanel '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time';
 
 map $http_upgrade $tpanel_connection_upgrade {
@@ -39,10 +43,13 @@ map $http_upgrade $tpanel_connection_upgrade {
 `;
 
 export async function ensureGlobalConfig(log?: HostLogger) {
+  // Installs from before the rename to Lares wrote 00-tpanel.conf; a second copy would define log_format twice.
+  const legacy = path.join(path.dirname(config.nginxGlobalConf), path.basename(config.nginxGlobalConf).replace('lares', 'tpanel'));
+  if (legacy !== config.nginxGlobalConf && (await fs.stat(legacy).catch(() => null))) await host.mutate(`rm -f ${shq(legacy)}`);
   const current = await fs.readFile(config.nginxGlobalConf, 'utf8').catch(() => '');
   if (current === GLOBAL_CONF) return;
   await host.writeFile(config.nginxGlobalConf, GLOBAL_CONF);
-  await testAndReload(log).catch((err) => log?.(`Không reload được nginx: ${err instanceof Error ? err.message : err}`));
+  await testAndReload(log).catch((err) => log?.(t('Không reload được nginx: {error}', { error: err instanceof Error ? err.message : String(err) })));
 }
 
 const indent = (block: string, n = 4) =>
@@ -72,11 +79,11 @@ function appBody(spec: VhostSpec): string {
   ];
 
   if (spec.disabled) {
-    return [...common, '', 'location / {\n    default_type text/html;\n    return 503 "<h1>Site tạm ngưng hoạt động</h1>";\n}'].join('\n');
+    return [...common, '', `location / {\n    default_type text/html;\n    return 503 "<h1>${tDefault('Site tạm ngưng hoạt động')}</h1>";\n}`].join('\n');
   }
 
   if (spec.appType === 'nextjs') {
-    if (!spec.appPort) throw new Error(`Site ${spec.domain} chưa được cấp port`);
+    if (!spec.appPort) throw new Error(t('Site {domain} chưa được cấp port', { domain: spec.domain }));
     const upstream = `http://127.0.0.1:${spec.appPort}`;
     const proxy = `proxy_http_version 1.1;
 proxy_set_header Host $host;
@@ -142,7 +149,7 @@ export async function supportsHttp2Directive(): Promise<boolean> {
 export function renderVhost(spec: VhostSpec, opts: { http2Directive?: boolean } = {}): string {
   const names = [spec.domain, ...spec.aliases].join(' ');
   const body = appBody(spec);
-  const header = `# Managed by TPanel - changes will be overwritten\n# site: ${spec.domain} (${spec.appType})\n`;
+  const header = `# Managed by Lares - changes will be overwritten\n# site: ${spec.domain} (${spec.appType})\n`;
 
   if (spec.listenPort) {
     // reachable as http://<server-ip>:<port>; the ACME location is harmless here
@@ -170,7 +177,7 @@ ${opts.http2Directive ? '    listen 443 ssl;\n    listen [::]:443 ssl;\n    http
     ssl_certificate_key ${spec.ssl.privateKey};
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:TPANEL_SSL:10m;
+    ssl_session_cache shared:LARES_SSL:10m;
     ssl_session_timeout 1d;
 ${spec.ssl.forceHttps ? '    add_header Strict-Transport-Security "max-age=31536000" always;\n' : ''}
 ${indent(body)}
@@ -190,11 +197,11 @@ export async function testAndReload(log?: HostLogger) {
     return;
   }
   const test = await host.exec(`${shq(config.nginxBin)} -t`);
-  if (test.code !== 0) throw new Error(`Cấu hình nginx lỗi:\n${test.stderr.trim()}`);
+  if (test.code !== 0) throw new Error(`${t('Cấu hình nginx lỗi:')}\n${test.stderr.trim()}`);
   // Coexist mode: another web server still owns :80, nginx is intentionally stopped.
   // The config is validated and takes effect once nginx is started - do not try to start it here.
   if (!(await nginxRunning())) {
-    log?.('nginx chưa chạy (port 80 có thể đang do web server khác giữ) - cấu hình hợp lệ, sẽ có hiệu lực khi nginx được khởi động');
+    log?.(t('nginx chưa chạy (port 80 có thể đang do web server khác giữ) - cấu hình hợp lệ, sẽ có hiệu lực khi nginx được khởi động'));
     return;
   }
   await host.run('systemctl reload nginx');

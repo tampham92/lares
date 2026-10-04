@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { AppType, DbCredentials } from '@tpanel/shared';
+import type { AppType, DbCredentials } from '@lares/shared';
 import type { Executor } from '../executors/index.js';
 import { shq } from '../lib/shell.js';
 

@@ -1,16 +1,16 @@
 {
-  "name": "tpanel",
+  "name": "lares",
   "private": true,
   "version": "0.1.0",
-  "description": "TPanel - web hosting control panel written in TypeScript",
+  "description": "Lares Panel by ThoCode - web hosting control panel written in TypeScript",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n server,web -c blue,green \"npm run dev -w @tpanel/server\" \"npm run dev -w @tpanel/web\"",
-    "build": "npm run build -w @tpanel/web && npm run build -w @tpanel/server",
-    "start": "npm start -w @tpanel/server",
+    "dev": "concurrently -k -n server,web -c blue,green \"npm run dev -w @lares/server\" \"npm run dev -w @lares/web\"",
+    "build": "npm run build -w @lares/web && npm run build -w @lares/server",
+    "start": "npm start -w @lares/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

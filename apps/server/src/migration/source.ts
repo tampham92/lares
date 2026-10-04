@@ -1,6 +1,7 @@
-import type { ConnectionReport, DbCredentials, DiscoveredSite, DiscoveryResult, SourceInput, ToolAvailability } from '@tpanel/shared';
+import type { ConnectionReport, DbCredentials, DiscoveredSite, DiscoveryResult, SourceInput, ToolAvailability } from '@lares/shared';
 import { connectSource, detectSameHost, localExecutor, type Executor } from '../executors/index.js';
 import { SshExecutor } from '../executors/ssh.js';
+import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { port80Owner } from '../services/nginx.js';
 import { findSiteByHostname } from '../services/sites.js';
@@ -17,7 +18,7 @@ export interface SourceSession {
 
 /**
  * Open the source. When the "remote" VPS turns out to be this very machine we drop the SSH session
- * and work locally: no network hop, no SFTP, and we run with TPanel's own (root) privileges.
+ * and work locally: no network hop, no SFTP, and we run with Lares's own (root) privileges.
  */
 export async function openSource(source: SourceInput): Promise<SourceSession> {
   const ex = await connectSource(source.connection);
@@ -63,21 +64,21 @@ export async function testConnection(source: SourceInput): Promise<ConnectionRep
     const c = source.connection;
     if (c.mode === 'ssh' && c.useSudo && !s.sameHost) {
       const sudo = await s.ex.exec('true');
-      if (sudo.code !== 0) warnings.push('sudo -n thất bại: user SSH cần quyền sudo NOPASSWD để đọc file của các site');
+      if (sudo.code !== 0) warnings.push(t('sudo -n thất bại: user SSH cần quyền sudo NOPASSWD để đọc file của các site'));
     } else if (user !== 'root' && !s.sameHost) {
-      warnings.push(`Đang kết nối bằng user "${user}" (không phải root) - có thể không đọc được file/config của mọi site. Bật "Dùng sudo" nếu cần.`);
+      warnings.push(t('Đang kết nối bằng user "{user}" (không phải root) - có thể không đọc được file/config của mọi site. Bật "Dùng sudo" nếu cần.', { user }));
     }
-    if (!tools.tar || !tools.gzip) warnings.push('VPS nguồn thiếu tar/gzip - không thể nén dữ liệu');
-    if (!tools.mysqldump) warnings.push('VPS nguồn thiếu mysqldump - không dump được database (chỉ chuyển được file)');
+    if (!tools.tar || !tools.gzip) warnings.push(t('VPS nguồn thiếu tar/gzip - không thể nén dữ liệu'));
+    if (!tools.mysqldump) warnings.push(t('VPS nguồn thiếu mysqldump - không dump được database (chỉ chuyển được file)'));
 
     if (s.sameHost) {
       const owner = await port80Owner();
       if (owner && owner !== 'nginx') {
         warnings.push(
-          `Port 80 đang do "${owner}" (web server của panel nguồn) chiếm. Sau khi chuyển, site trên TPanel chỉ nhận traffic khi bạn dừng web server đó và khởi động nginx của TPanel.`,
+          t('Port 80 đang do "{owner}" (web server của panel nguồn) chiếm. Sau khi chuyển, site trên Lares chỉ nhận traffic khi bạn dừng web server đó và khởi động nginx của Lares.', { owner }),
         );
       }
-      warnings.push('Panel nguồn chạy chung VPS: dữ liệu được copy trực tiếp trên máy (không qua mạng), database được dump sang database mới nên site cũ vẫn chạy song song.');
+      warnings.push(t('Panel nguồn chạy chung VPS: dữ liệu được copy trực tiếp trên máy (không qua mạng), database được dump sang database mới nên site cũ vẫn chạy song song.'));
     }
 
     return {
@@ -134,7 +135,7 @@ export async function discoverSites(source: SourceInput): Promise<DiscoveryResul
       if (!r.rootPath) return base;
       const p = await probeSite(s.ex, r.rootPath);
       if (!p.exists) {
-        warnings.push(`${r.domain}: không truy cập được ${r.rootPath}`);
+        warnings.push(t('{domain}: không truy cập được {path}', { domain: r.domain, path: r.rootPath }));
         return base;
       }
       return { ...base, rootPath: p.rootPath, webRootSubdir: p.webRootSubdir, appType: p.appType, configPath: p.configPath, db: p.db, sizeBytes: p.sizeBytes, owner: p.owner ?? r.owner };
@@ -148,7 +149,7 @@ export async function discoverSites(source: SourceInput): Promise<DiscoveryResul
         .map((o) => o.rootPath.slice(site.rootPath.length + 1));
     }
     for (const site of sites) {
-      if (site.proxyPass && !site.rootPath) warnings.push(`${site.domain}: reverse proxy tới ${site.proxyPass} - hãy nhập thư mục mã nguồn ứng dụng`);
+      if (site.proxyPass && !site.rootPath) warnings.push(t('{domain}: reverse proxy tới {target} - hãy nhập thư mục mã nguồn ứng dụng', { domain: site.domain, target: site.proxyPass }));
     }
     sites.sort((a, b) => a.domain.localeCompare(b.domain));
     return { panel, sites, warnings };

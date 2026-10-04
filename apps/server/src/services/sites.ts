@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { LOCALHOST, type AppType, type CreateSiteInput, type CreateSiteResult, type IssueSslInput, type Site, type SslState } from '@tpanel/shared';
+import { LOCALHOST, type AppType, type CreateSiteInput, type CreateSiteResult, type IssueSslInput, type Site, type SslState } from '@lares/shared';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
+import { t, tDefault } from '../i18n/index.js';
 import { decrypt, encrypt, randomPassword } from '../lib/crypto.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
@@ -61,7 +62,7 @@ export function listSites(): Site[] {
 
 export function getSite(id: number): Site {
   const row = db.prepare('SELECT * FROM sites WHERE id = ?').get(id) as SiteRow | undefined;
-  if (!row) throw notFound('Site không tồn tại');
+  if (!row) throw notFound(t('Site không tồn tại'));
   return toSite(row);
 }
 
@@ -74,7 +75,7 @@ export function saveNodeConfig(id: number, cfg: nodeapp.NodeAppConfig) {
   db.prepare('UPDATE sites SET app_config_enc = ? WHERE id = ?').run(encrypt(cfg), id);
 }
 
-/** Domain (or alias) owned by another TPanel site? */
+/** Domain (or alias) owned by another Lares site? */
 export function findSiteByHostname(name: string, exceptId?: number): Site | null {
   for (const s of listSites()) {
     if (s.id === exceptId) continue;
@@ -86,7 +87,7 @@ export function findSiteByHostname(name: string, exceptId?: number): Site | null
 function assertHostnamesFree(names: string[], exceptId?: number) {
   for (const n of names) {
     const owner = findSiteByHostname(n, exceptId);
-    if (owner) throw conflict(`${n} đang được dùng bởi site ${owner.domain}`);
+    if (owner) throw conflict(t('{name} đang được dùng bởi site {domain}', { name: n, domain: owner.domain }));
   }
 }
 
@@ -158,14 +159,14 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
   const layout = siteLayout(input.domain, input.appType, input.webRootSubdir);
   const rootExisted = await host.exists(layout.rootPath);
   if (rootExisted && !input.allowExistingDir && !(await host.isEmptyDir(layout.appDir))) {
-    throw conflict(`Thư mục ${layout.appDir} đã tồn tại và không trống`);
+    throw conflict(t('Thư mục {dir} đã tồn tại và không trống', { dir: layout.appDir }));
   }
   await fs.mkdir(layout.webRoot, { recursive: true });
-  if (!rootExisted) undo.push(`xoá ${layout.rootPath}`, () => fs.rm(layout.rootPath, { recursive: true, force: true }));
+  if (!rootExisted) undo.push(t('xoá {path}', { path: layout.rootPath }), () => fs.rm(layout.rootPath, { recursive: true, force: true }));
 
   const phpVersion = usesPhp(input.appType) ? await resolvePhpVersion(input.phpVersion) : null;
   if (input.phpVersion && phpVersion && phpVersion !== input.phpVersion) {
-    log(`PHP ${input.phpVersion} chưa được cài, dùng PHP ${phpVersion}`);
+    log(t('PHP {wanted} chưa được cài, dùng PHP {used}', { wanted: String(input.phpVersion), used: String(phpVersion) }));
   }
   let appPort: number | null = null;
   if (input.appType === 'nextjs') {
@@ -191,19 +192,19 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
       input.migrationId ?? null,
     );
   const siteId = Number(info.lastInsertRowid);
-  undo.push(`xoá bản ghi site ${input.domain}`, async () => db.prepare('DELETE FROM sites WHERE id = ?').run(siteId));
+  undo.push(t('xoá bản ghi site {domain}', { domain: input.domain }), async () => db.prepare('DELETE FROM sites WHERE id = ?').run(siteId));
 
   const site = getSite(siteId);
   await applySiteVhost(site, log);
-  undo.push(`xoá vhost ${input.domain}`, () => removeVhost(input.domain, log));
+  undo.push(t('xoá vhost {domain}', { domain: input.domain }), () => removeVhost(input.domain, log));
   if (input.listenPort) {
     if (await ports.openFirewallPort(input.listenPort, log)) {
-      undo.push(`đóng port ${input.listenPort}`, () => ports.closeFirewallPort(input.listenPort!, log));
-      log(`Đã mở port ${input.listenPort} trên firewall (ufw)`);
+      undo.push(t('đóng port {port}', { port: input.listenPort }), () => ports.closeFirewallPort(input.listenPort!, log));
+      log(t('Đã mở port {port} trên firewall (ufw)', { port: input.listenPort }));
     }
-    log(`Đã tạo vhost nginx lắng nghe port ${input.listenPort}${appPort ? ` → 127.0.0.1:${appPort}` : ''}`);
+    log(t('Đã tạo vhost nginx lắng nghe port {port}', { port: input.listenPort }) + (appPort ? ` → 127.0.0.1:${appPort}` : ''));
   } else {
-    log(`Đã tạo vhost nginx cho ${input.domain}${appPort ? ` → 127.0.0.1:${appPort}` : ''}`);
+    log(t('Đã tạo vhost nginx cho {domain}', { domain: input.domain }) + (appPort ? ` → 127.0.0.1:${appPort}` : ''));
   }
   return site;
 }
@@ -214,7 +215,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
     // "localhost" = no domain yet: reserve a public port, the site lives at http://<ip>:<port>
     let listenPort: number | null = null;
     if (input.domain === LOCALHOST) {
-      if (input.listenPort && !(await ports.isPortFree(input.listenPort))) throw conflict(`Port ${input.listenPort} đang được sử dụng`);
+      if (input.listenPort && !(await ports.isPortFree(input.listenPort))) throw conflict(t('Port {port} đang được sử dụng', { port: input.listenPort }));
       listenPort = input.listenPort ?? (await ports.allocatePort(config.sitePortStart));
     }
     const domain = listenPort ? portSiteDomain(listenPort) : input.domain;
@@ -238,9 +239,9 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
     if (input.type === 'wordpress' || (input.type === 'php' && input.createDatabase)) {
       const name = databases.deriveDbName(domain);
       const created = await databases.createDatabase({ name, username: name, siteId: site.id }, log);
-      undo.push(`xoá database ${name}`, () => databases.deleteDatabase(created.record.id, log));
+      undo.push(t('xoá database {name}', { name }), () => databases.deleteDatabase(created.record.id, log));
       database = { name, username: name, password: created.password };
-      log(`Đã tạo database ${name}`);
+      log(t('Đã tạo database {name}', { name }));
     }
 
     switch (input.type) {
@@ -260,30 +261,30 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
         }
         if (tpl && vars) {
           if (installed) await templates.installWordpressTemplate(tpl.id, site.webRoot, vars, log);
-          else log('Cảnh báo: cần wp-cli trên máy chủ để cài giao diện mẫu WordPress - site được tạo với giao diện mặc định');
+          else log(t('Cảnh báo: cần wp-cli trên máy chủ để cài giao diện mẫu WordPress - site được tạo với giao diện mặc định'));
         }
-        if (wordpressAdmin) log(`Tài khoản quản trị WordPress: ${wordpressAdmin.user} / ${wordpressAdmin.password} - đăng nhập tại ${wordpressAdmin.url}`);
+        if (wordpressAdmin) log(t('Tài khoản quản trị WordPress: {user} / {password} - đăng nhập tại {url}', { user: wordpressAdmin.user, password: wordpressAdmin.password, url: wordpressAdmin.url }));
         break;
       }
       case 'php':
-        await host.writeFile(path.join(site.webRoot, 'index.php'), `<?php\necho '<h1>${domain}</h1><p>Site được tạo bởi TPanel.</p>';\n`);
+        await host.writeFile(path.join(site.webRoot, 'index.php'), `<?php\necho '<h1>${domain}</h1><p>${tDefault('Site được tạo bởi Lares.')}</p>';\n`);
         break;
       case 'static':
         if (input.template) {
           const tpl = await templates.getTemplate(input.template);
           await templates.installStaticTemplate(tpl.id, site.webRoot, templates.templateVars(tpl, input.branding), log);
         } else {
-          await host.writeFile(path.join(site.webRoot, 'index.html'), `<!doctype html><meta charset="utf-8"><title>${domain}</title><h1>${domain}</h1><p>Site được tạo bởi TPanel.</p>\n`);
+          await host.writeFile(path.join(site.webRoot, 'index.html'), `<!doctype html><meta charset="utf-8"><title>${domain}</title><h1>${domain}</h1><p>${tDefault('Site được tạo bởi Lares.')}</p>\n`);
         }
         break;
       case 'nextjs': {
-        undo.push(`xoá service ${nodeapp.serviceName(site.domain)}`, () => nodeapp.removeService(site.domain, log));
+        undo.push(t('xoá service {name}', { name: nodeapp.serviceName(site.domain) }), () => nodeapp.removeService(site.domain, log));
         if (input.nextjs.gitUrl) {
           await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, input.nextjs.gitUrl, input.nextjs.branch, log);
           await nodeapp.buildAndRestart({ ...site, appPort: site.appPort! }, input.nextjs, log);
         } else {
           await nodeapp.writeServiceFiles(site.domain, site.webRoot, site.rootPath, site.appPort!, input.nextjs, log);
-          log(`Chưa có mã nguồn: upload project Next.js vào ${site.webRoot} rồi bấm "Build & khởi động".`);
+          log(t('Chưa có mã nguồn: upload project Next.js vào {dir} rồi bấm "Build & khởi động".', { dir: site.webRoot }));
         }
         break;
       }
@@ -291,7 +292,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
 
     await fixPermissions(site.rootPath, log);
     undo.clear();
-    log(`Hoàn tất tạo site - truy cập: ${url}`);
+    log(t('Hoàn tất tạo site - truy cập: {url}', { url }));
     return { site: getSite(site.id), url, database, wordpressAdmin };
   } catch (err) {
     await undo.run(log);
@@ -301,7 +302,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
 
 export async function deploySite(id: number, log: HostLogger, signal?: AbortSignal) {
   const site = getSite(id);
-  if (site.appType !== 'nextjs' || !site.appPort) throw conflict('Chỉ site Next.js mới có thể build/deploy');
+  if (site.appType !== 'nextjs' || !site.appPort) throw conflict(t('Chỉ site Next.js mới có thể build/deploy'));
   const cfg = getNodeConfig(id);
   if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, cfg.gitUrl, cfg.branch ?? 'main', log, signal);
   await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, cfg, log, signal);
@@ -342,17 +343,19 @@ function saveSsl(id: number, state: SslState) {
 
 export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger) {
   const site = getSite(id);
-  if (site.listenPort) throw conflict('Site đang chạy theo port (chưa có tên miền) nên không cài được SSL. Hãy tạo site với tên miền thật.');
+  if (site.listenPort) throw conflict(t('Site đang chạy theo port (chưa có tên miền) nên không cài được SSL. Hãy tạo site với tên miền thật.'));
   let state: SslState;
   if (input.type === 'letsencrypt') {
     if (!(await nginxRunning())) {
       const owner = await port80Owner();
       throw new Error(
-        `nginx của TPanel chưa chạy${owner ? ` - port 80 đang do "${owner}" giữ` : ''}. Let's Encrypt cần xác thực qua port 80: dừng web server cũ rồi chạy "systemctl enable --now nginx" trước khi cài SSL.`,
+        (owner ? t('nginx của Lares chưa chạy - port 80 đang do "{owner}" giữ.', { owner }) : t('nginx của Lares chưa chạy.')) +
+          ' ' +
+          t('Let\'s Encrypt cần xác thực qua port 80: dừng web server cũ rồi chạy "systemctl enable --now nginx" trước khi cài SSL.'),
       );
     }
     const names = input.includeAliases ? [site.domain, ...site.aliases] : [site.domain];
-    for (const w of await ssl.dnsWarnings(names)) log(`Cảnh báo DNS: ${w}`);
+    for (const w of await ssl.dnsWarnings(names)) log(t('Cảnh báo DNS: {warning}', { warning: w }));
     // make sure the ACME location is live on port 80 before certbot asks Let's Encrypt to hit it
     await applySiteVhost(site, log);
     await ssl.issueLetsEncrypt(site.domain, names, input.email, input.staging, log);
@@ -370,11 +373,15 @@ export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger
     const info = await ssl.readCertInfo(paths.certificate);
     state = { enabled: true, type: 'custom', domains: info.domains, issuer: info.issuer, expiresAt: info.expiresAt, forceHttps: input.forceHttps };
     const uncovered = [site.domain, ...site.aliases].filter((d) => !info.domains.some((c) => c === d || (c.startsWith('*.') && d.endsWith(c.slice(1)))));
-    if (uncovered.length) log(`Cảnh báo: certificate không bao gồm ${uncovered.join(', ')}`);
+    if (uncovered.length) log(t('Cảnh báo: certificate không bao gồm {names}', { names: uncovered.join(', ') }));
   }
   await applySiteVhost({ ...site, ssl: state }, log);
   saveSsl(id, state);
-  log(`Đã bật SSL cho ${site.domain}${state.expiresAt ? `, hết hạn ${state.expiresAt.slice(0, 10)}` : ''}`);
+  log(
+    state.expiresAt
+      ? t('Đã bật SSL cho {domain}, hết hạn {date}', { domain: site.domain, date: state.expiresAt.slice(0, 10) })
+      : t('Đã bật SSL cho {domain}', { domain: site.domain }),
+  );
   // An http:// home URL on an https page makes browsers block the theme's CSS/JS (mixed content).
   if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, site.rootPath, `https://${site.domain}`, log);
   return getSite(id);
@@ -382,7 +389,7 @@ export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger
 
 export async function setForceHttps(id: number, forceHttps: boolean, log?: HostLogger) {
   const site = getSite(id);
-  if (!site.ssl.enabled) throw conflict('Site chưa bật SSL');
+  if (!site.ssl.enabled) throw conflict(t('Site chưa bật SSL'));
   const state = { ...site.ssl, forceHttps };
   await applySiteVhost({ ...site, ssl: state }, log);
   saveSsl(id, state);
@@ -391,7 +398,7 @@ export async function setForceHttps(id: number, forceHttps: boolean, log?: HostL
 
 export async function renewSsl(id: number, log: HostLogger) {
   const site = getSite(id);
-  if (site.ssl.type !== 'letsencrypt') throw conflict("Chỉ gia hạn được chứng chỉ Let's Encrypt");
+  if (site.ssl.type !== 'letsencrypt') throw conflict(t("Chỉ gia hạn được chứng chỉ Let's Encrypt"));
   await ssl.renewLetsEncrypt(site.domain, log);
   const info = await ssl.readCertInfo(ssl.certPaths(site.domain, 'letsencrypt').certificate);
   saveSsl(id, { ...site.ssl, expiresAt: info.expiresAt ?? site.ssl.expiresAt });
@@ -407,10 +414,10 @@ export async function disableSsl(id: number, revoke: boolean, log?: HostLogger) 
   return getSite(id);
 }
 
-/** One-off repairs for sites created by older TPanel versions (runs at startup, idempotent). */
+/** One-off repairs for sites created by older Lares versions (runs at startup, idempotent). */
 export async function repairSites(log: HostLogger) {
   for (const s of listSites()) {
-    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, log).catch((e) => log(`Không vá được ${s.domain}: ${e instanceof Error ? e.message : e}`));
+    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
   }
 }
 
@@ -431,23 +438,23 @@ export async function refreshSslExpiry() {
 export async function changeDomain(id: number, input: { domain: string; aliases: string[] }, log: HostLogger) {
   const site = getSite(id);
   const domain = input.domain.toLowerCase();
-  if (domain === LOCALHOST) throw conflict('Hãy nhập tên miền thật');
-  if (domain === site.domain && !site.listenPort) throw conflict('Site đã dùng tên miền này');
+  if (domain === LOCALHOST) throw conflict(t('Hãy nhập tên miền thật'));
+  if (domain === site.domain && !site.listenPort) throw conflict(t('Site đã dùng tên miền này'));
   assertHostnamesFree([domain, ...input.aliases], id);
   const target = siteLayout(domain, site.appType);
   if (target.rootPath !== site.rootPath && (await host.exists(target.rootPath))) {
-    log(`Lưu ý: thư mục ${target.rootPath} đã tồn tại, site vẫn dùng thư mục hiện tại ${site.rootPath}`);
+    log(t('Lưu ý: thư mục {dir} đã tồn tại, site vẫn dùng thư mục hiện tại {current}', { dir: target.rootPath, current: site.rootPath }));
   }
 
   const undo = new UndoStack();
   const next: Site = { ...site, domain, aliases: input.aliases, listenPort: null, ssl: ssl.EMPTY_SSL };
   try {
     await applySiteVhost(next, log);
-    undo.push(`xoá vhost ${domain}`, () => removeVhost(domain, log));
+    undo.push(t('xoá vhost {domain}', { domain }), () => removeVhost(domain, log));
 
     if (site.appType === 'nextjs' && site.appPort) {
       await nodeapp.writeServiceFiles(domain, site.webRoot, site.rootPath, site.appPort, getNodeConfig(id), log);
-      undo.push(`xoá service ${nodeapp.serviceName(domain)}`, () => nodeapp.removeService(domain, log));
+      undo.push(t('xoá service {name}', { name: nodeapp.serviceName(domain) }), () => nodeapp.removeService(domain, log));
       await nodeapp.serviceAction(domain, 'restart', log);
     }
 
@@ -459,16 +466,16 @@ export async function changeDomain(id: number, input: { domain: string; aliases:
   }
 
   // Point of no return passed: clean up what belonged to the old name (best effort).
-  await removeVhost(site.domain, log).catch((e) => log(`Không xoá được vhost cũ: ${e instanceof Error ? e.message : e}`));
+  await removeVhost(site.domain, log).catch((e) => log(t('Không xoá được vhost cũ: {error}', { error: e instanceof Error ? e.message : String(e) })));
   if (site.appType === 'nextjs') await nodeapp.removeService(site.domain, log).catch(() => {});
   // Only now - with the old vhost gone - can the old log files move (nginx -t opens every log path).
-  await moveSiteLogs(site.domain, domain, log).catch((e) => log(`Không chuyển được log cũ: ${e instanceof Error ? e.message : e}`));
+  await moveSiteLogs(site.domain, domain, log).catch((e) => log(t('Không chuyển được log cũ: {error}', { error: e instanceof Error ? e.message : String(e) })));
   if (site.listenPort) await ports.closeFirewallPort(site.listenPort, log);
   if (site.ssl.type === 'letsencrypt') await ssl.deleteLetsEncrypt(site.domain, log);
   if (site.ssl.type === 'custom') await ssl.removeCustomCert(site.domain);
   if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, site.rootPath, `http://${domain}`, log);
 
-  log(`Đã gán tên miền ${[domain, ...input.aliases].join(', ')}. Tiếp theo: trỏ bản ghi DNS A về IP máy chủ, rồi cài SSL ở tab SSL.`);
+  log(t('Đã gán tên miền {domains}. Tiếp theo: trỏ bản ghi DNS A về IP máy chủ, rồi cài SSL ở tab SSL.', { domains: [domain, ...input.aliases].join(', ') }));
   return getSite(id);
 }
 
@@ -486,7 +493,7 @@ async function moveSiteLogs(from: string, to: string, log: HostLogger) {
   await fs.rm(src, { recursive: true, force: true });
   // nginx still holds the replaced (empty) files open
   if (!config.dryRun && (await nginxRunning())) await host.run(`${shq(config.nginxBin)} -s reopen`).catch(() => undefined);
-  log('Đã giữ lại lịch sử log traffic cho tên miền mới');
+  log(t('Đã giữ lại lịch sử log traffic cho tên miền mới'));
 }
 
 export async function deleteSite(
@@ -503,21 +510,21 @@ export async function deleteSite(
   if (opts.removeDatabases) {
     for (const d of databases.databasesForSite(id)) {
       if (!d.managed) {
-        log(`Bỏ qua database ${d.name} (dùng chung với panel khác, TPanel không xoá)`);
+        log(t('Bỏ qua database {name} (dùng chung với panel khác, Lares không xoá)', { name: d.name }));
         continue;
       }
       await databases.deleteDatabase(d.id, log);
-      log(`Đã xoá database ${d.name}`);
+      log(t('Đã xoá database {name}', { name: d.name }));
     }
   }
   if (opts.removeFiles) {
     // Guard against a corrupted row pointing somewhere dangerous.
     const root = path.resolve(site.rootPath);
-    if (!root.startsWith(path.resolve(config.sitesRoot) + path.sep)) throw new Error(`Từ chối xoá thư mục ngoài ${config.sitesRoot}: ${root}`);
+    if (!root.startsWith(path.resolve(config.sitesRoot) + path.sep)) throw new Error(t('Từ chối xoá thư mục ngoài {root}: {path}', { root: config.sitesRoot, path: root }));
     await fs.rm(root, { recursive: true, force: true });
-    log(`Đã xoá ${root}`);
+    log(t('Đã xoá {path}', { path: root }));
   }
   if (opts.removeLogs) await fs.rm(siteLogPaths(site.domain).dir, { recursive: true, force: true });
   db.prepare('DELETE FROM sites WHERE id = ?').run(id);
-  log(`Đã xoá site ${site.domain}`);
+  log(t('Đã xoá site {domain}', { domain: site.domain }));
 }

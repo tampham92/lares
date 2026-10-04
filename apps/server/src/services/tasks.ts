@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { t } from '../i18n/index.js';
 import { errorMessage } from '../lib/errors.js';
 
 export interface TaskInfo {
@@ -32,7 +33,7 @@ export function startTask<T>(label: string, fn: (log: (msg: string) => void) => 
     .catch((err) => {
       task.status = 'failed';
       task.error = errorMessage(err);
-      log(`LỖI: ${task.error}`);
+      log(t('LỖI: {error}', { error: task.error }));
     })
     .finally(() => {
       task.finishedAt = new Date().toISOString();

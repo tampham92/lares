@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { createDatabaseSchema } from '@tpanel/shared';
+import { createDatabaseSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
 import { idParam, parse } from '../lib/validate.js';
 import * as databases from '../services/databases.js';

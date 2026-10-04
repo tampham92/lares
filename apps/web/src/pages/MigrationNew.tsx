@@ -15,9 +15,10 @@ import {
   type MigrationOptions,
   type PanelType,
   type TransferMode,
-} from '@tpanel/shared';
+} from '@lares/shared';
 import { fmtBytes, post } from '../api';
 import { Alert, Badge, Check, ErrorBox, Field } from '../components/ui';
+import { t } from '../i18n';
 
 interface SourceForm {
   mode: 'local' | 'ssh';
@@ -190,7 +191,7 @@ export function MigrationNew() {
         '/api/migrations/inspect',
         { source: sourcePayload(), path: row.sourceRoot },
       );
-      if (!p.exists) throw new Error(`Không tìm thấy ${row.sourceRoot} trên VPS nguồn`);
+      if (!p.exists) throw new Error(t('Không tìm thấy {path} trên VPS nguồn', { path: row.sourceRoot }));
       update(row.key, {
         sourceRoot: p.rootPath,
         webRootSubdir: p.webRootSubdir,
@@ -235,12 +236,14 @@ export function MigrationNew() {
     <>
       <div className="page-head">
         <div>
-          <h1>Chuyển site về TPanel</h1>
-          <div className="sub">Từ VPS/panel khác (hoặc panel đang chạy chung VPS): tự nén database &amp; mã nguồn, đồng bộ về và cài lại trên TPanel</div>
+          <h1>{t('Chuyển site về Lares')}</h1>
+          <div className="sub">
+            {t('Từ VPS/panel khác (hoặc panel đang chạy chung VPS): tự nén database & mã nguồn, đồng bộ về và cài lại trên Lares')}
+          </div>
         </div>
       </div>
       <div className="wizard-steps">
-        {['1. Nguồn', '2. Chọn site', '3. Xác nhận'].map((l, i) => (
+        {[t('1. Nguồn'), t('2. Chọn site'), t('3. Xác nhận')].map((l, i) => (
           <div key={l} className={step === i + 1 ? 'active' : step > i + 1 ? 'done' : ''}>
             {l}
           </div>
@@ -251,13 +254,13 @@ export function MigrationNew() {
       {step === 1 && (
         <div className="grid cols-2">
           <div className="card stack">
-            <h2>VPS / panel nguồn</h2>
+            <h2>{t('VPS / panel nguồn')}</h2>
             <div className="row">
               <label className="check">
-                <input type="radio" checked={src.mode === 'ssh'} onChange={() => setSrc({ ...src, mode: 'ssh' })} /> VPS khác (SSH)
+                <input type="radio" checked={src.mode === 'ssh'} onChange={() => setSrc({ ...src, mode: 'ssh' })} /> {t('VPS khác (SSH)')}
               </label>
               <label className="check">
-                <input type="radio" checked={src.mode === 'local'} onChange={() => setSrc({ ...src, mode: 'local' })} /> Panel trên chính VPS này
+                <input type="radio" checked={src.mode === 'local'} onChange={() => setSrc({ ...src, mode: 'local' })} /> {t('Panel trên chính VPS này')}
               </label>
             </div>
             {src.mode === 'ssh' && (
@@ -266,21 +269,21 @@ export function MigrationNew() {
                   <Field label="IP / hostname">
                     <input value={src.host} onChange={(e) => setSrc({ ...src, host: e.target.value, hostFingerprint: '' })} placeholder="103.x.x.x" />
                   </Field>
-                  <Field label="Port SSH">
+                  <Field label={t('Port SSH')}>
                     <input type="number" value={src.port} onChange={(e) => setSrc({ ...src, port: Number(e.target.value) })} />
                   </Field>
                   <Field label="User">
                     <input value={src.username} onChange={(e) => setSrc({ ...src, username: e.target.value })} />
                   </Field>
-                  <Field label="Xác thực">
+                  <Field label={t('Xác thực')}>
                     <select value={src.authType} onChange={(e) => setSrc({ ...src, authType: e.target.value as 'password' | 'key' })}>
-                      <option value="password">Mật khẩu</option>
+                      <option value="password">{t('Mật khẩu')}</option>
                       <option value="key">Private key</option>
                     </select>
                   </Field>
                 </div>
                 {src.authType === 'password' ? (
-                  <Field label="Mật khẩu SSH">
+                  <Field label={t('Mật khẩu SSH')}>
                     <input type="password" value={src.password} onChange={(e) => setSrc({ ...src, password: e.target.value })} />
                   </Field>
                 ) : (
@@ -288,68 +291,72 @@ export function MigrationNew() {
                     <Field label="Private key (OpenSSH/PEM)">
                       <textarea value={src.privateKey} onChange={(e) => setSrc({ ...src, privateKey: e.target.value })} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" />
                     </Field>
-                    <Field label="Passphrase (nếu có)">
+                    <Field label={t('Passphrase (nếu có)')}>
                       <input type="password" value={src.passphrase} onChange={(e) => setSrc({ ...src, passphrase: e.target.value })} />
                     </Field>
                   </>
                 )}
                 {src.username !== 'root' && (
                   <Check checked={src.useSudo} onChange={(v) => setSrc({ ...src, useSudo: v })}>
-                    Chạy lệnh bằng sudo (yêu cầu NOPASSWD)
+                    {t('Chạy lệnh bằng sudo (yêu cầu NOPASSWD)')}
                   </Check>
                 )}
                 <div className="sub">
-                  Nếu IP này chính là VPS đang chạy TPanel, hệ thống tự nhận ra và copy trực tiếp trên máy, không truyền qua mạng.
+                  {t('Nếu IP này chính là VPS đang chạy Lares, hệ thống tự nhận ra và copy trực tiếp trên máy, không truyền qua mạng.')}
                 </div>
               </>
             )}
-            <Field label="Panel nguồn">
+            <Field label={t('Panel nguồn')}>
               <select value={src.panel} onChange={(e) => setSrc({ ...src, panel: e.target.value as PanelType })}>
                 {PANEL_TYPES.map((p) => (
                   <option key={p} value={p}>
-                    {PANEL_LABELS[p]}
+                    {t(PANEL_LABELS[p])}
                   </option>
                 ))}
               </select>
             </Field>
             <div className="row end">
               <button className="btn" onClick={test} disabled={!!busy || (src.mode === 'ssh' && !src.host)}>
-                {busy === 'test' ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}
+                {busy === 'test' ? t('Đang kiểm tra…') : t('Kiểm tra kết nối')}
               </button>
               <button className="btn primary" onClick={discover} disabled={!!busy || (src.mode === 'ssh' && !src.host)}>
-                {busy === 'discover' ? 'Đang quét site…' : 'Quét site →'}
+                {busy === 'discover' ? t('Đang quét site…') : t('Quét site →')}
               </button>
             </div>
           </div>
           <div className="card">
-            <h2>Kết quả kiểm tra</h2>
-            {!report && <div className="sub">Bấm “Kiểm tra kết nối” để xem thông tin VPS nguồn.</div>}
+            <h2>{t('Kết quả kiểm tra')}</h2>
+            {!report && <div className="sub">{t('Bấm “Kiểm tra kết nối” để xem thông tin VPS nguồn.')}</div>}
             {report && (
               <div className="stack">
                 <div className="kv">
                   <div>Hostname</div>
                   <div>{report.hostname}</div>
-                  <div>Hệ điều hành</div>
+                  <div>{t('Hệ điều hành')}</div>
                   <div>{report.os}</div>
                   <div>User</div>
                   <div>{report.user}</div>
-                  <div>Panel phát hiện</div>
+                  <div>{t('Panel phát hiện')}</div>
                   <div>
-                    <Badge tone="info">{PANEL_LABELS[report.detectedPanel]}</Badge>
+                    <Badge tone="info">{t(PANEL_LABELS[report.detectedPanel])}</Badge>
                   </div>
-                  <div>Cùng VPS với TPanel</div>
-                  <div>{report.sameHost ? <Badge tone="warn">Có — {report.sameHostReason}</Badge> : <Badge>Không</Badge>}</div>
+                  <div>{t('Cùng VPS với Lares')}</div>
+                  <div>{report.sameHost ? (
+                      <Badge tone="warn">{t('Có — {reason}', { reason: report.sameHostReason ?? '' })}</Badge>
+                    ) : (
+                      <Badge>{t('Không')}</Badge>
+                    )}</div>
                   {report.hostFingerprint && (
                     <>
                       <div>Host key</div>
                       <div className="mono" style={{ wordBreak: 'break-all' }}>
-                        {report.hostFingerprint} <Badge tone="ok">đã ghim</Badge>
+                        {report.hostFingerprint} <Badge tone="ok">{t('đã ghim')}</Badge>
                       </div>
                     </>
                   )}
-                  <div>Trống /var/tmp</div>
+                  <div>{t('Trống /var/tmp')}</div>
                   <div>{fmtBytes(report.tmpFreeBytes)}</div>
-                  <div>Công cụ</div>
+                  <div>{t('Công cụ')}</div>
                   <div className="row">
                     {Object.entries(report.tools).map(([k, v]) => (
                       <Badge key={k} tone={v ? 'ok' : 'default'}>
@@ -373,17 +380,19 @@ export function MigrationNew() {
         <div className="card stack">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2>
-              {discovery ? `Panel: ${PANEL_LABELS[discovery.panel]} · tìm thấy ${discovery.sites.length} site` : 'Chọn site'}
+              {discovery
+                ? t('Panel: {panel} · tìm thấy {n} site', { panel: t(PANEL_LABELS[discovery.panel]), n: discovery.sites.length })
+                : t('Chọn site')}
             </h2>
             <div className="row">
               <button className="btn sm" onClick={() => setRows(rows.map((r) => ({ ...r, selected: true })))}>
-                Chọn tất cả
+                {t('Chọn tất cả')}
               </button>
               <button className="btn sm" onClick={() => setRows(rows.map((r) => ({ ...r, selected: false })))}>
-                Bỏ chọn
+                {t('Bỏ chọn')}
               </button>
               <button className="btn sm" onClick={() => setRows([...rows, emptyRow()])}>
-                + Thêm site thủ công
+                {t('+ Thêm site thủ công')}
               </button>
             </div>
           </div>
@@ -392,17 +401,17 @@ export function MigrationNew() {
               {w}
             </Alert>
           ))}
-          {rows.length === 0 && <div className="empty">Không tìm thấy site nào. Bấm “Thêm site thủ công” và nhập đường dẫn mã nguồn.</div>}
+          {rows.length === 0 && <div className="empty">{t('Không tìm thấy site nào. Bấm “Thêm site thủ công” và nhập đường dẫn mã nguồn.')}</div>}
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th />
-                  <th>Site nguồn</th>
-                  <th>Loại</th>
-                  <th>Thư mục</th>
+                  <th>{t('Site nguồn')}</th>
+                  <th>{t('Loại')}</th>
+                  <th>{t('Thư mục')}</th>
                   <th>Database</th>
-                  <th>Dung lượng</th>
+                  <th>{t('Dung lượng')}</th>
                   <th />
                 </tr>
               </thead>
@@ -415,12 +424,12 @@ export function MigrationNew() {
           </div>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <button className="btn" onClick={() => setStep(1)}>
-              ← Quay lại
+              {t('← Quay lại')}
             </button>
             <div className="row">
-              {invalid.length > 0 && <span className="sub">{invalid.length} site thiếu thông tin (tên miền, thư mục hoặc database)</span>}
+              {invalid.length > 0 && <span className="sub">{t('{n} site thiếu thông tin (tên miền, thư mục hoặc database)', { n: invalid.length })}</span>}
               <button className="btn primary" disabled={!selected.length || invalid.length > 0} onClick={() => setStep(3)}>
-                Tiếp tục ({selected.length} site) →
+                {t('Tiếp tục ({n} site) →', { n: selected.length })}
               </button>
             </div>
           </div>
@@ -430,55 +439,59 @@ export function MigrationNew() {
       {step === 3 && (
         <div className="grid cols-2">
           <div className="card stack">
-            <h2>Tuỳ chọn</h2>
-            <Field label="Tên migration (tuỳ chọn)">
+            <h2>{t('Tuỳ chọn')}</h2>
+            <Field label={t('Tên migration (tuỳ chọn)')}>
               <input value={opts.name} onChange={(e) => setOpts({ ...opts, name: e.target.value })} />
             </Field>
             {!report?.sameHost && src.mode === 'ssh' && (
               <Field
-                label="Cách truyền dữ liệu"
-                hint="Archive: nén trên VPS nguồn, kiểm tra sha256 rồi tải về qua SFTP. Stream: nén và truyền trực tiếp qua SSH, không cần dung lượng trống trên nguồn."
+                label={t('Cách truyền dữ liệu')}
+                hint={t('Archive: nén trên VPS nguồn, kiểm tra sha256 rồi tải về qua SFTP. Stream: nén và truyền trực tiếp qua SSH, không cần dung lượng trống trên nguồn.')}
               >
                 <select value={opts.transferMode} onChange={(e) => setOpts({ ...opts, transferMode: e.target.value as TransferMode })}>
-                  <option value="auto">Tự động (theo dung lượng trống)</option>
-                  <option value="archive">Nén trên nguồn + SFTP (kiểm tra checksum)</option>
-                  <option value="stream">Stream qua SSH</option>
+                  <option value="auto">{t('Tự động (theo dung lượng trống)')}</option>
+                  <option value="archive">{t('Nén trên nguồn + SFTP (kiểm tra checksum)')}</option>
+                  <option value="stream">{t('Stream qua SSH')}</option>
                 </select>
               </Field>
             )}
             <Check checked={opts.rollbackOnFailure} onChange={(v) => setOpts({ ...opts, rollbackOnFailure: v })}>
-              Tự rollback (xoá site/database vừa tạo) nếu site bị lỗi
+              {t('Tự rollback (xoá site/database vừa tạo) nếu site bị lỗi')}
             </Check>
             <Check checked={opts.cleanupSource} onChange={(v) => setOpts({ ...opts, cleanupSource: v })}>
-              Xoá file nén tạm trên VPS nguồn sau khi xong
+              {t('Xoá file nén tạm trên VPS nguồn sau khi xong')}
             </Check>
             <Check checked={opts.keepLocalArchives} onChange={(v) => setOpts({ ...opts, keepLocalArchives: v })}>
-              Giữ lại file nén trên TPanel (để backup)
+              {t('Giữ lại file nén trên Lares (để backup)')}
             </Check>
-            <Alert tone="info">Dữ liệu trên VPS/panel nguồn không bị thay đổi: TPanel chỉ đọc và tạo bản sao.</Alert>
+            <Alert tone="info">{t('Dữ liệu trên VPS/panel nguồn không bị thay đổi: Lares chỉ đọc và tạo bản sao.')}</Alert>
           </div>
           <div className="card stack">
-            <h2>Sẽ chuyển {selected.length} site</h2>
+            <h2>{t('Sẽ chuyển {n} site', { n: selected.length })}</h2>
             <table>
               <tbody>
                 {selected.map((r) => (
                   <tr key={r.key}>
                     <td>
                       <strong>{r.targetDomain}</strong>
-                      {r.targetDomain !== r.sourceDomain && <div className="sub">từ {r.sourceDomain}</div>}
+                      {r.targetDomain !== r.sourceDomain && <div className="sub">{t('từ {domain}', { domain: r.sourceDomain })}</div>}
                     </td>
-                    <td>{APP_LABELS[r.appType]}</td>
-                    <td>{r.strategy === 'import' ? `DB: ${r.db?.name} → DB mới` : r.strategy === 'reuse' ? `DB: dùng lại ${r.db?.name}` : 'Không DB'}</td>
+                    <td>{t(APP_LABELS[r.appType])}</td>
+                    <td>{r.strategy === 'import'
+                        ? t('DB: {name} → DB mới', { name: String(r.db?.name) })
+                        : r.strategy === 'reuse'
+                          ? t('DB: dùng lại {name}', { name: String(r.db?.name) })
+                          : t('Không DB')}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <button className="btn" onClick={() => setStep(2)}>
-                ← Quay lại
+                {t('← Quay lại')}
               </button>
               <button className="btn primary" onClick={start} disabled={!!busy}>
-                {busy === 'start' ? 'Đang khởi tạo…' : 'Bắt đầu chuyển'}
+                {busy === 'start' ? t('Đang khởi tạo…') : t('Bắt đầu chuyển')}
               </button>
             </div>
           </div>
@@ -499,23 +512,23 @@ function RowView({ row: r, update, inspect, busy, remove }: { row: Row; update: 
           <input type="checkbox" checked={r.selected} onChange={(e) => update({ selected: e.target.checked })} />
         </td>
         <td>
-          <strong>{r.sourceDomain || <em className="sub">(site thủ công)</em>}</strong>
+          <strong>{r.sourceDomain || <em className="sub">{t('(site thủ công)')}</em>}</strong>
           {d?.existsOnTarget && (
             <div>
-              <Badge tone="warn">đã có trên TPanel</Badge>
+              <Badge tone="warn">{t('đã có trên Lares')}</Badge>
             </div>
           )}
           {d?.proxyPass && <div className="sub mono">proxy → {d.proxyPass}</div>}
         </td>
-        <td>{APP_LABELS[r.appType]}</td>
+        <td>{t(APP_LABELS[r.appType])}</td>
         <td className="mono" style={{ maxWidth: 280, wordBreak: 'break-all' }}>
-          {r.sourceRoot || <Badge tone="warn">cần nhập</Badge>}
+          {r.sourceRoot || <Badge tone="warn">{t('cần nhập')}</Badge>}
         </td>
         <td>{r.strategy === 'skip' ? <span className="sub">—</span> : <span className="mono">{r.db?.name}</span>}</td>
         <td>{fmtBytes(d?.sizeBytes)}</td>
         <td>
           <button className="btn sm" onClick={() => update({ expanded: !r.expanded })}>
-            {r.expanded ? 'Thu gọn' : 'Tuỳ chỉnh'}
+            {r.expanded ? t('Thu gọn') : t('Tuỳ chỉnh')}
           </button>
         </td>
       </tr>
@@ -525,20 +538,20 @@ function RowView({ row: r, update, inspect, busy, remove }: { row: Row; update: 
           <td colSpan={6}>
             <div className="stack" style={{ padding: '4px 0 12px' }}>
               <div className="form-grid">
-                <Field label="Tên miền nguồn">
+                <Field label={t('Tên miền nguồn')}>
                   <input value={r.sourceDomain} onChange={(e) => update({ sourceDomain: e.target.value, targetDomain: r.targetDomain || e.target.value })} />
                 </Field>
-                <Field label="Tên miền trên TPanel" hint={r.targetDomain !== r.sourceDomain ? 'Đổi tên miền: WordPress sẽ được search-replace' : undefined}>
+                <Field label={t('Tên miền trên Lares')} hint={r.targetDomain !== r.sourceDomain ? t('Đổi tên miền: WordPress sẽ được search-replace') : undefined}>
                   <input value={r.targetDomain} onChange={(e) => update({ targetDomain: e.target.value })} />
                 </Field>
                 <Field label="Alias">
                   <input value={r.aliases} onChange={(e) => update({ aliases: e.target.value })} placeholder="www.example.com" />
                 </Field>
-                <Field label="Loại ứng dụng">
+                <Field label={t('Loại ứng dụng')}>
                   <select value={r.appType} onChange={(e) => update({ appType: e.target.value as AppType, strategy: NO_DB_TYPES.includes(e.target.value as AppType) ? 'skip' : r.strategy })}>
-                    {APP_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {APP_LABELS[t]}
+                    {APP_TYPES.map((a) => (
+                      <option key={a} value={a}>
+                        {t(APP_LABELS[a])}
                       </option>
                     ))}
                   </select>
@@ -546,12 +559,12 @@ function RowView({ row: r, update, inspect, busy, remove }: { row: Row; update: 
               </div>
               <div className="row" style={{ alignItems: 'flex-end' }}>
                 <div style={{ flex: 1 }}>
-                  <Field label="Thư mục mã nguồn trên VPS nguồn">
+                  <Field label={t('Thư mục mã nguồn trên VPS nguồn')}>
                     <input value={r.sourceRoot} onChange={(e) => update({ sourceRoot: e.target.value })} placeholder="/home/user/public_html" />
                   </Field>
                 </div>
                 <button className="btn" onClick={inspect} disabled={!r.sourceRoot || busy}>
-                  {busy ? 'Đang đọc…' : 'Nhận diện lại'}
+                  {busy ? t('Đang đọc…') : t('Nhận diện lại')}
                 </button>
               </div>
               <div className="form-grid">
@@ -560,13 +573,13 @@ function RowView({ row: r, update, inspect, busy, remove }: { row: Row; update: 
                     <input value={r.phpVersion} onChange={(e) => update({ phpVersion: e.target.value })} placeholder="8.2" />
                   </Field>
                 )}
-                <Field label="Web root con" hint="vd. public (Laravel)">
+                <Field label={t('Web root con')} hint={t('vd. public (Laravel)')}>
                   <input value={r.webRootSubdir} onChange={(e) => update({ webRootSubdir: e.target.value })} />
                 </Field>
-                <Field label="File cấu hình ngoài web root" hint="Webinoly: /var/www/site/wp-config.php">
+                <Field label={t('File cấu hình ngoài web root')} hint="Webinoly: /var/www/site/wp-config.php">
                   <input value={r.configPath} onChange={(e) => update({ configPath: e.target.value })} />
                 </Field>
-                <Field label="Loại trừ (phẩy)" hint="Đường dẫn tương đối, hỗ trợ *">
+                <Field label={t('Loại trừ (phẩy)')} hint={t('Đường dẫn tương đối, hỗ trợ *')}>
                   <input value={r.excludes} onChange={(e) => update({ excludes: e.target.value })} />
                 </Field>
               </div>
@@ -574,9 +587,9 @@ function RowView({ row: r, update, inspect, busy, remove }: { row: Row; update: 
                 <>
                   <Field label="Database">
                     <select value={r.strategy} onChange={(e) => update({ strategy: e.target.value as DbStrategy, db: r.db ?? db })}>
-                      <option value="import">Dump &amp; import sang database mới trên TPanel</option>
-                      <option value="reuse">Dùng lại database hiện có (chỉ khi cùng VPS &amp; cùng MySQL)</option>
-                      <option value="skip">Không chuyển database</option>
+                      <option value="import">{t('Dump & import sang database mới trên Lares')}</option>
+                      <option value="reuse">{t('Dùng lại database hiện có (chỉ khi cùng VPS & cùng MySQL)')}</option>
+                      <option value="skip">{t('Không chuyển database')}</option>
                     </select>
                   </Field>
                   {r.strategy !== 'skip' && (
@@ -605,19 +618,19 @@ function RowView({ row: r, update, inspect, busy, remove }: { row: Row; update: 
               <div className="row">
                 {r.appType === 'wordpress' && (
                   <Check checked={r.searchReplace} onChange={(v) => update({ searchReplace: v })}>
-                    Search-replace tên miền khi đổi domain
+                    {t('Search-replace tên miền khi đổi domain')}
                   </Check>
                 )}
                 <Check checked={r.overwrite} onChange={(v) => update({ overwrite: v })}>
-                  Cho phép ghi đè thư mục đích đã tồn tại
+                  {t('Cho phép ghi đè thư mục đích đã tồn tại')}
                 </Check>
                 {!d && (
                   <button className="btn sm danger" onClick={remove}>
-                    Xoá dòng
+                    {t('Xoá dòng')}
                   </button>
                 )}
               </div>
-              {d && <div className="sub mono">Nguồn phát hiện: {d.discoveredBy}</div>}
+              {d && <div className="sub mono">{t('Nguồn phát hiện: {source}', { source: d.discoveredBy })}</div>}
             </div>
           </td>
         </tr>

@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ArticleRequest } from '@tpanel/shared';
+import type { ArticleRequest } from '@lares/shared';
 import { describe, expect, it } from 'vitest';
 import { sanitizeArticleHtml, slugify } from '../src/services/article.js';
 import { CONTEXT_PHP, PUBLISH_PHP, renderSsoPlugin } from '../src/services/wpContent.js';
@@ -47,7 +47,7 @@ const hasPhp = (() => {
 })();
 
 describe.skipIf(!hasPhp)('generated PHP', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tpanel-php-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lares-php-'));
   const lint = (code: string) => {
     const f = path.join(dir, `${crypto.randomBytes(4).toString('hex')}.php`);
     fs.writeFileSync(f, code);
@@ -73,6 +73,8 @@ define( 'ABSPATH', '/' );
 $GLOBALS['hooks'] = array();
 function add_action( $h, $cb ) { $GLOBALS['hooks'][] = $cb; }
 function home_url( $p = '' ) { return 'http://site.vn' . $p; }
+function site_url( $p = '' ) { return 'http://site.vn' . $p; }
+function nocache_headers() {}
 function wp_parse_url( $u ) { return parse_url( $u ); }
 function is_ssl() { return false; }
 function sanitize_text_field( $s ) { return trim( $s ); }
@@ -84,7 +86,7 @@ function admin_url( $p = '' ) { return 'http://site.vn/wp-admin/' . $p; }
 function wp_redirect( $u ) { echo "REDIRECT:$u\\n"; }
 function wp_safe_redirect( $u ) { echo "REDIRECT:$u\\n"; }
 function wp_die( $m, $t = '', $a = array() ) { echo 'DIE:' . $a['response'] . "\\n"; exit; }
-$_GET = array( 'tpanel_sso' => $argv[1] );
+$_GET = $argv[1] === 'PING' ? array( 'tpanel_sso_ping' => '1' ) : array( 'tpanel_sso' => $argv[1] );
 $_SERVER['HTTP_HOST'] = $argv[2];
 require '${plugin}';
 foreach ( $GLOBALS['hooks'] as $cb ) { $cb(); }
@@ -110,6 +112,14 @@ foreach ( $GLOBALS['hooks'] as $cb ) { $cb(); }
     expect(runSso({ token: 'b'.repeat(64), host: 'site.vn', record: { hash, exp: future() } }).out).toBe('DIE:403');
     expect(runSso({ token, host: 'site.vn', record: { hash, exp: 1 } }).out).toBe('DIE:403');
     expect(runSso({ token, host: 'site.vn', record: null }).out).toBe('DIE:403');
+  });
+  it('answers the health check with the site marker only', () => {
+    const r = runSso({ token: 'PING', host: 'site.vn', record: { hash, exp: future() } });
+    expect(r.out).toMatch(/^tpanel-sso:[0-9a-f]{32}$/);
+    expect(r.consumed).toBe(false);
+  });
+  it('ignores normal requests', () => {
+    expect(runSso({ token: '', host: 'site.vn', record: { hash, exp: future() } }).out).toBe('');
   });
   it('hops to the WordPress host first without consuming the token', () => {
     const r = runSso({ token, host: 'www.site.vn', record: { hash, exp: future() } });

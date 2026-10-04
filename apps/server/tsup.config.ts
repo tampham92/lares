@@ -7,5 +7,5 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   // the shared workspace package ships TypeScript sources, so bundle it into the server build
-  noExternal: ['@tpanel/shared'],
+  noExternal: ['@lares/shared'],
 });

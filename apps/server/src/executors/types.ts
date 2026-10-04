@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 export interface ExecResult {
   stdout: string;
   stderr: string;
@@ -22,7 +24,7 @@ export interface TransferOptions {
 }
 
 /**
- * Runs shell commands on a machine - either the TPanel host itself or a source VPS over SSH.
+ * Runs shell commands on a machine - either the Lares host itself or a source VPS over SSH.
  * Every command is executed through `bash -c` with `set -o pipefail` so pipelines
  * (mysqldump | gzip) fail loudly instead of producing a truncated archive.
  */
@@ -34,7 +36,7 @@ export interface Executor {
   run(command: string, opts?: ExecOptions): Promise<string>;
   /** Stream the command's stdout into a local file (used for streaming transfers). */
   execToFile(command: string, localPath: string, opts?: StreamOptions): Promise<void>;
-  /** Copy a file from this machine to a local path on the TPanel host. */
+  /** Copy a file from this machine to a local path on the Lares host. */
   download(remotePath: string, localPath: string, opts?: TransferOptions): Promise<void>;
   readFile(path: string, maxBytes?: number): Promise<string | null>;
   close(): Promise<void>;
@@ -46,7 +48,7 @@ export class CommandError extends Error {
     public result: ExecResult,
   ) {
     const tail = (result.stderr || result.stdout).trim().split('\n').slice(-5).join('\n');
-    super(`Lệnh thất bại (exit ${result.code}): ${tail || 'không có output'}`);
+    super(t('Lệnh thất bại (exit {code}): {output}', { code: result.code, output: tail || t('không có output') }));
   }
 }
 

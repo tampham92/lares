@@ -9,10 +9,11 @@ import type {
   MigrationStepId,
   Site,
   SourceInput,
-} from '@tpanel/shared';
+} from '@lares/shared';
 import { config } from '../config.js';
 import { nowIso } from '../db/index.js';
 import { localExecutor, type Executor } from '../executors/index.js';
+import { t } from '../i18n/index.js';
 import { randomSuffix, sha256File } from '../lib/crypto.js';
 import { errorMessage } from '../lib/errors.js';
 import { duKb, shq, tarCreate, tarExcludes } from '../lib/shell.js';
@@ -48,7 +49,7 @@ interface ItemContext {
   ex: Executor;
   undo: UndoStack;
   transfer: TransferKind;
-  /** Staging dir on the TPanel host. */
+  /** Staging dir on the Lares host. */
   localDir: string;
   /** Work dir on the source (archive mode only). */
   remoteDir: string;
@@ -64,11 +65,11 @@ interface ItemContext {
 
 class Cancelled extends Error {
   constructor() {
-    super('Đã huỷ bởi người dùng');
+    super(t('Đã huỷ bởi người dùng'));
   }
 }
 
-const REMOTE_PREFIX = 'tpanel-migrate-';
+const REMOTE_PREFIX = 'lares-migrate-';
 const NEXT_EXCLUDES = ['node_modules', '.next'];
 
 const fmtBytes = (n: number) => {
@@ -89,7 +90,7 @@ export class MigrationRunner {
   }
 
   start(migrationId: number) {
-    if (this.active.has(migrationId)) throw new Error('Migration đang chạy');
+    if (this.active.has(migrationId)) throw new Error(t('Migration đang chạy'));
     const ac = new AbortController();
     this.active.set(migrationId, ac);
     void this.run(migrationId, ac.signal).finally(() => this.active.delete(migrationId));
@@ -112,9 +113,9 @@ export class MigrationRunner {
     const source = repo.getSourceInput(migrationId);
     let session: SourceSession | null = null;
     try {
-      this.log(migrationId, null, 'info', `Kết nối tới nguồn ${m.sourceLabel}...`);
+      this.log(migrationId, null, 'info', t('Kết nối tới nguồn {source}...', { source: m.sourceLabel }));
       session = await openSource(source);
-      if (session.sameHost) this.log(migrationId, null, 'info', `Nguồn chạy chung máy với TPanel: ${session.sameHostReason ?? ''}`);
+      if (session.sameHost) this.log(migrationId, null, 'info', t('Nguồn chạy chung máy với Lares: {reason}', { reason: session.sameHostReason ?? '' }));
       repo.updateMigration(migrationId, { sameHost: session.sameHost });
 
       const tools = await detectTools(session.ex);
@@ -128,11 +129,11 @@ export class MigrationRunner {
         dumpFlags: tools.mysqldump ? await mysqldumpFlags(session.ex) : [],
         hasSha256: tools.sha256sum,
       };
-      this.log(migrationId, null, 'debug', `Công cụ nén: ${ctx.compressor}; mysqldump: ${tools.mysqldump ? 'có' : 'không'}`);
+      this.log(migrationId, null, 'debug', t('Công cụ nén: {compressor}; mysqldump: {mysqldump}', { compressor: ctx.compressor, mysqldump: tools.mysqldump ? t('có') : t('không') }));
 
       for (const item of (m.items ?? []).filter((i) => i.status === 'pending')) {
         if (signal.aborted) {
-          repo.saveItem({ ...item, status: 'cancelled', error: 'Đã huỷ' });
+          repo.saveItem({ ...item, status: 'cancelled', error: t('Đã huỷ') });
           continue;
         }
         await this.runItem(ctx, item);
@@ -151,7 +152,7 @@ export class MigrationRunner {
     const done = items.filter((i) => i.status === 'completed').length;
     const status = signal.aborted ? 'cancelled' : done === items.length ? 'completed' : done > 0 ? 'partial' : 'failed';
     repo.updateMigration(migrationId, { status, finishedAt: nowIso() });
-    this.log(migrationId, null, status === 'completed' ? 'info' : 'warn', `Kết thúc: ${done}/${items.length} site thành công`);
+    this.log(migrationId, null, status === 'completed' ? 'info' : 'warn', t('Kết thúc: {done}/{total} site thành công', { done, total: items.length }));
   }
 
   // -------------------------------------------------------------------------
@@ -185,7 +186,7 @@ export class MigrationRunner {
     };
     repo.saveItem(item);
     const log = (level: MigrationLog['level'], msg: string) => this.log(run.migrationId, item.id, level, `[${input.targetDomain}] ${msg}`);
-    log('info', `Bắt đầu chuyển ${input.sourceDomain} (${input.sourceRoot}) → ${input.targetDomain}`);
+    log('info', t('Bắt đầu chuyển {source} ({path}) → {target}', { source: input.sourceDomain, path: input.sourceRoot, target: input.targetDomain }));
 
     try {
       await this.step(ctx, 'prepare', () => this.prepare(ctx, log));
@@ -202,18 +203,18 @@ export class MigrationRunner {
       item.status = 'completed';
       item.currentStep = null;
       repo.saveItem(item);
-      log('info', 'Hoàn tất ✔');
+      log('info', t('Hoàn tất ✔'));
     } catch (err) {
       const cancelled = err instanceof Cancelled || run.signal.aborted;
       item.status = cancelled ? 'cancelled' : 'failed';
       item.error = errorMessage(err);
-      log('error', `Thất bại: ${item.error}`);
+      log('error', t('Thất bại: {error}', { error: item.error }));
       if (run.options.rollbackOnFailure) {
-        log('warn', 'Đang rollback các thay đổi trên TPanel...');
+        log('warn', t('Đang rollback các thay đổi trên Lares...'));
         await ctx.undo.run((m) => log('warn', m));
         item.siteId = null;
       } else if (ctx.site) {
-        item.notes.push(`Site ${ctx.site.domain} được giữ lại để kiểm tra (rollback đã tắt)`);
+        item.notes.push(t('Site {domain} được giữ lại để kiểm tra (rollback đã tắt)', { domain: ctx.site.domain }));
       }
       await this.cleanup(ctx, log, false).catch(() => {});
       repo.saveItem(item);
@@ -261,17 +262,17 @@ export class MigrationRunner {
 
   private async prepare(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void) {
     const { input, ex, run } = ctx;
-    if ((await ex.exec(`test -d ${shq(input.sourceRoot)}`)).code !== 0) throw new Error(`Không tìm thấy thư mục nguồn ${input.sourceRoot}`);
+    if ((await ex.exec(`test -d ${shq(input.sourceRoot)}`)).code !== 0) throw new Error(t('Không tìm thấy thư mục nguồn {path}', { path: input.sourceRoot }));
     const existing = sites.findSiteByHostname(input.targetDomain);
-    if (existing) throw new Error(`${input.targetDomain} đã tồn tại trên TPanel (site #${existing.id}). Xoá site đó hoặc đổi tên miền đích.`);
+    if (existing) throw new Error(t('{domain} đã tồn tại trên Lares (site #{id}). Xoá site đó hoặc đổi tên miền đích.', { domain: input.targetDomain, id: existing.id }));
     for (const a of input.aliases) {
       const owner = sites.findSiteByHostname(a);
-      if (owner) throw new Error(`Alias ${a} đang thuộc site ${owner.domain}`);
+      if (owner) throw new Error(t('Alias {alias} đang thuộc site {domain}', { alias: a, domain: owner.domain }));
     }
 
     const sizeKb = Number((await ex.exec(duKb(input.sourceRoot))).stdout.trim()) || 0;
     const size = sizeKb * 1024;
-    log('info', `Dung lượng mã nguồn: ${fmtBytes(size)}`);
+    log('info', t('Dung lượng mã nguồn: {size}', { size: fmtBytes(size) }));
 
     // --- transfer mode
     if (run.session.sameHost) {
@@ -286,15 +287,15 @@ export class MigrationRunner {
       }
       const enoughSpace = best !== null && best.free > size * 1.2 + 512 * 1024 * 1024;
       ctx.transfer = mode === 'stream' ? 'stream' : mode === 'archive' ? 'archive' : enoughSpace ? 'archive' : 'stream';
-      if (mode === 'archive' && !enoughSpace) log('warn', `VPS nguồn có thể không đủ chỗ trống để nén (${best ? fmtBytes(best.free) : '?'} trống)`);
-      if (mode === 'auto' && !enoughSpace) log('info', 'VPS nguồn ít dung lượng trống → dùng chế độ stream (nén và truyền trực tiếp qua SSH)');
+      if (mode === 'archive' && !enoughSpace) log('warn', t('VPS nguồn có thể không đủ chỗ trống để nén ({free} trống)', { free: best ? fmtBytes(best.free) : '?' }));
+      if (mode === 'auto' && !enoughSpace) log('info', t('VPS nguồn ít dung lượng trống → dùng chế độ stream (nén và truyền trực tiếp qua SSH)'));
       ctx.remoteDir = `${best?.dir ?? '/var/tmp'}/${REMOTE_PREFIX}${run.migrationId}-${ctx.item.id}-${randomSuffix(6)}`;
     }
 
     await fs.mkdir(ctx.localDir, { recursive: true, mode: 0o700 });
     const localFree = await freeBytes(localExecutor, config.stagingDir).catch(() => null);
     if (localFree !== null && ctx.transfer !== 'local' && localFree < size * 2) {
-      log('warn', `Dung lượng trống trên TPanel (${fmtBytes(localFree)}) có thể không đủ cho ${fmtBytes(size)} dữ liệu`);
+      log('warn', t('Dung lượng trống trên Lares ({free}) có thể không đủ cho {size} dữ liệu', { free: fmtBytes(localFree), size: fmtBytes(size) }));
     }
 
     const needsWorkDir = ctx.transfer !== 'local' || input.db.strategy !== 'skip';
@@ -303,28 +304,31 @@ export class MigrationRunner {
 
     // --- database
     if (ctx.appType === 'nextjs' || ctx.appType === 'static') {
-      if (input.db.strategy !== 'skip') log('info', `${ctx.appType} không dùng MySQL → bỏ qua database`);
+      if (input.db.strategy !== 'skip') log('info', t('{appType} không dùng MySQL → bỏ qua database', { appType: ctx.appType }));
       input.db.strategy = 'skip';
     }
     if (input.db.strategy !== 'skip') {
       const creds = input.db.source;
-      if (!creds) throw new Error('Thiếu thông tin database nguồn (nhập tay hoặc chọn "Không chuyển database")');
+      if (!creds) throw new Error(t('Thiếu thông tin database nguồn (nhập tay hoặc chọn "Không chuyển database")'));
       ctx.remoteCnf = `${ctx.remoteDir}/.my.cnf`;
       await writeSourceMyCnf(ex, ctx.remoteCnf, creds);
       const test = await ex.exec(`mysql --defaults-extra-file=${shq(ctx.remoteCnf)} -N -B -e 'SELECT 1' ${shq(creds.name)}`);
-      if (test.code !== 0) throw new Error(`Không đăng nhập được database nguồn ${creds.name}: ${test.stderr.trim().split('\n').pop()}`);
+      if (test.code !== 0) throw new Error(t('Không đăng nhập được database nguồn {name}: {error}', { name: creds.name, error: test.stderr.trim().split('\n').pop() ?? '' }));
 
       if (input.db.strategy === 'reuse') {
-        if (!run.session.sameHost) throw new Error('Chỉ dùng lại database khi panel nguồn chạy chung VPS với TPanel');
+        if (!run.session.sameHost) throw new Error(t('Chỉ dùng lại database khi panel nguồn chạy chung VPS với Lares'));
         const [src, dst] = await Promise.all([sourceMysqlIdentity(ex, ctx.remoteCnf), mysql.serverIdentity()]);
         if (!config.dryRun && (!src || !dst || src !== dst)) {
-          throw new Error('Database nguồn nằm trên MySQL server khác với MySQL của TPanel → không thể dùng lại, hãy chọn "Import sang database mới"');
+          throw new Error(t('Database nguồn nằm trên MySQL server khác với MySQL của Lares → không thể dùng lại, hãy chọn "Import sang database mới"'));
         }
-        log('info', `Dùng lại database ${creds.name} trên cùng MySQL server (không copy dữ liệu)`);
+        log('info', t('Dùng lại database {name} trên cùng MySQL server (không copy dữ liệu)', { name: creds.name }));
       }
     }
 
-    return `${fmtBytes(size)} · chế độ ${ctx.transfer === 'local' ? 'cùng máy (copy trực tiếp)' : ctx.transfer === 'archive' ? 'nén trên nguồn + SFTP' : 'stream qua SSH'}`;
+    return t('{size} · chế độ {mode}', {
+      size: fmtBytes(size),
+      mode: ctx.transfer === 'local' ? t('cùng máy (copy trực tiếp)') : ctx.transfer === 'archive' ? t('nén trên nguồn + SFTP') : t('stream qua SSH'),
+    });
   }
 
   private dumpCommand(ctx: ItemContext, withRoutines: boolean) {
@@ -334,7 +338,7 @@ export class MigrationRunner {
   }
 
   private async dumpDb(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void) {
-    if (ctx.input.db.strategy !== 'import') return { skip: ctx.input.db.strategy === 'reuse' ? 'Dùng lại database hiện có' : 'Không chuyển database' };
+    if (ctx.input.db.strategy !== 'import') return { skip: ctx.input.db.strategy === 'reuse' ? t('Dùng lại database hiện có') : t('Không chuyển database') };
     const { ex, run } = ctx;
     const progress = this.progress(ctx, 'dump_db');
     const localFile = path.join(ctx.localDir, 'db.sql.gz');
@@ -342,7 +346,7 @@ export class MigrationRunner {
     const attempt = async (withRoutines: boolean) => {
       const dump = this.dumpCommand(ctx, withRoutines);
       if (ctx.transfer === 'stream') {
-        await ex.execToFile(dump, localFile, { signal: run.signal, onProgress: (b) => progress(null, `Đã nhận ${fmtBytes(b)}`) });
+        await ex.execToFile(dump, localFile, { signal: run.signal, onProgress: (b) => progress(null, t('Đã nhận {size}', { size: fmtBytes(b) })) });
         ctx.dbDump = localFile;
       } else {
         const target = ctx.transfer === 'local' ? localFile : `${ctx.remoteDir}/db.sql.gz`;
@@ -356,7 +360,7 @@ export class MigrationRunner {
     } catch (err) {
       // Site users frequently lack the privilege to dump stored routines; the data itself matters more.
       if (!/routine|PROCEDURE|FUNCTION|privilege|Access denied/i.test(errorMessage(err))) throw err;
-      log('warn', 'User database không có quyền dump routines → dump lại không kèm stored procedures');
+      log('warn', t('User database không có quyền dump routines → dump lại không kèm stored procedures'));
       await attempt(false);
     }
 
@@ -365,23 +369,23 @@ export class MigrationRunner {
     if (ctx.transfer === 'archive' && run.hasSha256) {
       ctx.remoteHashes.db = (await ex.run(`sha256sum ${shq(ctx.dbDump!)} | cut -d' ' -f1`)).trim();
     }
-    log('info', `Đã dump database ${ctx.input.db.source!.name} (${fmtBytes(size || 0)} nén)`);
+    log('info', t('Đã dump database {name} ({size} nén)', { name: ctx.input.db.source!.name, size: fmtBytes(size || 0) }));
     return `${ctx.input.db.source!.name} · ${fmtBytes(size || 0)}`;
   }
 
   private async archiveFiles(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void) {
-    if (ctx.transfer === 'local') return { skip: 'Cùng máy chủ: sao chép trực tiếp, không cần nén' };
+    if (ctx.transfer === 'local') return { skip: t('Cùng máy chủ: sao chép trực tiếp, không cần nén') };
     const { ex, run, input } = ctx;
     const cmd = `${tarCreate(input.sourceRoot, tarExcludes(ctx.excludes))} | ${run.compressor} -c -6`;
     const progress = this.progress(ctx, 'archive_files');
-    if (ctx.excludes.length) log('info', `Loại trừ: ${ctx.excludes.join(', ')}`);
+    if (ctx.excludes.length) log('info', t('Loại trừ: {list}', { list: ctx.excludes.join(', ') }));
 
     if (ctx.transfer === 'stream') {
       const local = path.join(ctx.localDir, 'files.tar.gz');
-      await ex.execToFile(cmd, local, { signal: run.signal, onProgress: (b) => progress(null, `Đang nén & truyền: ${fmtBytes(b)}`) });
+      await ex.execToFile(cmd, local, { signal: run.signal, onProgress: (b) => progress(null, t('Đang nén & truyền: {size}', { size: fmtBytes(b) })) });
       ctx.filesArchive = local;
       const size = (await fs.stat(local)).size;
-      log('info', `Đã nén và nhận mã nguồn qua SSH (${fmtBytes(size)})`);
+      log('info', t('Đã nén và nhận mã nguồn qua SSH ({size})', { size: fmtBytes(size) }));
       return `${fmtBytes(size)} (stream)`;
     }
 
@@ -395,12 +399,12 @@ export class MigrationRunner {
       // archives were created as root via sudo; SFTP runs as the login user
       await ex.run(`chown ${shq(c.username)} ${shq(ctx.remoteDir)} ${shq(ctx.remoteDir)}/*.gz`);
     }
-    log('info', `Đã nén mã nguồn trên VPS nguồn (${fmtBytes(size)})`);
+    log('info', t('Đã nén mã nguồn trên VPS nguồn ({size})', { size: fmtBytes(size) }));
     return fmtBytes(size);
   }
 
   private async transferFiles(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void) {
-    if (ctx.transfer !== 'archive') return { skip: ctx.transfer === 'local' ? 'Cùng máy chủ' : 'Đã truyền trong lúc nén (stream)' };
+    if (ctx.transfer !== 'archive') return { skip: ctx.transfer === 'local' ? t('Cùng máy chủ') : t('Đã truyền trong lúc nén (stream)') };
     const progress = this.progress(ctx, 'transfer');
     const pairs: Array<[keyof ItemContext & ('dbDump' | 'filesArchive'), string]> = [];
     if (ctx.dbDump) pairs.push(['dbDump', path.join(ctx.localDir, 'db.sql.gz')]);
@@ -420,7 +424,7 @@ export class MigrationRunner {
       ctx[key] = local;
     }
     const secs = Math.max(1, (Date.now() - started) / 1000);
-    log('info', `Đã đồng bộ ${fmtBytes(total)} về TPanel trong ${secs.toFixed(0)}s (${fmtBytes(total / secs)}/s)`);
+    log('info', t('Đã đồng bộ {size} về Lares trong {secs}s ({speed}/s)', { size: fmtBytes(total), secs: secs.toFixed(0), speed: fmtBytes(total / secs) }));
     return `${fmtBytes(total)} · ${fmtBytes(total / secs)}/s`;
   }
 
@@ -434,19 +438,19 @@ export class MigrationRunner {
       const expected = ctx.remoteHashes[key];
       if (expected) {
         const actual = await sha256File(file);
-        if (actual !== expected) throw new Error(`Checksum ${path.basename(file)} không khớp (nguồn ${expected.slice(0, 12)}…, nhận ${actual.slice(0, 12)}…)`);
+        if (actual !== expected) throw new Error(t('Checksum {file} không khớp (nguồn {expected}…, nhận {actual}…)', { file: path.basename(file), expected: expected.slice(0, 12), actual: actual.slice(0, 12) }));
         checks.push(`${path.basename(file)} sha256 ✔`);
       }
       const gz = await host.exec(`gzip -t ${shq(file)}`);
-      if (gz.code !== 0) throw new Error(`${path.basename(file)} bị hỏng: ${gz.stderr.trim()}`);
+      if (gz.code !== 0) throw new Error(t('{file} bị hỏng: {error}', { file: path.basename(file), error: gz.stderr.trim() }));
       if (key === 'db') {
         const tail = await host.exec(`gzip -cd ${shq(file)} | tail -c 300`);
-        if (!tail.stdout.includes('Dump completed')) throw new Error('File dump database không hoàn chỉnh (thiếu dòng "Dump completed")');
+        if (!tail.stdout.includes('Dump completed')) throw new Error(t('File dump database không hoàn chỉnh (thiếu dòng "Dump completed")'));
       }
       checks.push(`${path.basename(file)} gzip ✔`);
     }
-    if (!checks.length) return { skip: 'Không có file nén để kiểm tra' };
-    log('info', `Kiểm tra toàn vẹn: ${checks.join(', ')}`);
+    if (!checks.length) return { skip: t('Không có file nén để kiểm tra') };
+    log('info', t('Kiểm tra toàn vẹn: {checks}', { checks: checks.join(', ') }));
     return checks.join(', ');
   }
 
@@ -470,7 +474,7 @@ export class MigrationRunner {
     );
     ctx.item.siteId = ctx.site.id;
     if (ctx.appType === 'nextjs') {
-      ctx.undo.push('xoá service Next.js', () => nodeapp.removeService(input.targetDomain));
+      ctx.undo.push(t('xoá service Next.js'), () => nodeapp.removeService(input.targetDomain));
     }
     return `Site #${ctx.site.id}${ctx.site.appPort ? ` · port ${ctx.site.appPort}` : ''}${ctx.site.phpVersion ? ` · PHP ${ctx.site.phpVersion}` : ''}`;
   }
@@ -480,20 +484,20 @@ export class MigrationRunner {
     const dest = sites.siteLayout(input.targetDomain, ctx.appType).appDir;
     await fs.mkdir(dest, { recursive: true });
     if (ctx.transfer === 'local') {
-      if (path.resolve(input.sourceRoot) === path.resolve(dest)) throw new Error('Thư mục nguồn trùng thư mục đích');
+      if (path.resolve(input.sourceRoot) === path.resolve(dest)) throw new Error(t('Thư mục nguồn trùng thư mục đích'));
       await host.run(`${tarCreate(input.sourceRoot, tarExcludes(ctx.excludes))} | tar -C ${shq(dest)} -xpf -`, { signal: run.signal, timeoutMs: 12 * 3_600_000 });
-      log('info', `Đã copy trực tiếp ${input.sourceRoot} → ${dest}`);
+      log('info', t('Đã copy trực tiếp {source} → {dest}', { source: input.sourceRoot, dest }));
     } else {
       await host.run(`tar -xzf ${shq(ctx.filesArchive!)} --no-same-owner -C ${shq(dest)}`, { signal: run.signal, timeoutMs: 12 * 3_600_000 });
-      log('info', `Đã giải nén mã nguồn vào ${dest}`);
+      log('info', t('Đã giải nén mã nguồn vào {dest}', { dest }));
     }
 
     // Config kept outside the web root on the source (Webinoly: /var/www/site/wp-config.php)
     if (input.configPath && !input.configPath.startsWith(input.sourceRoot + '/')) {
       const content = await ctx.ex.readFile(input.configPath);
-      if (content === null) throw new Error(`Không đọc được ${input.configPath}`);
+      if (content === null) throw new Error(t('Không đọc được {path}', { path: input.configPath }));
       await host.writeFile(path.join(dest, path.basename(input.configPath)), content, 0o640);
-      log('info', `Đã chuyển ${input.configPath} vào thư mục site`);
+      log('info', t('Đã chuyển {path} vào thư mục site', { path: input.configPath }));
     }
     return dest;
   }
@@ -501,20 +505,20 @@ export class MigrationRunner {
   private async restoreDb(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void) {
     const { input } = ctx;
     const src = input.db.source;
-    if (input.db.strategy === 'skip' || !src) return { skip: 'Không có database' };
+    if (input.db.strategy === 'skip' || !src) return { skip: t('Không có database') };
     if (input.db.strategy === 'reuse') {
       databases.registerExternalDatabase(src.name, src.user, src.password, ctx.site!.id);
-      return { skip: `Dùng lại ${src.name}` };
+      return { skip: t('Dùng lại {name}', { name: src.name }) };
     }
     const name = databases.deriveDbName(input.targetDomain);
     const created = await databases.createDatabase({ name, username: name, siteId: ctx.site!.id }, (m) => log('info', m));
-    ctx.undo.push(`xoá database ${name}`, () => databases.deleteDatabase(created.record.id));
+    ctx.undo.push(t('xoá database {name}', { name }), () => databases.deleteDatabase(created.record.id));
     ctx.targetDb = { name, user: name, password: created.password, host: 'localhost' };
-    log('info', `Đang import database vào ${name}...`);
+    log('info', t('Đang import database vào {name}...', { name }));
     const started = Date.now();
     await mysql.importGzipDump(name, ctx.dbDump!, { user: name, password: created.password }, { signal: ctx.run.signal, log: (m) => log('debug', m) });
-    log('info', `Đã import database ${src.name} → ${name} (${((Date.now() - started) / 1000).toFixed(0)}s)`);
-    ctx.item.notes.push(`Database mới: ${name} / user ${name} (mật khẩu xem tại mục Database)`);
+    log('info', t('Đã import database {source} → {name} ({secs}s)', { source: src.name, name, secs: ((Date.now() - started) / 1000).toFixed(0) }));
+    ctx.item.notes.push(t('Database mới: {name} / user {name} (mật khẩu xem tại mục Database)', { name }));
     return `${src.name} → ${name}`;
   }
 
@@ -530,11 +534,11 @@ export class MigrationRunner {
       if (ctx.targetDb && (await host.exists(cfgFile))) {
         const src = await fs.readFile(cfgFile, 'utf8');
         await host.writeFile(cfgFile, rewriteWpConfig(src, ctx.targetDb), 0o640);
-        changes.push('wp-config.php: cập nhật DB_*');
+        changes.push(t('wp-config.php: cập nhật DB_*'));
       }
       if (domainChanged && input.searchReplace) {
         if (input.db.strategy === 'reuse') {
-          ctx.item.notes.push('Không search-replace tên miền vì database đang dùng chung với site nguồn');
+          ctx.item.notes.push(t('Không search-replace tên miền vì database đang dùng chung với site nguồn'));
         } else if (input.db.strategy === 'import') {
           await this.wordpressSearchReplace(ctx, appDir, log);
           changes.push(`search-replace ${input.sourceDomain} → ${input.targetDomain}`);
@@ -566,14 +570,14 @@ export class MigrationRunner {
     }
 
     if (ctx.appType === 'nextjs') {
-      log('info', 'Cài dependencies & build Next.js (có thể mất vài phút)...');
+      log('info', t('Cài dependencies & build Next.js (có thể mất vài phút)...'));
       const cfg = sites.getNodeConfig(site.id);
       await nodeapp.buildAndRestart({ ...site, appPort: site.appPort! }, cfg, (m) => log('debug', m), ctx.run.signal);
-      changes.push(`build & chạy service ${nodeapp.serviceName(site.domain)} (port ${site.appPort})`);
-      ctx.item.notes.push('Next.js: biến môi trường bí mật không nằm trong mã nguồn (vd. .env.production) cần được khai báo lại trong phần cấu hình site');
+      changes.push(t('build & chạy service {service} (port {port})', { service: nodeapp.serviceName(site.domain), port: String(site.appPort) }));
+      ctx.item.notes.push(t('Next.js: biến môi trường bí mật không nằm trong mã nguồn (vd. .env.production) cần được khai báo lại trong phần cấu hình site'));
     }
 
-    if (!changes.length) return { skip: 'Không cần thay đổi cấu hình' };
+    if (!changes.length) return { skip: t('Không cần thay đổi cấu hình') };
     for (const c of changes) log('info', c);
     return changes.join(' · ');
   }
@@ -593,8 +597,8 @@ export class MigrationRunner {
       return;
     }
     const prefix = input.db.source?.prefix ?? 'wp_';
-    if (!/^[A-Za-z0-9_]+$/.test(prefix)) throw new Error(`Table prefix không hợp lệ: ${prefix}`);
-    log('warn', 'Không có wp-cli → chỉ cập nhật siteurl/home. Nên cài wp-cli để search-replace toàn bộ nội dung.');
+    if (!/^[A-Za-z0-9_]+$/.test(prefix)) throw new Error(t('Table prefix không hợp lệ: {prefix}', { prefix }));
+    log('warn', t('Không có wp-cli → chỉ cập nhật siteurl/home. Nên cài wp-cli để search-replace toàn bộ nội dung.'));
     await mysql.query(
       `UPDATE \`${ctx.targetDb!.name}\`.\`${prefix}options\` SET option_value = REPLACE(option_value, ?, ?) WHERE option_name IN ('siteurl', 'home')`,
       [`//${from}`, `//${to}`],
@@ -607,12 +611,12 @@ export class MigrationRunner {
     await sites.applySiteVhost(site, (m) => log('debug', m));
     if (ctx.run.session.sameHost) {
       const owner = await port80Owner();
-      if (owner && owner !== 'nginx') ctx.item.notes.push(`Port 80 vẫn do "${owner}" giữ - dừng web server của panel cũ để TPanel phục vụ ${site.domain}`);
-      else ctx.item.notes.push(`Site cũ vẫn còn trên panel nguồn. Nếu cùng dùng nginx, hãy tắt vhost ${ctx.input.sourceDomain} ở panel cũ để tránh trùng server_name.`);
+      if (owner && owner !== 'nginx') ctx.item.notes.push(t('Port 80 vẫn do "{owner}" giữ - dừng web server của panel cũ để Lares phục vụ {domain}', { owner, domain: site.domain }));
+      else ctx.item.notes.push(t('Site cũ vẫn còn trên panel nguồn. Nếu cùng dùng nginx, hãy tắt vhost {domain} ở panel cũ để tránh trùng server_name.', { domain: ctx.input.sourceDomain }));
     } else {
-      ctx.item.notes.push(`Trỏ DNS ${[site.domain, ...site.aliases].join(', ')} về IP máy chủ TPanel, sau đó cài SSL cho site`);
+      ctx.item.notes.push(t('Trỏ DNS {domains} về IP máy chủ Lares, sau đó cài SSL cho site', { domains: [site.domain, ...site.aliases].join(', ') }));
     }
-    return 'Đã áp dụng quyền & vhost';
+    return t('Đã áp dụng quyền & vhost');
   }
 
   private async cleanup(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void, success: boolean) {
@@ -622,16 +626,16 @@ export class MigrationRunner {
     const safeRemote = ctx.remoteDir && (path.basename(ctx.remoteDir).startsWith(REMOTE_PREFIX) || ctx.remoteDir.startsWith(config.stagingDir));
     if (safeRemote && (ctx.run.options.cleanupSource || !success)) {
       await ctx.ex.exec(`rm -rf ${shq(ctx.remoteDir)}`);
-      done.push('file tạm trên nguồn');
+      done.push(t('file tạm trên nguồn'));
     }
     if (!ctx.run.options.keepLocalArchives || !success) {
       await fs.rm(ctx.localDir, { recursive: true, force: true });
-      done.push('file tạm trên TPanel');
+      done.push(t('file tạm trên Lares'));
     } else {
-      ctx.item.notes.push(`Giữ file nén tại ${ctx.localDir}`);
+      ctx.item.notes.push(t('Giữ file nén tại {path}', { path: ctx.localDir }));
     }
-    if (success && done.length) log('info', `Đã dọn ${done.join(', ')}`);
-    return done.length ? `Đã xoá ${done.join(', ')}` : { skip: 'Giữ lại file tạm' };
+    if (success && done.length) log('info', t('Đã dọn {list}', { list: done.join(', ') }));
+    return done.length ? t('Đã xoá {list}', { list: done.join(', ') }) : { skip: t('Giữ lại file tạm') };
   }
 }
 

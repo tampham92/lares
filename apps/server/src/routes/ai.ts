@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { aiSettingsSchema, articleRequestSchema, publicHostSchema, publishArticleSchema, wpAdminTargetSchema } from '@tpanel/shared';
+import { aiSettingsSchema, articleRequestSchema, publicHostSchema, publishArticleSchema, wpAdminTargetSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
+import { t } from '../i18n/index.js';
 import { badRequest } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
 import * as ai from '../services/ai.js';
@@ -11,7 +12,7 @@ import { aiSiteContext, publishArticle, wpLoginUrl, wpSiteInfo } from '../servic
 
 function wordpressSite(params: unknown) {
   const site = sites.getSite(idParam(params));
-  if (site.appType !== 'wordpress') throw badRequest('Chỉ áp dụng cho site WordPress');
+  if (site.appType !== 'wordpress') throw badRequest(t('Chỉ áp dụng cho site WordPress'));
   return site;
 }
 
@@ -35,8 +36,8 @@ export async function aiRoutes(app: FastifyInstance) {
   app.post('/api/sites/:id/ai/article', async (req) => {
     const site = wordpressSite(req.params);
     const input = parse(articleRequestSchema, req.body);
-    if (!ai.getAiSettings().hasKey) throw badRequest('Chưa có API key AI - thêm key trong mục Cài đặt');
-    return startTask(`Viết bài AI: ${input.keyword}`, async (log) => ai.generateArticle(input, await aiSiteContext(site, log), log));
+    if (!ai.getAiSettings().hasKey) throw badRequest(t('Chưa có API key AI - thêm key trong mục Cài đặt'));
+    return startTask(t('Viết bài AI: {keyword}', { keyword: input.keyword }), async (log) => ai.generateArticle(input, await aiSiteContext(site, log), log));
   });
 
   app.post('/api/sites/:id/wp/posts', async (req) => publishArticle(wordpressSite(req.params), parse(publishArticleSchema, req.body)));

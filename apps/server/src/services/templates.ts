@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { Branding, TemplateInfo } from '@tpanel/shared';
+import type { Branding, TemplateInfo } from '@lares/shared';
 import { config } from '../config.js';
+import { t } from '../i18n/index.js';
 import { randomSuffix } from '../lib/crypto.js';
 import { notFound } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
@@ -36,17 +37,17 @@ async function dir(id: string): Promise<string> {
       return d;
     }
   }
-  throw notFound(`Template "${id}" không tồn tại`);
+  throw notFound(t('Template "{id}" không tồn tại', { id }));
 }
 
 export async function getTemplate(id: string): Promise<TemplateManifest> {
-  if (!ID_RE.test(id)) throw notFound('Template không tồn tại');
+  if (!ID_RE.test(id)) throw notFound(t('Template không tồn tại'));
   const d = await dir(id);
   try {
     const t = JSON.parse(await fs.readFile(path.join(d, 'template.json'), 'utf8')) as TemplateManifest;
     return { ...t, id, custom: d.startsWith(config.customTemplatesDir) };
   } catch (err) {
-    throw notFound(`template.json của "${id}" không hợp lệ: ${err instanceof Error ? err.message : err}`);
+    throw notFound(t('template.json của "{id}" không hợp lệ: {error}', { id, error: err instanceof Error ? err.message : String(err) }));
   }
 }
 
@@ -112,7 +113,7 @@ export async function renderStaticPage(id: string, vars: TemplateVars): Promise<
 
 export async function installStaticTemplate(id: string, webRoot: string, vars: TemplateVars, log: HostLogger) {
   await host.writeFile(path.join(webRoot, 'index.html'), await renderStaticPage(id, vars));
-  log(`Đã áp dụng giao diện "${id}"`);
+  log(t('Đã áp dụng giao diện "{id}"', { id }));
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +133,16 @@ export function textToBlocks(text: string): string {
     })
     .join('\n\n');
 }
+
+/** Theme text written into the customer's WordPress site: Vietnamese, like the templates' demo content (not panel UI). */
+const THEME_TEXT = {
+  home: 'Trang chủ', // i18n-ignore
+  contact: 'Liên hệ', // i18n-ignore
+  links: 'Liên kết', // i18n-ignore
+  rights: 'Bảo lưu mọi quyền.', // i18n-ignore
+  readMore: 'Xem chi tiết →', // i18n-ignore
+  noResults: 'Chưa có nội dung phù hợp.', // i18n-ignore
+};
 
 const attrs = (o: Record<string, unknown>) => JSON.stringify(o).replace(/--/g, '\\u002d\\u002d');
 
@@ -171,7 +182,7 @@ function footerPart(nav: NavLink[]): string {
 
 <!-- wp:column -->
 <div class="wp-block-column"><!-- wp:heading {"level":4} -->
-<h4 class="wp-block-heading">Liên hệ</h4>
+<h4 class="wp-block-heading">${THEME_TEXT.contact}</h4>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
@@ -189,7 +200,7 @@ function footerPart(nav: NavLink[]): string {
 
 <!-- wp:column -->
 <div class="wp-block-column"><!-- wp:heading {"level":4} -->
-<h4 class="wp-block-heading">Liên kết</h4>
+<h4 class="wp-block-heading">${THEME_TEXT.links}</h4>
 <!-- /wp:heading -->
 
 ${links}</div>
@@ -197,7 +208,7 @@ ${links}</div>
 <!-- /wp:columns -->
 
 <!-- wp:paragraph {"className":"copyright"} -->
-<p class="copyright">© {{YEAR}} {{SITE_NAME}}. Bảo lưu mọi quyền.</p>
+<p class="copyright">© {{YEAR}} {{SITE_NAME}}. ${THEME_TEXT.rights}</p>
 <!-- /wp:paragraph --></div>
 <!-- /wp:group --></div>
 <!-- /wp:group -->`;
@@ -213,7 +224,7 @@ const CARD = `<!-- wp:group {"className":"card","layout":{"type":"default"}} -->
 <!-- wp:group {"className":"card-body","layout":{"type":"default"}} -->
 <div class="wp-block-group card-body"><!-- wp:post-title {"level":3,"isLink":true} /-->
 
-<!-- wp:post-excerpt {"moreText":"Xem chi tiết →","excerptLength":30} /--></div>
+<!-- wp:post-excerpt {"moreText":"${THEME_TEXT.readMore}","excerptLength":30} /--></div>
 <!-- /wp:group --></div>
 <!-- /wp:group -->`;
 
@@ -250,7 +261,7 @@ ${CARD}
 
 <!-- wp:query-no-results -->
 <!-- wp:paragraph -->
-<p>Chưa có nội dung phù hợp.</p>
+<p>${THEME_TEXT.noResults}</p>
 <!-- /wp:paragraph -->
 <!-- /wp:query-no-results --></div>
 <!-- /wp:query --></div>
@@ -286,12 +297,12 @@ ${FOOTER}`,
 
 /** Write the block theme into wp-content/themes. Pure file generation (testable without WordPress). */
 export async function writeWordpressTheme(t: TemplateManifest, webRoot: string, vars: TemplateVars): Promise<string> {
-  const slug = `tpanel-${t.id}`;
+  const slug = `lares-${t.id}`;
   const themeDir = path.join(webRoot, 'wp-content', 'themes', slug);
-  const nav = t.wordpress?.nav ?? [{ label: 'Trang chủ', url: '/' }];
+  const nav = t.wordpress?.nav ?? [{ label: THEME_TEXT.home, url: '/' }];
   const header = `/*
-Theme Name: TPanel ${t.name}
-Author: TPanel
+Theme Name: Lares ${t.name}
+Author: Lares
 Description: ${t.description.replace(/\*\//g, '')}
 Version: 1.0.0
 Requires at least: 6.4
@@ -302,7 +313,7 @@ Text Domain: ${slug}
   const files: Record<string, string> = {
     'style.css': header + (await readCss(t.id, true)) + '\n.front-content > *{margin-block:0!important}\n.wp-block-columns.footer-grid{display:grid!important}\n',
     'functions.php': `<?php
-// Generated by TPanel
+// Generated by Lares
 add_action('wp_enqueue_scripts', function () {
 \twp_enqueue_style('${slug}-font', '${font}', [], null);
 \twp_enqueue_style('${slug}', get_stylesheet_uri(), [], wp_get_theme()->get('Version'));
@@ -355,18 +366,18 @@ export function fillCategoryIds(html: string, ids: Record<string, string>): stri
 }
 
 /**
- * Activate the theme and create demo content. Runs on a fresh WordPress that TPanel itself just
+ * Activate the theme and create demo content. Runs on a fresh WordPress that Lares itself just
  * installed (no third-party code yet), so wp-cli as root is acceptable here.
  */
 export async function installWordpressTemplate(id: string, webRoot: string, vars: TemplateVars, log: HostLogger) {
-  const t = await getTemplate(id);
-  const slug = await writeWordpressTheme(t, webRoot, vars);
+  const tpl = await getTemplate(id);
+  const slug = await writeWordpressTheme(tpl, webRoot, vars);
   const wp = (args: string) => host.mutate(wpCli(webRoot, args), { log, timeoutMs: 5 * 60_000 });
   const tmp = path.join(config.dataDir, `wp-seed-${randomSuffix(8)}`);
   await fs.mkdir(tmp, { recursive: true, mode: 0o700 });
   try {
     await wp(`theme activate ${shq(slug)}`);
-    log(`Đã kích hoạt theme ${slug}`);
+    log(t('Đã kích hoạt theme {slug}', { slug }));
     for (const [k, v] of [
       ['blogname', vars.SITE_NAME!],
       ['blogdescription', vars.TAGLINE!],
@@ -380,7 +391,7 @@ export async function installWordpressTemplate(id: string, webRoot: string, vars
     await wp('post delete 1 2 --force').catch(() => undefined);
 
     const catIds: Record<string, string> = {};
-    for (const c of t.wordpress?.categories ?? []) {
+    for (const c of tpl.wordpress?.categories ?? []) {
       catIds[c.slug] = (await wp(`term create category ${shq(c.name)} --slug=${shq(c.slug)} --porcelain`)).trim();
     }
 
@@ -391,7 +402,7 @@ export async function installWordpressTemplate(id: string, webRoot: string, vars
     };
 
     let i = 0;
-    for (const p of t.wordpress?.posts ?? []) {
+    for (const p of tpl.wordpress?.posts ?? []) {
       i++;
       const file = await writeContent(`post-${i}.html`, fill(textToBlocks(p.content), vars));
       const cat = catIds[p.category];
@@ -410,25 +421,25 @@ export async function installWordpressTemplate(id: string, webRoot: string, vars
           await host.mutate(`curl -fsSL --max-time 60 -o ${shq(img)} ${shq(`${p.image}&fm=jpg`)}`, { log });
           await wp(`media import ${shq(img)} --post_id=${postId} --featured_image --title=${shq(p.title)}`);
         } catch {
-          log(`Cảnh báo: không tải được ảnh minh hoạ cho "${p.title}" (VPS không truy cập được images.unsplash.com?)`);
+          log(t('Cảnh báo: không tải được ảnh minh hoạ cho "{title}" (VPS không truy cập được images.unsplash.com?)', { title: p.title }));
         }
       }
     }
-    if (t.wordpress?.posts.length) log(`Đã tạo ${t.wordpress.posts.length} bài viết mẫu`);
+    if (tpl.wordpress?.posts.length) log(t('Đã tạo {count} bài viết mẫu', { count: tpl.wordpress.posts.length }));
 
-    for (const pg of t.wordpress?.pages ?? []) {
+    for (const pg of tpl.wordpress?.pages ?? []) {
       const file = await writeContent(`page-${pg.slug}.html`, fill(textToBlocks(pg.content), vars));
       await wp(`post create ${shq(file)} --post_type=page --post_status=publish --post_title=${shq(pg.title)} --post_name=${shq(pg.slug)}`);
     }
 
-    const homeHtml = await fs.readFile(path.join(await dir(t.id), 'wordpress', 'home.html'), 'utf8');
+    const homeHtml = await fs.readFile(path.join(await dir(tpl.id), 'wordpress', 'home.html'), 'utf8');
     const homeFile = await writeContent('home.html', fillCategoryIds(fill(homeHtml, vars), catIds));
-    const homeId = (await wp(`post create ${shq(homeFile)} --post_type=page --post_status=publish --post_title=${shq('Trang chủ')} --post_name=trang-chu --porcelain`)).trim();
+    const homeId = (await wp(`post create ${shq(homeFile)} --post_type=page --post_status=publish --post_title=${shq(THEME_TEXT.home)} --post_name=trang-chu --porcelain`)).trim();
     if (/^\d+$/.test(homeId)) {
       await wp('option update show_on_front page');
       await wp(`option update page_on_front ${homeId}`);
     }
-    log(`Đã tạo trang chủ, ${t.wordpress?.pages.length ?? 0} trang và menu theo giao diện "${t.name}"`);
+    log(t('Đã tạo trang chủ, {count} trang và menu theo giao diện "{name}"', { count: tpl.wordpress?.pages.length ?? 0, name: tpl.name }));
   } finally {
     await fs.rm(tmp, { recursive: true, force: true });
   }

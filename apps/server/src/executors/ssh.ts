@@ -1,8 +1,9 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { Client, type ClientChannel, type ConnectConfig, type SFTPWrapper } from 'ssh2';
-import type { SourceConnection } from '@tpanel/shared';
+import type { SourceConnection } from '@lares/shared';
 import { shq } from '../lib/shell.js';
+import { t } from '../i18n/index.js';
 import { BaseExecutor, appendCapped } from './base.js';
 import { CommandError, wrapBash, type ExecOptions, type ExecResult, type StreamOptions, type TransferOptions } from './types.js';
 
@@ -47,10 +48,14 @@ export class SshExecutor extends BaseExecutor {
           if (conn.hostFingerprint && ex.fingerprint && ex.fingerprint !== conn.hostFingerprint) {
             reject(
               new Error(
-                `Host key của ${conn.host} đã thay đổi (${ex.fingerprint}, trước đó ${conn.hostFingerprint}). Có thể VPS đã cài lại hoặc kết nối bị giả mạo - kiểm tra lại trước khi tiếp tục.`,
+                t('Host key của {host} đã thay đổi ({fingerprint}, trước đó {previous}). Có thể VPS đã cài lại hoặc kết nối bị giả mạo - kiểm tra lại trước khi tiếp tục.', {
+                  host: conn.host,
+                  fingerprint: ex.fingerprint,
+                  previous: conn.hostFingerprint,
+                }),
               ),
             );
-          } else reject(new Error(`Không kết nối được SSH tới ${ex.label}: ${err.message}`));
+          } else reject(new Error(t('Không kết nối được SSH tới {label}: {error}', { label: ex.label, error: err.message })));
         })
         .connect(cfg);
     });
@@ -77,7 +82,7 @@ export class SshExecutor extends BaseExecutor {
       const abort = () => {
         ch.signal('KILL');
         ch.close();
-        reject(new Error('Đã huỷ'));
+        reject(new Error(t('Đã huỷ')));
       };
       opts.signal?.addEventListener('abort', abort, { once: true });
       const timer = opts.timeoutMs ? setTimeout(() => ch.close(), opts.timeoutMs) : null;
@@ -108,7 +113,7 @@ export class SshExecutor extends BaseExecutor {
       const abort = () => {
         ch.signal('KILL');
         ch.close();
-        reject(new Error('Đã huỷ'));
+        reject(new Error(t('Đã huỷ')));
       };
       opts.signal?.addEventListener('abort', abort, { once: true });
       ch.stderr.on('data', (d: Buffer) => (stderr = appendCapped(stderr, d.toString(), 100_000)));
@@ -141,7 +146,7 @@ export class SshExecutor extends BaseExecutor {
   async download(remotePath: string, localPath: string, opts: TransferOptions = {}): Promise<void> {
     const sftp = await this.sftp();
     await new Promise<void>((resolve, reject) => {
-      const abort = () => reject(new Error('Đã huỷ'));
+      const abort = () => reject(new Error(t('Đã huỷ')));
       opts.signal?.addEventListener('abort', abort, { once: true });
       sftp.fastGet(
         remotePath,
@@ -153,7 +158,7 @@ export class SshExecutor extends BaseExecutor {
         },
         (err) => {
           opts.signal?.removeEventListener('abort', abort);
-          if (err) reject(new Error(`SFTP tải ${remotePath} thất bại: ${err.message}`));
+          if (err) reject(new Error(t('SFTP tải {path} thất bại: {error}', { path: remotePath, error: err.message })));
           else resolve();
         },
       );

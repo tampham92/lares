@@ -7,6 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { config } from './config.js';
 import { authRoutes, ensureAdminUser } from './auth/index.js';
 import { HttpError } from './lib/errors.js';
+import { requestLang, runWithLang, t } from './i18n/index.js';
 import { failInterruptedMigrations } from './migration/repo.js';
 import { databaseRoutes } from './routes/databases.js';
 import { migrationRoutes } from './routes/migrations.js';
@@ -42,11 +43,16 @@ await app.register(cors, { origin: config.isProd ? false : true });
 await app.register(jwt, { secret: config.secret });
 await app.register(rateLimit, { global: false });
 
+// Every request (and any background task it starts) speaks the language the UI asked for.
+app.addHook('onRequest', (req, _reply, done) => {
+  runWithLang(requestLang(req.headers, req.query), done);
+});
+
 app.setErrorHandler((err, req, reply) => {
   const e = err as Error & { statusCode?: number; validation?: unknown };
   const status = err instanceof HttpError ? err.statusCode : (e.statusCode ?? 500);
   if (status >= 500) req.log.error(err);
-  reply.status(status).send({ error: status >= 500 && config.isProd ? `Lỗi máy chủ: ${e.message}` : e.message });
+  reply.status(status).send({ error: status >= 500 && config.isProd ? t('Lỗi máy chủ: {message}', { message: e.message }) : e.message });
 });
 
 await app.register(authRoutes);
@@ -68,7 +74,7 @@ if (fs.existsSync(config.webDist)) {
 
 ensureAdminUser((msg) => app.log.warn(msg));
 failInterruptedMigrations();
-if (config.dryRun) app.log.warn('TPANEL_DRY_RUN=1 - các lệnh thay đổi hệ thống chỉ được ghi log, không thực thi');
+if (config.dryRun) app.log.warn(t('LARES_DRY_RUN=1 - các lệnh thay đổi hệ thống chỉ được ghi log, không thực thi'));
 await ensureGlobalConfig((m) => app.log.info(m)).catch((err) => app.log.warn(`nginx global config: ${err.message}`));
 await saveLogrotate(getLogrotate()).catch((err) => app.log.warn(`logrotate: ${err.message}`));
 await repairSites((m) => app.log.warn(m)).catch((err) => app.log.warn(`repairSites: ${err.message}`));

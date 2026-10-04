@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LOCALHOST, SITE_TYPES, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@tpanel/shared';
+import { LANG_LABELS, LOCALHOST, SITE_TYPES, msg, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
 import { get, post, type TaskInfo } from '../api';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { Alert, Check, ErrorBox, Field, TaskLog } from '../components/ui';
+import { t } from '../i18n';
 
 const TYPE_INFO: Record<SiteType, { title: string; desc: string }> = {
-  wordpress: { title: 'WordPress', desc: 'Tự cài WordPress + database, chọn được giao diện mẫu có sẵn nội dung' },
-  nextjs: { title: 'Next.js', desc: 'Node.js app chạy bằng systemd, Nginx reverse proxy. Không cần database (dữ liệu JSON).' },
-  php: { title: 'PHP', desc: 'Site PHP thuần / framework (Laravel, CodeIgniter...)' },
-  static: { title: 'HTML tĩnh', desc: 'HTML/CSS/JS, có giao diện mẫu dựng sẵn hoặc Next.js static export' },
+  wordpress: { title: 'WordPress', desc: msg('Tự cài WordPress + database, chọn được giao diện mẫu có sẵn nội dung') },
+  nextjs: { title: 'Next.js', desc: msg('Node.js app chạy bằng systemd, Nginx reverse proxy. Không cần database (dữ liệu JSON).') },
+  php: { title: 'PHP', desc: msg('Site PHP thuần / framework (Laravel, CodeIgniter...)') },
+  static: { title: msg('HTML tĩnh'), desc: msg('HTML/CSS/JS, có giao diện mẫu dựng sẵn hoặc Next.js static export') },
 };
 
 export function SiteNew() {
@@ -79,12 +80,12 @@ export function SiteNew() {
     return (
       <>
         <div className="page-head">
-          <h1>{result ? 'Đã tạo website' : `Đang tạo ${domain || 'site'}`}</h1>
+          <h1>{result ? t('Đã tạo website') : t('Đang tạo {domain}', { domain: domain || 'site' })}</h1>
         </div>
         {result && (
           <div className="card stack">
             <div className="kv">
-              <div>Địa chỉ truy cập</div>
+              <div>{t('Địa chỉ truy cập')}</div>
               <div>
                 <a href={result.url} target="_blank" rel="noreferrer">
                   <strong>{result.url}</strong>
@@ -92,13 +93,13 @@ export function SiteNew() {
               </div>
               {result.wordpressAdmin && (
                 <>
-                  <div>Trang quản trị WordPress</div>
+                  <div>{t('Trang quản trị WordPress')}</div>
                   <div>
                     <a href={result.wordpressAdmin.url} target="_blank" rel="noreferrer">
                       {result.wordpressAdmin.url}
                     </a>
                   </div>
-                  <div>Tài khoản / mật khẩu</div>
+                  <div>{t('Tài khoản / mật khẩu')}</div>
                   <div className="mono">
                     {result.wordpressAdmin.user} / {result.wordpressAdmin.password}
                   </div>
@@ -113,18 +114,18 @@ export function SiteNew() {
                 </>
               )}
             </div>
-            {result.wordpressAdmin && <Alert tone="warn">Lưu lại mật khẩu WordPress — TPanel chỉ hiển thị một lần.</Alert>}
+            {result.wordpressAdmin && <Alert tone="warn">{t('Lưu lại mật khẩu WordPress — Lares chỉ hiển thị một lần.')}</Alert>}
             {result.site.listenPort && (
               <Alert tone="info">
-                Site chạy theo port {result.site.listenPort}. Nếu VPS có firewall của nhà cung cấp (AWS, GCP, Vultr…), hãy mở thêm port này.
+                {t('Site chạy theo port {port}. Nếu VPS có firewall của nhà cung cấp (AWS, GCP, Vultr…), hãy mở thêm port này.', { port: result.site.listenPort })}
               </Alert>
             )}
             <div className="row">
               <a className="btn primary" href={result.url} target="_blank" rel="noreferrer">
-                Mở website
+                {t('Mở website')}
               </a>
               <button className="btn" onClick={() => nav(`/sites/${result.site.id}`)}>
-                Quản lý site
+                {t('Quản lý site')}
               </button>
             </div>
           </div>
@@ -142,38 +143,46 @@ export function SiteNew() {
     <form onSubmit={submit}>
       <div className="page-head">
         <div>
-          <h1>Thêm website</h1>
-          <div className="sub">Chọn loại site, TPanel sẽ tạo vhost Nginx, thư mục và runtime tương ứng</div>
+          <h1>{t('Thêm website')}</h1>
+          <div className="sub">{t('Chọn loại site, Lares sẽ tạo vhost Nginx, thư mục và runtime tương ứng')}</div>
         </div>
       </div>
       <ErrorBox error={error} />
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        {SITE_TYPES.map((t) => (
+        {SITE_TYPES.map((st) => (
           <div
-            key={t}
+            key={st}
             className="card"
-            onClick={() => setType(t)}
-            style={{ cursor: 'pointer', marginBottom: 0, borderColor: type === t ? 'var(--primary)' : undefined, outline: type === t ? '2px solid var(--primary-soft)' : undefined }}
+            onClick={() => setType(st)}
+            style={{ cursor: 'pointer', marginBottom: 0, borderColor: type === st ? 'var(--primary)' : undefined, outline: type === st ? '2px solid var(--primary-soft)' : undefined }}
           >
-            <strong>{TYPE_INFO[t].title}</strong>
-            <div className="sub">{TYPE_INFO[t].desc}</div>
+            <strong>{t(TYPE_INFO[st].title)}</strong>
+            <div className="sub">{t(TYPE_INFO[st].desc)}</div>
           </div>
         ))}
       </div>
       <div className="card stack">
         <div className="form-grid">
-          <Field label="Tên miền" hint={<>Ví dụ: example.com — hoặc nhập <code>localhost</code> (để trống) để chạy qua http://{window.location.hostname}:PORT khi chưa có tên miền</>}>
-            <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com hoặc localhost" />
+          <Field
+            label={t('Tên miền')}
+            hint={
+              <>
+                {t('Ví dụ: example.com — hoặc nhập')} <code>localhost</code>{' '}
+                {t('(để trống) để chạy qua {url} khi chưa có tên miền', { url: `http://${window.location.hostname}:PORT` })}
+              </>
+            }
+          >
+            <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder={t('example.com hoặc localhost')} />
           </Field>
           {portMode && (
-            <Field label="Port" hint="Bỏ trống để TPanel tự chọn port trống (từ 8001)">
-              <input type="number" min={1024} max={65535} value={listenPort} onChange={(e) => setListenPort(e.target.value)} placeholder="tự động" />
+            <Field label="Port" hint={t('Bỏ trống để Lares tự chọn port trống (từ 8001)')}>
+              <input type="number" min={1024} max={65535} value={listenPort} onChange={(e) => setListenPort(e.target.value)} placeholder={t('tự động')} />
             </Field>
           )}
           {(type === 'wordpress' || type === 'php') && (
-            <Field label="Phiên bản PHP">
+            <Field label={t('Phiên bản PHP')}>
               <select value={php} onChange={(e) => setPhp(e.target.value)}>
-                <option value="">Mặc định</option>
+                <option value="">{t('Mặc định')}</option>
                 {stats.data?.phpVersions.map((v) => (
                   <option key={v} value={v}>
                     PHP {v}
@@ -185,11 +194,12 @@ export function SiteNew() {
         </div>
         {portMode ? (
           <Alert tone="info">
-            Chưa có tên miền: site sẽ truy cập qua <strong>http://{window.location.hostname}:{listenPort || 'PORT'}</strong>. Không cài được SSL cho dạng này.
+            {t('Chưa có tên miền: site sẽ truy cập qua')} <strong>http://{window.location.hostname}:{listenPort || 'PORT'}</strong>.{' '}
+            {t('Không cài được SSL cho dạng này.')}
           </Alert>
         ) : (
           <Check checked={addWww} onChange={setAddWww}>
-            Thêm alias www.{domain || 'example.com'}
+            {t('Thêm alias www.{domain}', { domain: domain || 'example.com' })}
           </Check>
         )}
 
@@ -199,14 +209,14 @@ export function SiteNew() {
 
         {type === 'wordpress' && (
           <>
-            <h3>Tài khoản quản trị WordPress (tuỳ chọn)</h3>
+            <h3>{t('Tài khoản quản trị WordPress (tuỳ chọn)')}</h3>
             <div className="sub">
               {template
-                ? 'Bỏ trống để TPanel tự tạo tài khoản admin (hiển thị sau khi tạo xong).'
-                : 'Nếu điền đủ và server có wp-cli, TPanel sẽ cài đặt luôn. Bỏ trống để tự hoàn tất qua trình duyệt.'}
+                ? t('Bỏ trống để Lares tự tạo tài khoản admin (hiển thị sau khi tạo xong).')
+                : t('Nếu điền đủ và server có wp-cli, Lares sẽ cài đặt luôn. Bỏ trống để tự hoàn tất qua trình duyệt.')}
             </div>
             <div className="form-grid">
-              <Field label="Tiêu đề site">
+              <Field label={t('Tiêu đề site')}>
                 <input value={wp.title} onChange={(e) => setWp({ ...wp, title: e.target.value })} />
               </Field>
               <Field label="Admin user">
@@ -218,10 +228,10 @@ export function SiteNew() {
               <Field label="Admin email">
                 <input type="email" value={wp.adminEmail} onChange={(e) => setWp({ ...wp, adminEmail: e.target.value })} />
               </Field>
-              <Field label="Ngôn ngữ">
+              <Field label={t('Ngôn ngữ')}>
                 <select value={wp.locale} onChange={(e) => setWp({ ...wp, locale: e.target.value })}>
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="en_US">English</option>
+                  <option value="vi">{LANG_LABELS.vi}</option>
+                  <option value="en_US">{LANG_LABELS.en}</option>
                 </select>
               </Field>
             </div>
@@ -230,12 +240,13 @@ export function SiteNew() {
 
         {type === 'nextjs' && (
           <>
-            <h3>Mã nguồn Next.js</h3>
+            <h3>{t('Mã nguồn Next.js')}</h3>
             <Alert tone="info">
-              Bỏ trống Git URL nếu bạn muốn upload code qua SFTP vào <code>/var/www/{domain || 'domain'}/app</code> rồi bấm “Build &amp; khởi động” trong trang site.
+              {t('Bỏ trống Git URL nếu bạn muốn upload code qua SFTP vào')} <code>/var/www/{domain || 'domain'}/app</code>{' '}
+              {t('rồi bấm “Build & khởi động” trong trang site.')}
             </Alert>
             <div className="form-grid">
-              <Field label="Git URL" hint="https://github.com/org/repo.git hoặc git@...">
+              <Field label="Git URL" hint={t('https://github.com/org/repo.git hoặc git@...')}>
                 <input value={next.gitUrl} onChange={(e) => setNext({ ...next, gitUrl: e.target.value })} />
               </Field>
               <Field label="Branch">
@@ -243,7 +254,7 @@ export function SiteNew() {
               </Field>
               <Field label="Package manager">
                 <select value={next.packageManager} onChange={(e) => setNext({ ...next, packageManager: e.target.value })}>
-                  <option value="auto">Tự nhận (theo lockfile)</option>
+                  <option value="auto">{t('Tự nhận (theo lockfile)')}</option>
                   <option value="npm">npm</option>
                   <option value="yarn">yarn</option>
                   <option value="pnpm">pnpm</option>
@@ -251,19 +262,19 @@ export function SiteNew() {
               </Field>
             </div>
             <details>
-              <summary>Lệnh tuỳ chỉnh &amp; biến môi trường</summary>
+              <summary>{t('Lệnh tuỳ chỉnh & biến môi trường')}</summary>
               <div className="form-grid" style={{ marginTop: 10 }}>
-                <Field label="Install command" hint="Mặc định: npm ci / yarn install / pnpm install">
+                <Field label="Install command" hint={t('Mặc định: npm ci / yarn install / pnpm install')}>
                   <input value={next.installCommand} onChange={(e) => setNext({ ...next, installCommand: e.target.value })} />
                 </Field>
-                <Field label="Build command" hint="Mặc định: <pm> run build">
+                <Field label="Build command" hint={t('Mặc định: <pm> run build')}>
                   <input value={next.buildCommand} onChange={(e) => setNext({ ...next, buildCommand: e.target.value })} />
                 </Field>
-                <Field label="Start command" hint='Mặc định: next start -H 127.0.0.1 -p "$PORT"'>
+                <Field label="Start command" hint={t('Mặc định: next start -H 127.0.0.1 -p "$PORT"')}>
                   <input value={next.startCommand} onChange={(e) => setNext({ ...next, startCommand: e.target.value })} />
                 </Field>
               </div>
-              <Field label="Biến môi trường (.env.production.local)" hint="Mỗi dòng KEY=value">
+              <Field label={t('Biến môi trường (.env.production.local)')} hint={t('Mỗi dòng KEY=value')}>
                 <textarea value={next.env} onChange={(e) => setNext({ ...next, env: e.target.value })} placeholder={'NEXT_PUBLIC_SITE_URL=https://example.com'} />
               </Field>
             </details>
@@ -272,12 +283,12 @@ export function SiteNew() {
 
         {type === 'php' && (
           <Check checked={createDb} onChange={setCreateDb}>
-            Tạo database MySQL cho site
+            {t('Tạo database MySQL cho site')}
           </Check>
         )}
 
         <div className="row end">
-          <button className="btn primary">Tạo website</button>
+          <button className="btn primary">{t('Tạo website')}</button>
         </div>
       </div>
     </form>
