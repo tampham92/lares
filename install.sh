@@ -447,7 +447,8 @@ ok "$(L 'Mã nguồn tại' 'Source code in') $SRC"
 step "$(L 'Build Lares (có thể mất 1-2 phút)' 'Building Lares (may take 1-2 minutes)')"
 cd "$SRC"
 export PATH="/usr/bin:$PATH"   # build with the same node the service will run
-if [[ -f package-lock.json ]]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+# --include=dev: the build needs typescript/vite even if NODE_ENV=production leaked into this shell
+if [[ -f package-lock.json ]]; then npm ci --include=dev --no-audit --no-fund; else npm install --include=dev --no-audit --no-fund; fi
 npm run build
 ok "$(L 'Build xong' 'Build finished')"
 
