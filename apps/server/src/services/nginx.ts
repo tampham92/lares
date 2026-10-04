@@ -52,7 +52,7 @@ const indent = (block: string, n = 4) =>
     .map((l) => (l ? ' '.repeat(n) + l : l))
     .join('\n');
 
-function acmeLocation(): string {
+export function acmeLocation(): string {
   return `location ^~ /.well-known/acme-challenge/ {
     root ${config.acmeDir};
     default_type text/plain;
