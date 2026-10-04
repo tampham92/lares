@@ -12,6 +12,7 @@ import { failInterruptedMigrations } from './migration/repo.js';
 import { databaseRoutes } from './routes/databases.js';
 import { migrationRoutes } from './routes/migrations.js';
 import { aiRoutes } from './routes/ai.js';
+import { networkRoutes } from './routes/network.js';
 import { siteRoutes } from './routes/sites.js';
 import { systemRoutes } from './routes/system.js';
 import { templateRoutes } from './routes/templates.js';
@@ -19,6 +20,8 @@ import { getLogrotate, saveLogrotate } from './services/logs.js';
 import { closeMysql } from './services/mysql.js';
 import { stopDevNginx, syncDevNginx } from './services/devNginx.js';
 import { ensureGlobalConfig } from './services/nginx.js';
+import { startCloudflareRealIp } from './services/cloudflare.js';
+import { attachPanelServer } from './services/panelTls.js';
 import { refreshSslExpiry, repairSites } from './services/sites.js';
 
 const https =
@@ -62,6 +65,7 @@ await app.register(databaseRoutes);
 await app.register(migrationRoutes);
 await app.register(templateRoutes);
 await app.register(aiRoutes);
+await app.register(networkRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
@@ -80,6 +84,8 @@ await saveLogrotate(getLogrotate()).catch((err) => app.log.warn(`logrotate: ${er
 await repairSites((m) => app.log.warn(m)).catch((err) => app.log.warn(`repairSites: ${err.message}`));
 setInterval(() => void refreshSslExpiry().catch(() => {}), 12 * 3_600_000).unref();
 await syncDevNginx((m) => app.log.info(m));
+startCloudflareRealIp((m) => app.log.info(m));
+attachPanelServer(app.server, (m) => app.log.info(m));
 
 const shutdown = async () => {
   await stopDevNginx().catch(() => {});
