@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export * from './i18n.js';
 export { SHARED_EN } from './i18n-en.js';
+export * from './security.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)

@@ -3,11 +3,16 @@
  *   lares users                          list panel accounts
  *   lares reset-password [user] [--password X]   set a new password (random if omitted)
  *   lares has-user <user>                exit 0 if the account exists (used by install.sh)
+ *   lares disable-2fa [user]             turn off two-factor auth (lost phone + recovery codes)
+ *   lares allowlist show|add <ip/cidr>|remove <ip/cidr>|clear   panel IP allowlist
  */
 import bcrypt from 'bcryptjs';
 import { db } from './db/index.js';
 import { t } from './i18n/index.js';
+import { clearFailures } from './auth/lockout.js';
+import { bumpTokenVersion, disableTwoFactor } from './auth/twofactor.js';
 import { randomPassword } from './lib/crypto.js';
+import { getAllowlist, normalizeAllowlist, setAllowlist } from './services/security.js';
 
 interface UserRow {
   id: number;
@@ -42,9 +47,12 @@ function main(): number {
       }
       const password = given ?? randomPassword(16);
       const hash = bcrypt.hashSync(password, 12);
-      const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
-      if (existing) db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, username);
-      else db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, hash);
+      const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as { id: number } | undefined;
+      if (existing) {
+        db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, username);
+        bumpTokenVersion(existing.id); // the old password may be compromised: sign out every session
+      } else db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, hash);
+      clearFailures(username);
       console.log(
         existing
           ? t('Đã đặt lại mật khẩu cho "{user}": {password}', { user: username, password })
@@ -52,9 +60,58 @@ function main(): number {
       );
       return 0;
     }
+    case 'disable-2fa': {
+      const username = rest[0] ?? 'admin';
+      const row = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as { id: number } | undefined;
+      if (!row) {
+        console.error(t('Không có tài khoản "{user}"', { user: username }));
+        return 1;
+      }
+      disableTwoFactor(row.id);
+      clearFailures(username);
+      console.log(t('Đã tắt xác thực hai lớp cho "{user}"', { user: username }));
+      return 0;
+    }
+    case 'allowlist':
+      return allowlist(rest[0], rest[1]);
     default:
-      console.log(`${t('Cách dùng:')}\n  lares users\n  lares reset-password [user] [--password <${t('mật khẩu')}>]`);
+      console.log(
+        `${t('Cách dùng:')}\n  lares users\n  lares reset-password [user] [--password <${t('mật khẩu')}>]\n  lares disable-2fa [user]\n  lares allowlist show|add <ip/cidr>|remove <ip/cidr>|clear`,
+      );
       return cmd ? 1 : 0;
+  }
+}
+
+function allowlist(action = 'show', entry?: string): number {
+  try {
+    const list = getAllowlist();
+    switch (action) {
+      case 'show':
+        if (!list.length) console.log(t('(trống - mọi IP đều vào được trang đăng nhập)'));
+        for (const e of list) console.log(e);
+        return 0;
+      case 'add':
+      case 'remove': {
+        if (!entry) {
+          console.error(`${t('Cách dùng:')} lares allowlist ${action} <ip/cidr>`);
+          return 1;
+        }
+        const [norm] = normalizeAllowlist([entry]);
+        const next = setAllowlist(action === 'add' ? [...list, norm!] : list.filter((e) => e !== norm));
+        console.log(next.length ? next.join('\n') : t('(trống - mọi IP đều vào được trang đăng nhập)'));
+        return 0;
+      }
+      case 'clear':
+        setAllowlist([]);
+        console.log(t('Đã xoá danh sách IP được phép - mọi IP đều vào được trang đăng nhập'));
+        return 0;
+      default:
+        console.error(`${t('Cách dùng:')} lares allowlist show|add <ip/cidr>|remove <ip/cidr>|clear`);
+        return 1;
+    }
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : String(e));
+    return 1;
   }
 }
 

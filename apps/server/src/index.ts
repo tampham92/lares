@@ -12,6 +12,7 @@ import { failInterruptedMigrations } from './migration/repo.js';
 import { databaseRoutes } from './routes/databases.js';
 import { migrationRoutes } from './routes/migrations.js';
 import { aiRoutes } from './routes/ai.js';
+import { securityRoutes } from './routes/security.js';
 import { siteRoutes } from './routes/sites.js';
 import { systemRoutes } from './routes/system.js';
 import { templateRoutes } from './routes/templates.js';
@@ -19,6 +20,7 @@ import { getLogrotate, saveLogrotate } from './services/logs.js';
 import { closeMysql } from './services/mysql.js';
 import { stopDevNginx, syncDevNginx } from './services/devNginx.js';
 import { ensureGlobalConfig } from './services/nginx.js';
+import { installSecurityHooks } from './services/security.js';
 import { refreshSslExpiry, repairSites } from './services/sites.js';
 
 const https =
@@ -36,7 +38,8 @@ const app = Fastify({
     },
   },
   bodyLimit: 10 * 1024 * 1024,
-  trustProxy: true,
+  // Off unless LARES_TRUST_PROXY is set: otherwise X-Forwarded-For could be forged to dodge rate limits and the IP allowlist.
+  trustProxy: config.trustProxy,
 });
 
 await app.register(cors, { origin: config.isProd ? false : true });
@@ -47,6 +50,7 @@ await app.register(rateLimit, { global: false });
 app.addHook('onRequest', (req, _reply, done) => {
   runWithLang(requestLang(req.headers, req.query), done);
 });
+installSecurityHooks(app);
 
 app.setErrorHandler((err, req, reply) => {
   const e = err as Error & { statusCode?: number; validation?: unknown };
@@ -62,6 +66,7 @@ await app.register(databaseRoutes);
 await app.register(migrationRoutes);
 await app.register(templateRoutes);
 await app.register(aiRoutes);
+await app.register(securityRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
