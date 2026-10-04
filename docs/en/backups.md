@@ -18,7 +18,7 @@ and is stored **on the same server**:
 
 - **Back up now**: a manual backup, for example before updating plugins. Manual backups are never
   deleted automatically.
-- **Daily schedule**: **Settings → Backups**. Set the time (HH:MM, server local time) and how many
+- **Daily schedule**: **Settings → Website backups**. Set the time (HH:MM, server local time) and how many
   scheduled backups to keep per site (default 7). Individual sites can opt out. Only scheduled
   backups are pruned.
 - **Download**: you get a signed link valid for 5 minutes. The file is a `.tar` that contains the

@@ -19,14 +19,14 @@ install, port 8686 is open to every IP. Work through this checklist:
 - **Brute-force protection**: at most 10 login attempts per minute per IP. After 5 failed logins in
   15 minutes, the username is locked for 15 minutes. `sudo lares reset-password [user]` clears the
   lockout.
-- **Sessions can be revoked**: **Settings → Log out everywhere** ends all sessions. Changing the
+- **Sessions can be revoked**: **Settings → Sessions → Log out everywhere** ends all sessions. Changing the
   password logs out the other sessions, and `sudo lares reset-password` logs out every session of
   that user.
 - `X-Forwarded-For` is **not trusted** by default (see [Reverse proxy](#running-the-panel-behind-a-reverse-proxy)).
 
 ## Two-factor authentication (2FA)
 
-**Settings → Security**: scan the QR code with any TOTP authenticator app (Google Authenticator,
+**Settings → Two-factor authentication (2FA)**: scan the QR code with any TOTP authenticator app (Google Authenticator,
 Aegis, 1Password, Bitwarden…) and confirm with a 6-digit code. You then get **10 recovery codes**,
 shown once. Copy or download them and keep them off the server. Each code works once, in place of
 the 6-digit code. You can generate a new set of recovery codes with a current code.

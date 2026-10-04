@@ -19,13 +19,13 @@ cài, port 8686 mở cho mọi IP. Hãy làm lần lượt danh sách sau:
   content-type và referrer policy.
 - **Chống dò mật khẩu**: mỗi IP được thử đăng nhập tối đa 10 lần mỗi phút. Một tài khoản đăng nhập sai
   5 lần trong 15 phút thì bị khoá 15 phút. Lệnh `sudo lares reset-password [user]` mở khoá ngay.
-- **Thu hồi phiên đăng nhập**: nút **Cài đặt → Đăng xuất mọi nơi** kết thúc mọi phiên. Đổi mật khẩu
+- **Thu hồi phiên đăng nhập**: nút **Cài đặt → Phiên đăng nhập → Đăng xuất mọi nơi** kết thúc mọi phiên. Đổi mật khẩu
   sẽ đăng xuất các phiên khác. `sudo lares reset-password` đăng xuất mọi phiên của tài khoản đó.
 - Mặc định panel **không tin** header `X-Forwarded-For`. Xem phần [Reverse proxy](#đặt-panel-sau-reverse-proxy).
 
 ## Xác thực 2 lớp (2FA)
 
-Vào **Cài đặt → Bảo mật**, quét mã QR bằng một ứng dụng TOTP bất kỳ (Google Authenticator, Aegis,
+Vào **Cài đặt → Xác thực hai lớp (2FA)**, quét mã QR bằng một ứng dụng TOTP bất kỳ (Google Authenticator, Aegis,
 1Password, Bitwarden…), rồi nhập mã 6 số để xác nhận. Sau đó panel hiện **10 mã khôi phục**, chỉ hiện
 một lần. Hãy sao chép hoặc tải chúng về và cất ở nơi khác ngoài VPS. Mỗi mã khôi phục dùng được một
 lần, thay cho mã 6 số. Bạn có thể tạo bộ mã khôi phục mới bằng một mã 6 số hiện tại.

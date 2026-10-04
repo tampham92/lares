@@ -8,11 +8,15 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.2.0-beta] - 2026-10-04
+
+First public beta under the name **Lares Panel by ThoCode**.
+
 ### Added
 - **Login protection**: at most 10 login attempts per minute per IP, and a username is locked for
   15 minutes after 5 failures in 15 minutes. `sudo lares reset-password` clears the lockout.
 - **Session revocation**: **Log out everywhere** in Settings. Changing the password logs out the
-  other sessions. Security headers (HSTS, frame, content-type and referrer policies).
+  other sessions. Security headers for the panel (CSP, frame, content-type and referrer policies).
 - **Two-factor authentication (TOTP)** with 10 single-use recovery codes. Recovery from SSH:
   `sudo lares disable-2fa [user]`.
 - **Panel IP allowlist** (IPs or CIDR ranges): `sudo lares allowlist show|add|remove|clear`.
@@ -25,18 +29,6 @@ breaking changes; upgrading is always the install command run again
 - **Site backups**: manual and daily scheduled backups of files and databases under
   `/var/backups/lares`, with download, retention and restore (a safety backup is taken first and a
   failed restore is rolled back).
-
-### Changed
-- `X-Forwarded-For` is no longer trusted by default.
-- Upgrading logs every user out once (sessions now support revocation).
-- `uninstall.sh --purge` also removes the panel certificate and the Cloudflare/panel nginx files,
-  but never the site backups.
-
-## [0.2.0-beta] - 2026-10-04
-
-First public beta under the name **Lares Panel by ThoCode**.
-
-### Added
 - **Websites**: WordPress (download, database, `wp-config.php`, optional `wp core install`), Next.js
   (systemd service + nginx reverse proxy, Git clone, install/build/start commands, encrypted
   environment variables, app logs), plain PHP and static HTML; aliases, PHP version switch,
@@ -74,6 +66,10 @@ First public beta under the name **Lares Panel by ThoCode**.
 - License: GNU AGPL-3.0.
 
 ### Changed
+- `X-Forwarded-For` is no longer trusted by default.
+- Upgrading logs every user out once (sessions now support revocation).
+- `uninstall.sh --purge` also removes the panel certificate and the Cloudflare/panel nginx files,
+  but never the site backups.
 - Officially supported systems: **Ubuntu 22.04 / 24.04 and Debian 12**. Debian 13 installs with a
   "not yet tested" warning. Ubuntu 20.04 and Debian 11 (end of life) are refused unless
   `--force-unsupported` is given.

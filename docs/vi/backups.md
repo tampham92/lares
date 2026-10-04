@@ -18,7 +18,7 @@ site, và được lưu **ngay trên VPS**:
 
 - **Sao lưu ngay**: tạo một bản sao lưu thủ công, ví dụ trước khi cập nhật plugin. Bản thủ công không
   bao giờ bị tự động xoá.
-- **Lịch hằng ngày**: vào **Cài đặt → Sao lưu**, chọn giờ chạy (HH:MM, theo giờ của VPS) và số bản sao
+- **Lịch hằng ngày**: vào **Cài đặt → Sao lưu website**, chọn giờ chạy (HH:MM, theo giờ của VPS) và số bản sao
   lưu theo lịch giữ lại cho mỗi site (mặc định 7). Có thể tắt sao lưu theo lịch cho từng site. Chỉ các
   bản theo lịch mới bị tự động xoá bớt.
 - **Tải về**: panel tạo một link có chữ ký, hiệu lực 5 phút. File tải về là một file `.tar` chứa các
