@@ -32,6 +32,19 @@ function loadSecret(): string {
 
 // Outside Linux (developer laptops) system commands are never executed for real, whatever .env says:
 // Lares would otherwise chown/systemctl/mysql against the developer's own machine.
+/**
+ * Fastify trustProxy: off by default, because the panel listens directly on its port and a client could
+ * otherwise forge X-Forwarded-For to dodge the login rate limit and the IP allowlist.
+ * Set LARES_TRUST_PROXY to the proxy's address(es) - e.g. 127.0.0.1, or a comma list of IPs/CIDRs - when
+ * the panel sits behind your own reverse proxy ("true" trusts any sender, only safe if the port is firewalled).
+ */
+function trustProxy(): boolean | string {
+  const v = env('LARES_TRUST_PROXY').trim();
+  if (!v || /^(0|false|no|off)$/i.test(v)) return false;
+  if (/^(1|true|yes|on)$/i.test(v)) return true;
+  return v;
+}
+
 const dryRun = process.platform !== 'linux' || env('LARES_DRY_RUN', '0') === '1';
 
 export const config = {
@@ -41,6 +54,7 @@ export const config = {
   dataDir,
   secret: loadSecret(),
   jwtExpiresIn: env('LARES_JWT_EXPIRES', '12h'),
+  trustProxy: trustProxy(),
   /** Serve the panel itself over HTTPS (install.sh generates a self-signed pair). */
   tlsCert: env('LARES_TLS_CERT'),
   tlsKey: env('LARES_TLS_KEY'),

@@ -50,6 +50,16 @@ export const put = <T>(p: string, body: unknown) => api<T>(p, { method: 'PUT', b
 export const patch = <T>(p: string, body: unknown) => api<T>(p, { method: 'PATCH', body });
 export const del = <T>(p: string, body?: unknown) => api<T>(p, { method: 'DELETE', body });
 
+/** Ends this session on the server (or every session of the user), then forgets the token. */
+export async function logout(everywhere = false) {
+  try {
+    if (auth.token) await post(everywhere ? '/api/auth/logout-all' : '/api/auth/logout');
+  } catch {
+    /* already invalid - nothing to revoke */
+  }
+  auth.set(null);
+}
+
 export interface TaskInfo {
   id: string;
   label: string;

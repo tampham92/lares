@@ -109,3 +109,25 @@ export function setSetting(key: string, value: unknown) {
     JSON.stringify(value),
   );
 }
+
+// ---- Panel security: sessions, login lockout, two-factor auth ------------------------------
+// token_version is embedded in every JWT; bumping it revokes all of a user's sessions.
+ensureColumn('users', 'token_version', 'INTEGER NOT NULL DEFAULT 0');
+// TOTP secret (encrypted with lib/crypto). NULL = 2FA off. The pending secret waits for the first code.
+ensureColumn('users', 'totp_secret_enc', 'TEXT');
+ensureColumn('users', 'totp_pending_enc', 'TEXT');
+ensureColumn('users', 'totp_last_step', 'INTEGER');
+// JSON array of SHA-256 hashes of the unused recovery codes.
+ensureColumn('users', 'recovery_codes_json', 'TEXT');
+db.exec(`
+CREATE TABLE IF NOT EXISTS login_failures (
+  username TEXT PRIMARY KEY,
+  failures INTEGER NOT NULL DEFAULT 0,
+  first_failure_at INTEGER NOT NULL,
+  locked_until INTEGER
+);
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+  jti TEXT PRIMARY KEY,
+  expires_at INTEGER NOT NULL
+);
+`);

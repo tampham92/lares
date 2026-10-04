@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { auth } from '../api';
+import { logout } from '../api';
 import { msg } from '@lares/shared';
 import { t } from '../i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
@@ -33,8 +33,8 @@ export function Layout() {
             className="icon-btn"
             title={t('Đăng xuất')}
             aria-label={t('Đăng xuất')}
-            onClick={() => {
-              auth.set(null);
+            onClick={async () => {
+              await logout();
               nav('/login');
             }}
           >

@@ -4,6 +4,7 @@ import type { Site, SystemStats } from '@lares/shared';
 import { APP_LABELS } from '@lares/shared';
 import { fmtBytes, get, siteLabel } from '../api';
 import { Alert, Badge, ErrorBox, Progress } from '../components/ui';
+import { AllowlistNotice } from '../components/SecuritySettings';
 import { locale, t } from '../i18n';
 
 export function Dashboard() {
@@ -21,6 +22,7 @@ export function Dashboard() {
         </div>
       </div>
       <ErrorBox error={stats.error} />
+      <AllowlistNotice />
       {s?.dryRun && <Alert tone="warn">{t('Chế độ DRY-RUN: các lệnh thay đổi hệ thống (nginx, mysql, certbot, systemctl) chỉ được ghi log.')}</Alert>}
       {s && !s.dryRun && s.services.nginx === 'inactive' && (
         <Alert tone="warn">

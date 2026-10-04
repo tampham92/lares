@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AI_MODELS, AI_PROVIDER_LABELS, AI_PROVIDERS, ANTHROPIC_MODELS, type AiProvider, type AiSettingsView, type LogrotateSettings } from '@lares/shared';
-import { del, errMsg, get, post, put } from '../api';
+import { auth, del, errMsg, get, post, put } from '../api';
 import { NetworkSettings } from '../components/NetworkSettings';
+import { SecuritySettings } from '../components/SecuritySettings';
 import { Alert, Check, Field } from '../components/ui';
 import { t } from '../i18n';
 
@@ -67,8 +68,9 @@ export function Settings() {
               className="btn primary"
               onClick={async () => {
                 try {
-                  await post('/api/auth/password', pw);
-                  setPwMsg({ tone: 'ok', text: t('Đã đổi mật khẩu') });
+                  const r = await post<{ token?: string }>('/api/auth/password', pw);
+                  if (r.token) auth.set(r.token); // the old token was revoked with the old password
+                  setPwMsg({ tone: 'ok', text: t('Đã đổi mật khẩu - các phiên đăng nhập khác đã bị đăng xuất') });
                   setPw({ current: '', next: '' });
                 } catch (e) {
                   setPwMsg({ tone: 'err', text: errMsg(e) });
@@ -79,6 +81,7 @@ export function Settings() {
             </button>
           </div>
         </div>
+        <SecuritySettings />
       </div>
     </>
   );
