@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LANG_LABELS, LOCALHOST, SITE_TYPES, msg, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
+import { LANG_LABELS, LOCALHOST, SITE_TYPES, msg, type AutoDnsInput, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
 import { get, post, type TaskInfo } from '../api';
+import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { Alert, Check, ErrorBox, Field, TaskLog } from '../components/ui';
 import { t } from '../i18n';
@@ -28,6 +29,7 @@ export function SiteNew() {
   const [template, setTemplate] = useState<string | null>(null);
   const [branding, setBranding] = useState<Branding>({});
   const [listenPort, setListenPort] = useState('');
+  const [cfDns, setCfDns] = useState<AutoDnsInput | null>(null);
   const [task, setTask] = useState<string | null>(null);
   const [result, setResult] = useState<CreateSiteResult | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -40,6 +42,7 @@ export function SiteNew() {
     const aliases = !portMode && addWww && !d.startsWith('www.') ? [`www.${d}`] : [];
     const body: Record<string, unknown> = { type, domain: d, aliases, publicHost: window.location.hostname };
     if (portMode && listenPort) body.listenPort = Number(listenPort);
+    if (!portMode && cfDns) body.cloudflareDns = cfDns;
     if (type === 'wordpress' || type === 'static') {
       body.template = template ?? undefined;
       body.branding = Object.fromEntries(Object.entries(branding).filter(([, v]) => typeof v === 'string' && v.trim()));
@@ -138,6 +141,8 @@ export function SiteNew() {
   }
 
   const portMode = domain.trim().toLowerCase() === LOCALHOST || domain.trim() === '';
+  const typed = domain.trim().toLowerCase();
+  const hostnames = portMode ? [] : [typed, ...(addWww && !typed.startsWith('www.') ? [`www.${typed}`] : [])];
 
   return (
     <form onSubmit={submit}>
@@ -198,9 +203,12 @@ export function SiteNew() {
             {t('Không cài được SSL cho dạng này.')}
           </Alert>
         ) : (
-          <Check checked={addWww} onChange={setAddWww}>
-            {t('Thêm alias www.{domain}', { domain: domain || 'example.com' })}
-          </Check>
+          <>
+            <Check checked={addWww} onChange={setAddWww}>
+              {t('Thêm alias www.{domain}', { domain: domain || 'example.com' })}
+            </Check>
+            <CloudflareDnsOption hostnames={hostnames} onChange={setCfDns} />
+          </>
         )}
 
         {(type === 'wordpress' || type === 'static') && (

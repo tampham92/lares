@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { LOCALHOST, LOG_TYPES, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@lares/shared';
+import { LOCALHOST, LOG_TYPES, autoDnsBodySchema, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
 import { t } from '../i18n/index.js';
 import { badRequest } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
 import { cloneSite } from '../services/clone.js';
+import { autoDnsForSite } from '../services/cloudflareDns.js';
 import * as databases from '../services/databases.js';
 import { tailFile, trafficStats, truncateLog } from '../services/logs.js';
 import { siteLogPaths } from '../services/nginx.js';
@@ -46,7 +47,12 @@ export async function siteRoutes(app: FastifyInstance) {
     if (sites.findSiteByHostname(input.domain)) throw badRequest(t('{domain} đã tồn tại', { domain: input.domain }));
     // Port-based sites are opened as http://<the host the admin is using>:<port>
     input.publicHost ||= req.hostname.replace(/:\d+$/, '');
-    return startTask(t('Tạo site {domain}', { domain: input.domain }), (log) => sites.createSite(input, log));
+    const { cloudflareDns } = parse(autoDnsBodySchema, req.body);
+    return startTask(t('Tạo site {domain}', { domain: input.domain }), async (log) => {
+      const result = await sites.createSite(input, log);
+      await autoDnsForSite(cloudflareDns, result.site, log);
+      return result;
+    });
   });
 
   app.post('/api/sites/:id/clone', async (req) => {
@@ -67,8 +73,13 @@ export async function siteRoutes(app: FastifyInstance) {
   app.put('/api/sites/:id/domain', async (req) => {
     const id = idParam(req.params);
     const input = parse(z.object({ domain: domainSchema, aliases: z.array(domainSchema).default([]) }), req.body);
+    const { cloudflareDns } = parse(autoDnsBodySchema, req.body);
     const site = sites.getSite(id);
-    return startTask(t('Gán tên miền {domain} cho {site}', { domain: input.domain, site: site.domain }), (log) => sites.changeDomain(id, input, log));
+    return startTask(t('Gán tên miền {domain} cho {site}', { domain: input.domain, site: site.domain }), async (log) => {
+      const renamed = await sites.changeDomain(id, input, log);
+      await autoDnsForSite(cloudflareDns, renamed, log);
+      return renamed;
+    });
   });
 
   app.delete('/api/sites/:id', async (req) => {

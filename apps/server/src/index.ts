@@ -10,6 +10,7 @@ import { HttpError } from './lib/errors.js';
 import { requestLang, runWithLang, t } from './i18n/index.js';
 import { failInterruptedMigrations } from './migration/repo.js';
 import { databaseRoutes } from './routes/databases.js';
+import { dnsRoutes } from './routes/dns.js';
 import { migrationRoutes } from './routes/migrations.js';
 import { aiRoutes } from './routes/ai.js';
 import { networkRoutes } from './routes/network.js';
@@ -75,6 +76,7 @@ await app.register(networkRoutes);
 await app.register(securityRoutes);
 await app.register(backupRoutes);
 await app.register(releaseRoutes);
+await app.register(dnsRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
