@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { APP_LABELS, LOCALHOST, msg, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
+import { APP_LABELS, LOCALHOST, msg, type AutoDnsInput, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
 import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
 import { AiWriter } from '../components/AiWriter';
 import { BackupsTab } from '../components/BackupsTab';
+import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
+import { SiteDnsCard } from '../components/SiteDnsCard';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
 import { locale, t } from '../i18n';
@@ -207,17 +209,19 @@ function DomainCard({ site }: { site: Site }) {
   const refresh = useRefreshSite(site.id);
   const [domain, setDomain] = useState(site.listenPort ? '' : site.domain);
   const [addWww, setAddWww] = useState(true);
+  const [cfDns, setCfDns] = useState<AutoDnsInput | null>(null);
   const [task, setTask] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const d = domain.trim().toLowerCase();
   const changed = d !== '' && (site.listenPort !== null || d !== site.domain);
+  const hostnames = changed ? [d, ...(addWww && !d.startsWith('www.') ? [`www.${d}`] : [])] : [];
 
   const submit = async () => {
     setError(null);
     if (!confirm(site.listenPort ? t('Gán tên miền {domain}? Site sẽ không còn chạy ở port {port}.', { domain: d, port: site.listenPort }) : t('Đổi tên miền {old} → {domain}? Chứng chỉ SSL của tên miền cũ sẽ bị gỡ.', { old: site.domain, domain: d }))) return;
     try {
       const aliases = addWww && !d.startsWith('www.') ? [`www.${d}`] : [];
-      setTask((await put<TaskInfo>(`/api/sites/${site.id}/domain`, { domain: d, aliases })).id);
+      setTask((await put<TaskInfo>(`/api/sites/${site.id}/domain`, { domain: d, aliases, cloudflareDns: cfDns ?? undefined })).id);
     } catch (e) {
       setError(e);
     }
@@ -246,10 +250,13 @@ function DomainCard({ site }: { site: Site }) {
       <Check checked={addWww} onChange={setAddWww}>
         {t('Thêm alias www.{domain}', { domain: d || 'example.com' })}
       </Check>
-      <Alert tone="info">
-        {t('Trước hoặc sau khi gán: tạo bản ghi DNS')} <strong>A</strong>{' '}
-        {t('cho {domain} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab', { domain: d || t('tên miền') })} <strong>SSL</strong>.
-      </Alert>
+      <CloudflareDnsOption hostnames={hostnames} onChange={setCfDns} />
+      {!cfDns && (
+        <Alert tone="info">
+          {t('Trước hoặc sau khi gán: tạo bản ghi DNS')} <strong>A</strong>{' '}
+          {t('cho {domain} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab', { domain: d || t('tên miền') })} <strong>SSL</strong>.
+        </Alert>
+      )}
       {task && <TaskLog taskId={task} onDone={(t) => t.status === 'completed' && refresh()} />}
     </div>
   );
@@ -286,6 +293,7 @@ function SslTab({ site }: { site: Site }) {
   const daysLeft = site.ssl.expiresAt ? Math.floor((Date.parse(site.ssl.expiresAt) - Date.now()) / 86_400_000) : null;
 
   return (
+    <>
     <div className="grid cols-2">
       <div className="card stack">
         <h2>{t('Trạng thái SSL')}</h2>
@@ -391,6 +399,8 @@ function SslTab({ site }: { site: Site }) {
         </div>
       </div>
     </div>
+    {!site.listenPort && <SiteDnsCard site={site} />}
+    </>
   );
 }
 

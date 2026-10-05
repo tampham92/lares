@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CloudflareRealIpView, PanelDomainView } from '@lares/shared';
 import { del, errMsg, fmtDate, get, post, put, type TaskInfo } from '../api';
 import { Alert, Badge, Check, ErrorBox, Field, TaskLog } from './ui';
+import { CloudflareDnsCard, PanelDnsRecord } from './CloudflareDnsCard';
 import { locale, t } from '../i18n';
 
 /** Settings cards: trusted certificate for the panel, real visitor IP behind Cloudflare. */
@@ -10,6 +11,7 @@ export function NetworkSettings() {
   return (
     <>
       <PanelDomainCard />
+      <CloudflareDnsCard />
       <CloudflareCard />
     </>
   );
@@ -92,6 +94,7 @@ function PanelDomainCard() {
       >
         <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder={v?.domain ?? 'panel.example.com'} />
       </Field>
+      <PanelDnsRecord domain={domain} />
       <Field label={t('Email nhận thông báo từ Let\'s Encrypt (tuỳ chọn)')}>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={v?.email ?? 'admin@example.com'} />
       </Field>
