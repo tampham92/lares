@@ -22,27 +22,26 @@ export function VersionBadge() {
   };
 
   return (
-    <div style={{ marginTop: 'auto', padding: '12px 12px 0', fontSize: 12, color: 'var(--sidebar-text)', opacity: 0.85 }}>
+    <div className="sidebar-footer">
       {v.updateAvailable && v.latest && (
-        <details style={{ marginBottom: 8 }}>
-          <summary style={{ cursor: 'pointer', color: '#fbbf24' }}>{t('Có bản mới {version}', { version: v.latest })}</summary>
-          <div style={{ marginTop: 6, lineHeight: 1.45 }}>
+        <details className="update">
+          <summary>{t('Có bản mới {version}', { version: v.latest })}</summary>
+          <div>
             {t('Nâng cấp bằng lệnh sau trên VPS (website và dữ liệu được giữ nguyên):')}
-            <code
-              style={{ display: 'block', margin: '6px 0', padding: '6px 8px', borderRadius: 6, background: 'var(--code-bg)', color: 'var(--code-text)', wordBreak: 'break-all', userSelect: 'all' }}
-            >
+            <code>
               {v.upgradeCommand}
             </code>
-            <button type="button" className="btn sm" onClick={copy} style={{ marginRight: 8 }}>
+            <button type="button" className="btn sm" onClick={copy}>
               {copied ? t('Đã sao chép') : t('Sao chép')}
             </button>
-            <a href={CHANGELOG_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--sidebar-text)', textDecoration: 'underline', padding: 0, display: 'inline' }}>
+            {' '}
+            <a href={CHANGELOG_URL} target="_blank" rel="noreferrer">
               {t('Xem thay đổi')}
             </a>
           </div>
         </details>
       )}
-      <a href={CHANGELOG_URL} target="_blank" rel="noreferrer" title={t('Xem thay đổi')} style={{ color: 'inherit', padding: 0, display: 'inline' }}>
+      <a href={CHANGELOG_URL} target="_blank" rel="noreferrer" title={t('Xem thay đổi')}>
         Lares v{v.version}
       </a>
     </div>

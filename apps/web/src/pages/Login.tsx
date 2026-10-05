@@ -5,6 +5,7 @@ import { auth, post } from '../api';
 import { ErrorBox, Field } from '../components/ui';
 import { t } from '../i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
+import { Logo } from '../components/Logo';
 
 export function Login() {
   const nav = useNavigate();
@@ -42,9 +43,7 @@ export function Login() {
   return (
     <div className="login">
       <form className="card stack" onSubmit={submit}>
-        <div className="brand" style={{ color: 'var(--text)', padding: 0 }}>
-          <span style={{ color: '#fff' }}>L</span>Lares
-        </div>
+        <Logo size={36} tagline />
         <ErrorBox error={error} />
         {mfaToken ? (
           <>
@@ -79,7 +78,10 @@ export function Login() {
             </button>
           </>
         )}
-        <LanguageSwitcher />
+        <div className="login-footer">
+          <span>© ThoCode</span>
+          <LanguageSwitcher className="lang-switch" />
+        </div>
       </form>
     </div>
   );
