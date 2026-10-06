@@ -70,6 +70,11 @@ describe('wp-cli output parsing', () => {
     ]);
   });
 
+  it('decodes the entities wp-cli leaves in display names', () => {
+    const out = '[{"name":"lares-spa","title":"Lares Spa &amp; Th\u1ea9m m\u1ef9 vi\u1ec7n","status":"active","version":"1.0.0","update":"none"},{"name":"x","title":"A &#8211; B &#99999999; &bogus;","status":"inactive","version":"1","update":"none"}]';
+    expect(parseExtensionList(out)!.map((e) => e.title)).toEqual(['A – B &#99999999; &bogus;', 'Lares Spa & Thẩm mỹ viện']);
+  });
+
   it('parses the update summary, including failed items', () => {
     const out = `Downloading update from https://downloads.wordpress.org/plugin/akismet.5.3.5.zip...
 Unpacking the update...

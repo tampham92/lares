@@ -489,10 +489,12 @@ const WORDPRESS = `
 .wp-block-image{margin:0}
 .wp-block-image img{box-sizing:border-box}
 .wp-block-details summary{cursor:pointer}
-.site-head .wp-block-navigation__responsive-container-open{width:44px;height:44px;border:1px solid var(--c-border);border-radius:var(--r-sm);display:grid;place-items:center;color:var(--c-heading)}
+/* No display here: core hides the toggle from 600px with a rule of equal specificity that loads first. */
+.site-head .wp-block-navigation__responsive-container-open{width:44px;height:44px;border:1px solid var(--c-border);border-radius:var(--r-sm);place-items:center;color:var(--c-heading)}
+@media (max-width:599.98px){.site-head .wp-block-navigation__responsive-container-open:not(.always-shown){display:grid}}
 .site-head .wp-block-navigation__responsive-container.is-menu-open{background:var(--c-bg);padding:24px}
 .site-head .wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation-item__content{font-size:1.15rem;padding:10px 0}
-@media (max-width:600px){.site-head .head-cta{display:none}}
+@media (max-width:599.98px){.site-head .head-cta{display:none}}
 .content-area{max-width:820px;margin:0 auto;padding:56px 20px 88px;display:flex;flex-direction:column;gap:20px}
 .content-area .wp-block-post-title{font-size:clamp(1.8rem,1.3rem + 2vw,2.6rem)}
 .content-area .wp-block-post-featured-image{border-radius:var(--r-img);overflow:hidden;margin:0}

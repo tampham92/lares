@@ -186,6 +186,14 @@ describe('builder WordPress output', () => {
     }
   });
 
+  it('leaves the core menu toggle hidden on desktop', async () => {
+    const site = await renderSite(await allSections(0), { mode: 'wordpress', assetUrl: () => '/x.webp' });
+    // Core hides the toggle from 600px; an unscoped display rule of ours (loaded later) would win and show it.
+    const topLevel = site.css.replace(/@media[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}/g, '');
+    for (const m of topLevel.matchAll(/([^{}]*responsive-container-open[^{}]*)\{([^}]*)\}/g)) expect(m[2], m[1]).not.toMatch(/(^|;)display:/);
+    expect(site.css).toMatch(/@media \(max-width:599\.98px\)\{\.site-head \.wp-block-navigation__responsive-container-open:not\(\.always-shown\)\{display:grid\}\}/);
+  });
+
   it('writes a complete block theme with bundled assets and fills the home page', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lares-builder-'));
     try {

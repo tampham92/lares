@@ -93,7 +93,8 @@ export function parseExtensionList(stdout: string): WpExtension[] | null {
     const hasUpdate = str(r.update) === 'available';
     out.push({
       slug,
-      title: str(r.title).trim() || slug,
+      // wp-cli prints the escaped display name ("Spa &amp; Beauty"); the panel escapes on render itself
+      title: decodeEntities(str(r.title)).trim() || slug,
       status,
       version: str(r.version).trim(),
       update: hasUpdate ? updateVersion || '?' : null,
@@ -204,14 +205,20 @@ export const findMarkers = (body: string) => WP_MARKERS.filter((m) => m.re.test(
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsaquo: '›', lsaquo: '‹', raquo: '»', laquo: '«', ndash: '–', mdash: '—', hellip: '…' };
 
+const codePoint = (e: string, n: number) => (n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : e);
+
+/** Decodes the HTML entities WordPress puts in names and titles (`&amp;`, `&#8211;`, ...). */
+export const decodeEntities = (s: string) =>
+  s
+    .replace(/&#(\d+);/g, (e, n: string) => codePoint(e, Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (e, n: string) => codePoint(e, Number.parseInt(n, 16)))
+    .replace(/&([a-z]+);/gi, (e, n: string) => ENTITIES[n.toLowerCase()] ?? e);
+
 /** Text of the page's <title>, entities decoded, whitespace collapsed. */
 export function pageTitle(html: string): string {
   const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
   if (!m) return '';
-  return m[1]!
-    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(Number.parseInt(n, 16)))
-    .replace(/&([a-z]+);/gi, (e, n: string) => ENTITIES[n.toLowerCase()] ?? e)
+  return decodeEntities(m[1]!)
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 200);
