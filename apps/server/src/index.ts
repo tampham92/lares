@@ -19,6 +19,7 @@ import { backupRoutes } from './routes/backups.js';
 import { leadRoutes } from './routes/leads.js';
 import { releaseRoutes } from './routes/release.js';
 import { siteRoutes } from './routes/sites.js';
+import { siteToolsRoutes } from './routes/sitetools.js';
 import { systemRoutes } from './routes/system.js';
 import { templateRoutes } from './routes/templates.js';
 import { wpUpdateRoutes } from './routes/wpupdates.js';
@@ -81,6 +82,7 @@ await app.register(releaseRoutes);
 await app.register(dnsRoutes);
 await app.register(wpUpdateRoutes);
 await app.register(leadRoutes);
+await app.register(siteToolsRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });

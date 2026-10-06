@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { DatabaseRecord } from '@lares/shared';
 import { del, fmtDate, get, post } from '../api';
+import { AdminerButton, AdminerNote } from '../components/AdminerButton';
 import { Alert, Badge, ErrorBox, Field } from '../components/ui';
 import { t } from '../i18n';
 
@@ -59,6 +60,7 @@ export function Databases() {
               <th>{t('Mật khẩu')}</th>
               <th>{t('Tạo lúc')}</th>
               <th />
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -84,6 +86,9 @@ export function Databases() {
                 </td>
                 <td className="sub">{fmtDate(d.createdAt)}</td>
                 <td>
+                  <AdminerButton databaseId={d.id} />
+                </td>
+                <td>
                   <button
                     className="btn sm danger"
                     onClick={async () => {
@@ -104,6 +109,7 @@ export function Databases() {
           </tbody>
         </table>
         {q.data?.length === 0 && <div className="empty">{t('Chưa có database')}</div>}
+        {!!q.data?.length && <AdminerNote />}
       </div>
     </>
   );

@@ -14,6 +14,7 @@ import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type 
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
 import { resolvePhpVersion } from './php.js';
+import { siteClientMaxBodyMb } from './phpSettings.js';
 import * as ssl from './ssl.js';
 import * as templates from './templates.js';
 import { ensurePortHostFix, installWordpress, wordpressReplaceUrl } from './wordpress.js';
@@ -110,6 +111,7 @@ export function vhostSpecFor(site: Site): VhostSpec {
     accessLog: site.accessLog,
     disabled: site.status === 'disabled',
     ssl: sslPaths ? { ...sslPaths, forceHttps: site.ssl.forceHttps } : null,
+    clientMaxBodyMb: siteClientMaxBodyMb(site.id),
   };
 }
 
