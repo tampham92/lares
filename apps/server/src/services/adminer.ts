@@ -146,8 +146,11 @@ export async function adminerFileVerified(file = adminerPaths().adminer): Promis
 
 const phpStr = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
-/** MySQL server for Adminer's connections (DB users are 'user'@'localhost' → unix socket). */
-export const adminerDbServer = () => (config.mysql.socketPath ? `localhost:${config.mysql.socketPath}` : 'localhost');
+/**
+ * MySQL server for Adminer's connections (DB users are 'user'@'localhost' → unix socket).
+ * Adminer 6 only accepts a socket as `:/path/to.sock` ("localhost:/path" is "Invalid server.").
+ */
+export const adminerDbServer = (socketPath = config.mysql.socketPath) => (socketPath ? `:${socketPath}` : 'localhost');
 
 /**
  * Front controller: health check, ticket login and the Adminer customisation, then the pinned

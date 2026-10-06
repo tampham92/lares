@@ -1,93 +1,130 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AI_MODELS, AI_PROVIDER_LABELS, AI_PROVIDERS, ANTHROPIC_MODELS, type AiProvider, type AiSettingsView, type LogrotateSettings } from '@lares/shared';
+import { AI_MODELS, AI_PROVIDER_LABELS, AI_PROVIDERS, ANTHROPIC_MODELS, msg, type AiProvider, type AiSettingsView, type LogrotateSettings } from '@lares/shared';
 import { auth, del, errMsg, get, post, put } from '../api';
-import { NetworkSettings } from '../components/NetworkSettings';
-import { SecuritySettings } from '../components/SecuritySettings';
+import { CloudflareDnsCard } from '../components/CloudflareDnsCard';
+import { CloudflareRealIpCard, PanelDomainCard } from '../components/NetworkSettings';
+import { AllowlistCard, SessionsCard, TwoFactorCard } from '../components/SecuritySettings';
 import { BackupSettingsCard } from '../components/BackupSettingsCard';
 import { LeadSettingsCard } from '../components/LeadSettingsCard';
-import { Alert, Check, Field } from '../components/ui';
+import { Alert, Check, Field, Tabs } from '../components/ui';
 import { t } from '../i18n';
 
-export function Settings() {
-  const lr = useQuery({ queryKey: ['logrotate'], queryFn: () => get<LogrotateSettings>('/api/settings/logrotate') });
-  const [form, setForm] = useState<LogrotateSettings>({ retentionDays: 14, compress: true });
-  const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
-  const [pw, setPw] = useState({ current: '', next: '' });
-  const [pwMsg, setPwMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+type SettingsTab = 'domain' | 'security' | 'backup' | 'integrations';
 
-  useEffect(() => {
-    if (lr.data) setForm(lr.data);
-  }, [lr.data]);
+const TABS: Array<[SettingsTab, string]> = [
+  ['domain', msg('Tên miền & Cloudflare')],
+  ['security', msg('Bảo mật')],
+  ['backup', msg('Sao lưu & log')],
+  ['integrations', msg('Tích hợp')],
+];
+
+export function Settings() {
+  const [params, setParams] = useSearchParams();
+  const tab = TABS.find(([id]) => id === params.get('tab'))?.[0] ?? 'domain';
 
   return (
     <>
       <div className="page-head">
         <h1>{t('Cài đặt')}</h1>
       </div>
-      <div className="grid cols-2">
-        <AiSettingsCard />
-        <NetworkSettings />
-        <BackupSettingsCard />
-        <LeadSettingsCard />
-        <div className="card stack">
-          <h2>{t('Lưu trữ log truy cập (logrotate)')}</h2>
-          {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
-          <Field label={t('Giữ log trong (ngày)')}>
-            <input type="number" min={1} max={365} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: Number(e.target.value) })} />
-          </Field>
-          <Field label={t('Xoay vòng sớm khi file vượt quá (MB)')} hint={t('Bỏ trống = chỉ xoay vòng hằng ngày')}>
-            <input type="number" min={1} value={form.maxSizeMb ?? ''} onChange={(e) => setForm({ ...form, maxSizeMb: e.target.value ? Number(e.target.value) : undefined })} />
-          </Field>
-          <Check checked={form.compress} onChange={(v) => setForm({ ...form, compress: v })}>
-            {t('Nén (gzip) log cũ')}
-          </Check>
-          <div className="row end">
-            <button
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  await put('/api/settings/logrotate', form);
-                  setMsg({ tone: 'ok', text: t('Đã lưu {path}', { path: '/etc/logrotate.d/lares' }) });
-                } catch (e) {
-                  setMsg({ tone: 'err', text: errMsg(e) });
-                }
-              }}
-            >
-              {t('Lưu')}
-            </button>
-          </div>
-        </div>
-        <div className="card stack">
-          <h2>{t('Đổi mật khẩu quản trị')}</h2>
-          {pwMsg && <Alert tone={pwMsg.tone}>{pwMsg.text}</Alert>}
-          <Field label={t('Mật khẩu hiện tại')}>
-            <input type="password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
-          </Field>
-          <Field label={t('Mật khẩu mới (≥ 10 ký tự)')}>
-            <input type="password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
-          </Field>
-          <div className="row end">
-            <button
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  const r = await post<{ token?: string }>('/api/auth/password', pw);
-                  if (r.token) auth.set(r.token); // the old token was revoked with the old password
-                  setPwMsg({ tone: 'ok', text: t('Đã đổi mật khẩu - các phiên đăng nhập khác đã bị đăng xuất') });
-                  setPw({ current: '', next: '' });
-                } catch (e) {
-                  setPwMsg({ tone: 'err', text: errMsg(e) });
-                }
-              }}
-            >
-              {t('Đổi mật khẩu')}
-            </button>
-          </div>
-        </div>
-        <SecuritySettings />
-      </div>
+      <Tabs tabs={TABS.map(([id, label]) => [id, t(label)])} value={tab} onChange={(next) => setParams({ tab: next }, { replace: true })} />
+      {tab === 'domain' && (
+        <Columns left={<PanelDomainCard />} right={[<CloudflareDnsCard key="dns" />, <CloudflareRealIpCard key="ip" />]} />
+      )}
+      {tab === 'security' && (
+        <Columns left={[<PasswordCard key="pw" />, <SessionsCard key="sessions" />]} right={[<TwoFactorCard key="2fa" />, <AllowlistCard key="allowlist" />]} />
+      )}
+      {tab === 'backup' && <Columns left={<BackupSettingsCard />} right={<LogrotateCard />} />}
+      {tab === 'integrations' && <Columns left={<AiSettingsCard />} right={<LeadSettingsCard />} />}
     </>
+  );
+}
+
+/** Two independent columns, so a tall card does not leave a gap next to a short one. */
+function Columns({ left, right }: { left: ReactNode; right: ReactNode }) {
+  return (
+    <div className="settings-cols">
+      <div>{left}</div>
+      <div>{right}</div>
+    </div>
+  );
+}
+
+function LogrotateCard() {
+  const lr = useQuery({ queryKey: ['logrotate'], queryFn: () => get<LogrotateSettings>('/api/settings/logrotate') });
+  const [form, setForm] = useState<LogrotateSettings>({ retentionDays: 14, compress: true });
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (lr.data) setForm(lr.data);
+  }, [lr.data]);
+
+  return (
+    <div className="card stack">
+      <h2>{t('Lưu trữ log truy cập (logrotate)')}</h2>
+      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+      <Field label={t('Giữ log trong (ngày)')}>
+        <input type="number" min={1} max={365} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: Number(e.target.value) })} />
+      </Field>
+      <Field label={t('Xoay vòng sớm khi file vượt quá (MB)')} hint={t('Bỏ trống = chỉ xoay vòng hằng ngày')}>
+        <input type="number" min={1} value={form.maxSizeMb ?? ''} onChange={(e) => setForm({ ...form, maxSizeMb: e.target.value ? Number(e.target.value) : undefined })} />
+      </Field>
+      <Check checked={form.compress} onChange={(v) => setForm({ ...form, compress: v })}>
+        {t('Nén (gzip) log cũ')}
+      </Check>
+      <div className="row end">
+        <button
+          className="btn primary"
+          onClick={async () => {
+            try {
+              await put('/api/settings/logrotate', form);
+              setNotice({ tone: 'ok', text: t('Đã lưu {path}', { path: '/etc/logrotate.d/lares' }) });
+            } catch (e) {
+              setNotice({ tone: 'err', text: errMsg(e) });
+            }
+          }}
+        >
+          {t('Lưu')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PasswordCard() {
+  const [pw, setPw] = useState({ current: '', next: '' });
+  const [pwMsg, setPwMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+
+  return (
+    <div className="card stack">
+      <h2>{t('Đổi mật khẩu quản trị')}</h2>
+      {pwMsg && <Alert tone={pwMsg.tone}>{pwMsg.text}</Alert>}
+      <Field label={t('Mật khẩu hiện tại')}>
+        <input type="password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
+      </Field>
+      <Field label={t('Mật khẩu mới (≥ 10 ký tự)')}>
+        <input type="password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
+      </Field>
+      <div className="row end">
+        <button
+          className="btn primary"
+          onClick={async () => {
+            try {
+              const r = await post<{ token?: string }>('/api/auth/password', pw);
+              if (r.token) auth.set(r.token); // the old token was revoked with the old password
+              setPwMsg({ tone: 'ok', text: t('Đã đổi mật khẩu - các phiên đăng nhập khác đã bị đăng xuất') });
+              setPw({ current: '', next: '' });
+            } catch (e) {
+              setPwMsg({ tone: 'err', text: errMsg(e) });
+            }
+          }}
+        >
+          {t('Đổi mật khẩu')}
+        </button>
+      </div>
+    </div>
   );
 }
 

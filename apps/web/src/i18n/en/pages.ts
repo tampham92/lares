@@ -44,6 +44,10 @@ export const PAGES_EN: Dict = {
   'Chưa có database': 'No databases yet',
 
   // Settings
+  'Tên miền & Cloudflare': 'Domain & Cloudflare',
+  'Bảo mật': 'Security',
+  'Sao lưu & log': 'Backups & logs',
+  'Tích hợp': 'Integrations',
   'Lưu trữ log truy cập (logrotate)': 'Access log retention (logrotate)',
   'Giữ log trong (ngày)': 'Keep logs for (days)',
   'Xoay vòng sớm khi file vượt quá (MB)': 'Rotate early when a file exceeds (MB)',

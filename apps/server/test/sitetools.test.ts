@@ -14,6 +14,7 @@ import { db } from '../src/db/index.js';
 import { siteToolsRoutes } from '../src/routes/sitetools.js';
 import {
   ADMINER_SHA256,
+  adminerDbServer,
   downloadAdminer,
   downstreamHeaders,
   proxyToAdminer,
@@ -147,6 +148,13 @@ describe('Adminer', () => {
     expect(php).toContain('@unlink($file);');
     expect(php).toContain('class LaresAdminer extends \\Adminer\\Adminer');
     expect(php).not.toMatch(/[a-f0-9]{64}/);
+  });
+
+  it('passes the MySQL socket in the form Adminer 6 accepts', () => {
+    // Adminer 6 parse_server(): ":/path" is a socket; "localhost:/path" is rejected as "Invalid server."
+    const socket = (server: string) => (server[0] === ':' && /^\/[-\w.:/]*$/.test(server.slice(1)) ? server.slice(1) : null);
+    expect(socket(adminerDbServer('/var/run/mysqld/mysqld.sock'))).toBe('/var/run/mysqld/mysqld.sock');
+    expect(adminerDbServer('')).toBe('localhost');
   });
 
   it('forwards only what Adminer needs and keeps redirects on the panel', () => {

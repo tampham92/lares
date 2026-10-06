@@ -9,17 +9,6 @@ import { t } from '../i18n';
 
 type Msg = { tone: 'ok' | 'err' | 'warn'; text: string } | null;
 
-/** Security cards for the Settings page grid: 2FA, IP allowlist, sessions. */
-export function SecuritySettings() {
-  return (
-    <>
-      <TwoFactorCard />
-      <AllowlistCard />
-      <SessionsCard />
-    </>
-  );
-}
-
 function QrCode({ text }: { text: string }) {
   const { size, d } = useMemo(() => {
     const qr = encode(text, { ecc: 'M', border: 2 });
@@ -65,7 +54,7 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
   );
 }
 
-function TwoFactorCard() {
+export function TwoFactorCard() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['2fa'], queryFn: () => get<TwoFactorStatus>('/api/security/2fa') });
   const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
@@ -196,7 +185,7 @@ const splitEntries = (s: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-function AllowlistCard() {
+export function AllowlistCard() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['allowlist'], queryFn: () => get<AllowlistView>('/api/security/allowlist') });
   const [text, setText] = useState('');
@@ -260,7 +249,7 @@ function AllowlistCard() {
   );
 }
 
-function SessionsCard() {
+export function SessionsCard() {
   const nav = useNavigate();
   return (
     <div className="card stack">
@@ -299,7 +288,7 @@ export function AllowlistNotice() {
     <Alert tone="warn">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <span>
-          {t('Panel đang mở cho mọi địa chỉ IP. Nên giới hạn IP truy cập và bật xác thực hai lớp trong')} <Link to="/settings">{t('Cài đặt')}</Link>.
+          {t('Panel đang mở cho mọi địa chỉ IP. Nên giới hạn IP truy cập và bật xác thực hai lớp trong')} <Link to="/settings?tab=security">{t('Cài đặt')}</Link>.
         </span>
         <button
           className="btn sm"

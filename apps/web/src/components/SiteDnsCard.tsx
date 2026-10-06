@@ -62,14 +62,14 @@ export function SiteDnsCard({ site }: { site: Site }) {
             <div className="mono">
               {[s.ipv4, s.ipv6].filter(Boolean).join(' · ') || (
                 <>
-                  {t('chưa xác định -')} <Link to="/settings">{t('nhập trong Cài đặt')}</Link>
+                  {t('chưa xác định -')} <Link to="/settings?tab=domain">{t('nhập trong Cài đặt')}</Link>
                 </>
               )}
             </div>
           </div>
           {!s.connected && (
             <Alert tone="info">
-              {t('Kết nối Cloudflare trong')} <Link to="/settings">{t('Cài đặt')}</Link> {t('để tạo bản ghi và bật/tắt proxy ngay tại đây.')}
+              {t('Kết nối Cloudflare trong')} <Link to="/settings?tab=domain">{t('Cài đặt')}</Link> {t('để tạo bản ghi và bật/tắt proxy ngay tại đây.')}
             </Alert>
           )}
           <div className="table-wrap">

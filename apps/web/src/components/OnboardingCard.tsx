@@ -10,19 +10,19 @@ const ITEMS: Record<OnboardingItemId, { title: string; hint: string; to: string;
   allowlist: {
     title: msg('Giới hạn IP truy cập panel'),
     hint: msg('Chỉ IP của bạn mới mở được trang đăng nhập. Cài đặt → Giới hạn IP truy cập panel.'),
-    to: '/settings',
+    to: '/settings?tab=security',
     action: msg('Thiết lập'),
   },
   twoFactor: {
     title: msg('Bật xác thực hai lớp (2FA)'),
     hint: msg('Lộ mật khẩu cũng không đủ để vào panel. Cài đặt → Xác thực hai lớp (2FA).'),
-    to: '/settings',
+    to: '/settings?tab=security',
     action: msg('Bật 2FA'),
   },
   panelDomain: {
     title: msg('Gắn tên miền và HTTPS cho trang quản trị'),
     hint: msg("Chứng chỉ Let's Encrypt thay cho chứng chỉ tự ký. Cài đặt → Tên miền cho trang quản trị."),
-    to: '/settings',
+    to: '/settings?tab=domain',
     action: msg('Thiết lập'),
   },
   firstSite: {
@@ -34,13 +34,13 @@ const ITEMS: Record<OnboardingItemId, { title: string; hint: string; to: string;
   backups: {
     title: msg('Bật sao lưu tự động hằng ngày'),
     hint: msg('Sao lưu file và database mỗi ngày, giữ nhiều bản. Cài đặt → Sao lưu website.'),
-    to: '/settings',
+    to: '/settings?tab=backup',
     action: msg('Thiết lập'),
   },
   cloudflare: {
     title: msg('Kết nối Cloudflare API token'),
     hint: msg('Để Lares tự tạo bản ghi DNS cho tên miền. Cài đặt → Cloudflare.'),
-    to: '/settings',
+    to: '/settings?tab=domain',
     action: msg('Kết nối'),
   },
 };

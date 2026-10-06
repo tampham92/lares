@@ -80,7 +80,7 @@ function SiteNotifyCard({ site }: { site: Site }) {
           </Field>
           {mode === 'inherit' && (
             <div className="sub">
-              {t('Khách của site này được gửi tới các kênh trong')} <Link to="/settings">{t('Cài đặt → Khách liên hệ')}</Link>.
+              {t('Khách của site này được gửi tới các kênh trong')} <Link to="/settings?tab=integrations">{t('Cài đặt → Khách liên hệ')}</Link>.
             </div>
           )}
           {mode === 'off' && <div className="sub">{t('Khách vẫn được lưu trong hộp thư, chỉ không gửi thông báo.')}</div>}

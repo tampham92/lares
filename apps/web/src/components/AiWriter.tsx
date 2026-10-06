@@ -61,7 +61,7 @@ export function AiWriter({ site }: { site: Site }) {
       <div className="card stack" style={{ maxWidth: 640 }}>
         <h2>{t('Viết bài bằng AI')}</h2>
         <Alert tone="warn">
-          {t('Chưa có API key AI. Thêm key Claude (Anthropic) hoặc OpenAI trong')} <Link to="/settings">{t('Cài đặt')}</Link> {t('để bắt đầu.')}
+          {t('Chưa có API key AI. Thêm key Claude (Anthropic) hoặc OpenAI trong')} <Link to="/settings?tab=integrations">{t('Cài đặt')}</Link> {t('để bắt đầu.')}
         </Alert>
       </div>
     );

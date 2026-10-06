@@ -144,6 +144,10 @@ code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monosp
 .grid > * { min-width: 0; }
 .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+/* Settings tabs: two independent columns (no gaps under short cards), one column on narrow screens */
+.settings-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; max-width: 1280px; }
+.settings-cols > * { min-width: 0; }
+@media (max-width: 1000px) { .settings-cols { grid-template-columns: minmax(0, 1fr); gap: 0; } }
 .stat .label { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat .value { font-size: 24px; font-weight: 650; letter-spacing: -0.01em; margin-top: 6px; font-variant-numeric: tabular-nums; }
 

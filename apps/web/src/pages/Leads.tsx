@@ -22,7 +22,7 @@ export function Leads() {
           </div>
         </div>
         <div className="row">
-          <Link className="btn" to="/settings">
+          <Link className="btn" to="/settings?tab=integrations">
             {t('Cài đặt thông báo')}
           </Link>
         </div>

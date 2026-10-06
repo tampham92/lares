@@ -102,11 +102,11 @@ export function BackupsTab({ site }: { site: Site }) {
               {data.schedule.globalEnabled ? (
                 <div className="sub">
                   {t('Hằng ngày lúc {time} (giờ máy chủ), giữ {keep} bản gần nhất.', { time: data.schedule.time, keep: data.schedule.keep })}{' '}
-                  <Link to="/settings">{t('Đổi trong Cài đặt')}</Link>
+                  <Link to="/settings?tab=backup">{t('Đổi trong Cài đặt')}</Link>
                 </div>
               ) : (
                 <Alert tone="info">
-                  {t('Sao lưu tự động đang tắt cho toàn bộ panel.')} <Link to="/settings">{t('Bật trong Cài đặt')}</Link>
+                  {t('Sao lưu tự động đang tắt cho toàn bộ panel.')} <Link to="/settings?tab=backup">{t('Bật trong Cài đặt')}</Link>
                 </Alert>
               )}
               <Check checked={data.schedule.siteEnabled} onChange={setScheduled}>

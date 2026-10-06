@@ -98,7 +98,7 @@ export function CloudflareDnsOption({ hostnames, onChange }: { hostnames: string
   if (!connected) {
     return (
       <div className="hint">
-        {t('Mẹo: kết nối Cloudflare trong')} <Link to="/settings">{t('Cài đặt')}</Link> {t('để Lares tự tạo bản ghi DNS cho tên miền.')}
+        {t('Mẹo: kết nối Cloudflare trong')} <Link to="/settings?tab=domain">{t('Cài đặt')}</Link> {t('để Lares tự tạo bản ghi DNS cho tên miền.')}
       </div>
     );
   }

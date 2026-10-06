@@ -3,21 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CloudflareRealIpView, PanelDomainView } from '@lares/shared';
 import { del, errMsg, fmtDate, get, post, put, type TaskInfo } from '../api';
 import { Alert, Badge, Check, ErrorBox, Field, TaskLog } from './ui';
-import { CloudflareDnsCard, PanelDnsRecord } from './CloudflareDnsCard';
+import { PanelDnsRecord } from './CloudflareDnsCard';
 import { locale, t } from '../i18n';
 
-/** Settings cards: trusted certificate for the panel, real visitor IP behind Cloudflare. */
-export function NetworkSettings() {
-  return (
-    <>
-      <PanelDomainCard />
-      <CloudflareDnsCard />
-      <CloudflareCard />
-    </>
-  );
-}
-
-function PanelDomainCard() {
+/** Settings card: trusted certificate for the panel. */
+export function PanelDomainCard() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['panel-domain'], queryFn: () => get<PanelDomainView>('/api/settings/panel-domain') });
   const [domain, setDomain] = useState('');
@@ -155,7 +145,8 @@ function PanelDomainCard() {
   );
 }
 
-function CloudflareCard() {
+/** Settings card: real visitor IP behind Cloudflare. */
+export function CloudflareRealIpCard() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['cloudflare'], queryFn: () => get<CloudflareRealIpView>('/api/settings/cloudflare') });
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
