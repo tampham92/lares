@@ -17,6 +17,7 @@ import { securityRoutes } from './routes/security.js';
 import { backupRoutes } from './routes/backups.js';
 import { releaseRoutes } from './routes/release.js';
 import { siteRoutes } from './routes/sites.js';
+import { siteToolsRoutes } from './routes/sitetools.js';
 import { systemRoutes } from './routes/system.js';
 import { templateRoutes } from './routes/templates.js';
 import { getLogrotate, saveLogrotate } from './services/logs.js';
@@ -75,6 +76,7 @@ await app.register(networkRoutes);
 await app.register(securityRoutes);
 await app.register(backupRoutes);
 await app.register(releaseRoutes);
+await app.register(siteToolsRoutes);
 
 if (fs.existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false });

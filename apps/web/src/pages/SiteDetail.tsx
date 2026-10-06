@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { APP_LABELS, LOCALHOST, msg, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
 import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
+import { AdminerButton } from '../components/AdminerButton';
 import { AiWriter } from '../components/AiWriter';
 import { BackupsTab } from '../components/BackupsTab';
+import { PhpSettingsTab } from '../components/PhpSettingsTab';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
 import { locale, t } from '../i18n';
@@ -16,7 +18,7 @@ interface SiteDetailResponse {
   nodeConfig: { gitUrl?: string; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
-type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'backups' | 'clone' | 'danger';
+type Tab = 'overview' | 'ssl' | 'logs' | 'php' | 'nextjs' | 'ai' | 'backups' | 'clone' | 'danger';
 
 export function SiteDetail() {
   const id = Number(useParams().id);
@@ -34,6 +36,7 @@ function SitePage({ id }: { id: number }) {
     ['overview', t('Tổng quan')],
     ['ssl', 'SSL'],
     ['logs', t('Log traffic')],
+    ...(site.phpVersion ? ([['php', 'PHP']] as Array<[Tab, string]>) : []),
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
     ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')]] as Array<[Tab, string]>) : []),
     ['backups', t('Sao lưu')],
@@ -67,6 +70,7 @@ function SitePage({ id }: { id: number }) {
       {tab === 'overview' && <Overview data={q.data} />}
       {tab === 'ssl' && <SslTab site={site} />}
       {tab === 'logs' && <LogsTab site={site} />}
+      {tab === 'php' && <PhpSettingsTab site={site} />}
       {tab === 'nextjs' && <NextTab data={q.data} />}
       {tab === 'ai' && <AiWriter site={site} />}
       {tab === 'backups' && <BackupsTab site={site} />}
@@ -148,8 +152,12 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
           <>
             <h3>Database</h3>
             {databases.map((d) => (
-              <div key={d.id} className="mono">
-                {d.name} / {d.username} {!d.managed && <Badge tone="warn">{t('dùng chung')}</Badge>}
+              <div key={d.id} className="row">
+                <span className="mono" style={{ minWidth: 0 }}>
+                  {d.name} / {d.username}
+                </span>
+                {!d.managed && <Badge tone="warn">{t('dùng chung')}</Badge>}
+                <AdminerButton databaseId={d.id} />
               </div>
             ))}
           </>

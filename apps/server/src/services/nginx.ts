@@ -20,6 +20,8 @@ export interface VhostSpec {
   accessLog: boolean;
   disabled: boolean;
   ssl: { certificate: string; privateKey: string; forceHttps: boolean } | null;
+  /** client_max_body_size in MB, following the site's PHP upload limit (services/phpSettings.ts); unset = 256. */
+  clientMaxBodyMb?: number | null;
 }
 
 export const vhostPath = (domain: string) => path.join(config.nginxAvailable, `${domain}.conf`);
@@ -65,7 +67,7 @@ function appBody(spec: VhostSpec): string {
   const common = [
     spec.accessLog ? `access_log ${logs.access} lares;` : 'access_log off;',
     `error_log ${logs.error} warn;`,
-    'client_max_body_size 256m;',
+    `client_max_body_size ${spec.clientMaxBodyMb ?? 256}m;`,
     '',
     acmeLocation(),
     '',

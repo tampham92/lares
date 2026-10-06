@@ -145,3 +145,16 @@ CREATE TABLE IF NOT EXISTS site_backups (
   last_run_at TEXT
 );
 `);
+
+// ---- Site tools: per-site PHP settings (services/phpSettings.ts) -----------
+// The values a site overrides (JSON, see phpSettingsSchema) and the nginx client_max_body_size
+// derived from them when they were saved (MB), so rendering a vhost needs no php.ini lookup.
+// Adminer state and the onboarding dismissal live in the settings table (keys `adminer`, `onboarding.<userId>`).
+db.exec(`
+CREATE TABLE IF NOT EXISTS site_php_settings (
+  site_id INTEGER PRIMARY KEY REFERENCES sites(id) ON DELETE CASCADE,
+  settings_json TEXT NOT NULL,
+  client_max_body_mb INTEGER,
+  updated_at TEXT NOT NULL
+);
+`);
