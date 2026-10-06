@@ -35,6 +35,8 @@ export function isDue(now: Date, time: string, lastRunDate: string | null): bool
 
 /** How many backups of each trigger are kept automatically. Manual backups are never pruned. */
 export const SAFETY_KEEP = 3;
+/** Backups taken automatically before a WordPress update (services/wpUpdates.ts). */
+export const PRE_UPDATE_KEEP = 3;
 
 /**
  * Backups to delete so that only the `keep` newest of `trigger` remain (others are untouched).

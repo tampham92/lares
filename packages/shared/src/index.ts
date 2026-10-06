@@ -6,6 +6,7 @@ export * from './network.js';
 export * from './security.js';
 export * from './backup.js';
 export * from './release.js';
+export * from './wpupdates.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)

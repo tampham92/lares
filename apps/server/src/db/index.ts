@@ -145,3 +145,28 @@ CREATE TABLE IF NOT EXISTS site_backups (
   last_run_at TEXT
 );
 `);
+
+// ---- WordPress updates (services/wpUpdates.ts) ------------------------------
+// Cached inventory (core/plugin/theme versions and available updates) per site, and the history of
+// update runs. A run still 'running' at startup was interrupted by a panel restart.
+db.exec(`
+CREATE TABLE IF NOT EXISTS wp_update_inventory (
+  site_id INTEGER PRIMARY KEY REFERENCES sites(id) ON DELETE CASCADE,
+  data_json TEXT,
+  checked_at TEXT NOT NULL,
+  error TEXT
+);
+CREATE TABLE IF NOT EXISTS wp_update_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  task_id TEXT,
+  status TEXT NOT NULL,
+  items_json TEXT NOT NULL,
+  backup_id TEXT,
+  error TEXT,
+  details_json TEXT NOT NULL DEFAULT '{}',
+  started_at TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wp_update_runs_site ON wp_update_runs(site_id, id);
+`);

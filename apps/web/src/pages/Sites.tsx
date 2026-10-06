@@ -4,6 +4,7 @@ import { APP_LABELS, type Site } from '@lares/shared';
 import { fmtDate, get, siteHref, siteLabel } from '../api';
 import { Badge, ErrorBox } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
+import { WpUpdatesBadge } from '../components/WpUpdatesTab';
 import { t } from '../i18n';
 
 export function Sites() {
@@ -54,7 +55,7 @@ export function Sites() {
                   </div>
                 </td>
                 <td>
-                  {t(APP_LABELS[s.appType])} {s.migrationId && <Badge tone="info">migrated</Badge>}
+                  {t(APP_LABELS[s.appType])} {s.migrationId && <Badge tone="info">migrated</Badge>} {s.appType === 'wordpress' && <WpUpdatesBadge siteId={s.id} />}
                 </td>
                 <td className="mono">{s.appType === 'nextjs' ? `node :${s.appPort}` : s.phpVersion ? `PHP ${s.phpVersion}` : '—'}</td>
                 <td>
