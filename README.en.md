@@ -4,7 +4,7 @@
 
 A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **WordPress** and **Next.js** websites (plus plain PHP and static HTML), SSL, traffic logs, databases, backups, and **migrate sites from another VPS/panel**.
 
-**Docs:** [Installation](docs/en/installation.md) · [Security](docs/en/security.md) · [Troubleshooting](docs/en/troubleshooting.md) · [Backups](docs/en/backups.md) · [FAQ](docs/en/faq.md) · [Changelog](CHANGELOG.md)
+**Docs:** [Installation](docs/en/installation.md) · [Security](docs/en/security.md) · [Troubleshooting](docs/en/troubleshooting.md) · [Backups](docs/en/backups.md) · [Contact leads](docs/en/leads.md) · [FAQ](docs/en/faq.md) · [Changelog](CHANGELOG.md)
 
 > **Beta**: Lares is in `0.x` beta. Take backups, and try it on a non-critical VPS before using it for important sites.
 
