@@ -1,0 +1,171 @@
+{
+  "id": "nha-hang",
+  "name": "Nhà hàng & Quán cà phê",
+  "description": "Nhà hàng, quán ăn, quán cà phê: thực đơn kèm giá và ảnh món, câu chuyện của quán, thư viện ảnh, đánh giá, form đặt bàn, bản đồ và giờ mở cửa.",
+  "types": ["wordpress", "static"],
+  "previewImage": "assets/thumb.webp",
+  "builder": {
+    "version": 1,
+    "industry": "restaurant",
+    "lang": "vi",
+    "business": {
+      "name": "Bếp Nhà Mây",
+      "slogan": "Phở bò nấu xương 12 tiếng, bún chả than hoa và cà phê phin – hương vị Hà Nội giữa lòng Sài Gòn.",
+      "phone": "028 3930 5678",
+      "zalo": "0912 345 678",
+      "email": "datban@bepnhamay.vn",
+      "address": "45 Trần Quốc Thảo, Phường Võ Thị Sáu, Quận 3, TP. Hồ Chí Minh",
+      "city": "TP. Hồ Chí Minh",
+      "hours": [
+        { "label": "Bữa sáng", "value": "6:30 – 10:30" },
+        { "label": "Bữa trưa & tối", "value": "11:00 – 21:30" },
+        { "label": "Cà phê", "value": "6:30 – 22:00 hằng ngày" }
+      ],
+      "items": [
+        { "title": "Phở bò tái lăn", "price": "75.000đ", "text": "Nước dùng xương ống ninh 12 tiếng, thịt bò tái lăn gừng tỏi.", "image": "tpl:nha-hang/dish-pho.webp", "meta": "Món đặc trưng" },
+        { "title": "Bún chả Hà Nội", "price": "70.000đ", "text": "Chả viên, chả miếng nướng than hoa, nước chấm chua ngọt, rau sống.", "image": "tpl:nha-hang/dish-bun.webp" },
+        { "title": "Nem rán (4 chiếc)", "price": "55.000đ", "text": "Nhân thịt, mộc nhĩ, miến, cuốn bánh đa nem giòn rụm." },
+        { "title": "Gỏi cuốn tôm thịt", "price": "50.000đ", "text": "Tôm sú, thịt ba chỉ, bún, rau thơm, chấm tương đậu phộng." },
+        { "title": "Cà phê phin sữa đá", "price": "35.000đ", "text": "Robusta Buôn Ma Thuột rang mộc, pha phin tại bàn.", "image": "tpl:nha-hang/coffee-phin.webp", "meta": "Bán chạy" },
+        { "title": "Bạc xỉu", "price": "39.000đ", "text": "Nhiều sữa, ít cà phê, vị béo nhẹ cho người mới uống.", "image": "tpl:nha-hang/bac-xiu.webp" },
+        { "title": "Cà phê muối", "price": "45.000đ", "text": "Lớp kem muối mằn mặn trên nền cà phê đậm." },
+        { "title": "Trà sen vàng", "price": "45.000đ", "text": "Trà Thái Nguyên ướp sen, hạt sen bùi và kem cheese." }
+      ]
+    },
+    "style": { "color": "#b5452a", "preset": "warm" },
+    "floatingContact": true,
+    "sections": [
+      {
+        "type": "hero",
+        "variant": "overlay",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Quán ăn gia đình tại {city}",
+          "title": "Bát phở nóng hổi, **đúng vị Hà Nội** như bà nấu",
+          "text": "{slogan}",
+          "cta": "Đặt bàn",
+          "cta2": "Xem thực đơn",
+          "image": "tpl:nha-hang/hero.webp",
+          "points": ["Mở cửa từ 6:30 sáng", "Phòng riêng 20 khách", "Giao hàng trong bán kính 5km"]
+        }
+      },
+      {
+        "type": "services",
+        "variant": "menu",
+        "enabled": true,
+        "content": {
+          "nav": "Thực đơn",
+          "anchor": "thuc-don",
+          "eyebrow": "Thực đơn",
+          "title": "Món ngon mỗi ngày",
+          "text": "Nguyên liệu nhập mỗi sáng từ chợ đầu mối, không bột ngọt trong nước dùng.",
+          "note": "Giá đã gồm VAT. Thực đơn đầy đủ có tại quán."
+        }
+      },
+      {
+        "type": "about",
+        "variant": "stats",
+        "enabled": true,
+        "content": {
+          "nav": "Câu chuyện",
+          "eyebrow": "Câu chuyện của quán",
+          "title": "Từ gánh phở của bà đến căn bếp nhỏ ở Sài Gòn",
+          "text": "{brand} bắt đầu từ công thức phở của bà nội ở phố Hàng Bạc. Ba thế hệ giữ nguyên cách ninh xương, đốt gừng hành và nêm nước mắm cốt.\n\nChúng tôi mở quán để những người con xa Hà Nội tìm lại hương vị quen thuộc, và để bạn bè Sài Gòn có chỗ ngồi thong thả bên ly cà phê phin.",
+          "stats": [
+            { "value": "3", "label": "thế hệ giữ công thức" },
+            { "value": "12 giờ", "label": "ninh xương mỗi nồi nước dùng" },
+            { "value": "4,8★", "label": "điểm đánh giá trên Google" },
+            { "value": "500+", "label": "bát phở mỗi ngày" }
+          ]
+        }
+      },
+      {
+        "type": "gallery",
+        "variant": "masonry",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Không gian & món ăn",
+          "title": "Ghé {brand} một lần, nhớ mãi",
+          "items": [
+            { "title": "Góc quán ngập nắng sáng", "image": "tpl:nha-hang/gal-1.webp" },
+            { "title": "Barista pha cà phê", "image": "tpl:nha-hang/gal-2.webp" },
+            { "title": "Đầu bếp trình bày món", "image": "tpl:nha-hang/gal-3.webp" },
+            { "title": "Phở bò nóng hổi", "image": "tpl:nha-hang/gal-4.webp" },
+            { "title": "Quầy bánh và đồ uống", "image": "tpl:nha-hang/gal-5.webp" }
+          ]
+        }
+      },
+      {
+        "type": "testimonials",
+        "variant": "spotlight",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Thực khách nói gì",
+          "items": [
+            { "title": "Anh Đức Huy", "meta": "Đánh giá trên Google Maps", "text": "Nước phở trong, ngọt xương, không bị gắt. Đây là bát phở giống Hà Nội nhất mà tôi ăn được ở Sài Gòn.", "rating": 5 },
+            { "title": "Chị Thanh Vân", "meta": "Khách quen", "text": "Sáng nào cũng ghé làm ly phin sữa đá. Nhân viên nhớ cả thói quen ít đường của mình.", "rating": 5 },
+            { "title": "Bạn Minh Khoa", "meta": "Sinh viên", "text": "Bún chả nướng than thơm lừng, giá hợp lý, phần ăn đầy đặn.", "rating": 5 }
+          ]
+        }
+      },
+      {
+        "type": "contact",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "nav": "Đặt bàn",
+          "anchor": "dat-ban",
+          "eyebrow": "Đặt bàn",
+          "title": "Giữ bàn cho nhóm của bạn",
+          "text": "Nhận đặt bàn tiệc sinh nhật, liên hoan công ty đến 60 khách. Quán sẽ gọi xác nhận trong 15 phút.",
+          "cta": "Đặt bàn",
+          "formKind": "booking"
+        }
+      },
+      {
+        "type": "map",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Tìm đường",
+          "title": "Giờ mở cửa"
+        }
+      },
+      {
+        "type": "team",
+        "variant": "round",
+        "enabled": false,
+        "content": {
+          "eyebrow": "Người đứng bếp",
+          "title": "Những người nấu nên hương vị",
+          "items": [
+            { "title": "Bếp trưởng Hoàng Nam", "meta": "20 năm nấu phở", "image": "tpl:nha-hang/chef.webp" },
+            { "title": "Nguyễn Thị Lan", "meta": "Phụ trách món cuốn" },
+            { "title": "Phạm Gia Bảo", "meta": "Barista" }
+          ]
+        }
+      },
+      {
+        "type": "faq",
+        "variant": "split",
+        "enabled": false,
+        "content": {
+          "eyebrow": "Hỏi đáp",
+          "title": "Thông tin hữu ích",
+          "text": "Chưa thấy câu trả lời? Gọi hoặc nhắn Zalo cho quán.",
+          "items": [
+            { "title": "Quán có chỗ đỗ ô tô không?", "text": "Có bãi đỗ ô tô có thu phí cách quán 50m, xe máy gửi miễn phí trước cửa." },
+            { "title": "Có giao hàng không?", "text": "Có, qua GrabFood, ShopeeFood hoặc gọi trực tiếp cho quán trong bán kính 5km." },
+            { "title": "Có món chay không?", "text": "Có phở chay nấu từ rau củ và nấm, vui lòng báo trước khi gọi món." }
+          ]
+        }
+      },
+      {
+        "type": "footer",
+        "variant": "columns",
+        "enabled": true,
+        "content": {}
+      }
+    ]
+  }
+}

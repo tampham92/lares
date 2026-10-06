@@ -1,0 +1,190 @@
+{
+  "id": "spa",
+  "name": "Spa & Thẩm mỹ viện",
+  "description": "Spa, thẩm mỹ viện, nail, gội đầu dưỡng sinh: dịch vụ có ảnh, bảng giá, đội ngũ chuyên viên, đánh giá, form đặt lịch, bản đồ và giờ mở cửa.",
+  "types": ["wordpress", "static"],
+  "previewImage": "assets/thumb.webp",
+  "builder": {
+    "version": 1,
+    "industry": "spa",
+    "lang": "vi",
+    "business": {
+      "name": "Hoa Mộc Spa",
+      "slogan": "Chăm sóc da và trị liệu thư giãn bằng thảo mộc Việt – nơi bạn được nghỉ ngơi thật sự.",
+      "phone": "0908 246 135",
+      "zalo": "",
+      "email": "datlich@hoamocspa.vn",
+      "address": "28 Nguyễn Đình Chiểu, Phường Đa Kao, Quận 1, TP. Hồ Chí Minh",
+      "city": "TP. Hồ Chí Minh",
+      "hours": [
+        { "label": "Thứ Hai – Thứ Sáu", "value": "9:00 – 21:00" },
+        { "label": "Thứ Bảy, Chủ Nhật", "value": "8:30 – 22:00" }
+      ],
+      "items": [
+        { "title": "Massage body thảo mộc 60 phút", "price": "450.000đ", "text": "Tinh dầu sả chanh, đá muối Himalaya, chườm túi thảo dược ấm." },
+        { "title": "Massage đá nóng 90 phút", "price": "650.000đ", "text": "Đá bazan làm ấm, giải toả căng cơ vai gáy và thắt lưng." },
+        { "title": "Chăm sóc da mặt chuyên sâu", "price": "550.000đ", "text": "Làm sạch, tẩy da chết, đắp mặt nạ theo loại da, massage nâng cơ." },
+        { "title": "Trị mụn chuẩn y khoa", "price": "390.000đ", "text": "Lấy nhân mụn vô khuẩn, điện tím, mặt nạ làm dịu." },
+        { "title": "Gội đầu dưỡng sinh", "price": "180.000đ", "text": "Gội thảo dược bồ kết, massage cổ vai gáy 20 phút." },
+        { "title": "Tắm trắng thảo mộc", "price": "750.000đ", "text": "Tẩy tế bào chết toàn thân, ủ cám gạo – sữa tươi." },
+        { "title": "Combo thư giãn 2 giờ", "price": "890.000đ", "text": "Massage body 60 phút + chăm sóc da mặt + gội đầu dưỡng sinh." },
+        { "title": "Liệu trình 10 buổi massage", "price": "3.900.000đ", "text": "Tiết kiệm 600.000đ, dùng trong 6 tháng, chia sẻ được cho người thân." }
+      ]
+    },
+    "style": { "color": "#2f6b4f", "preset": "luxury" },
+    "floatingContact": true,
+    "sections": [
+      {
+        "type": "hero",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Spa thảo mộc tại {city}",
+          "title": "Thả lỏng cơ thể, **đánh thức làn da** sau một tuần bận rộn",
+          "text": "{slogan}",
+          "cta": "Đặt lịch ngay",
+          "cta2": "Xem dịch vụ",
+          "image": "tpl:spa/hero.webp",
+          "points": ["Chuyên viên trên 5 năm kinh nghiệm", "Mỹ phẩm hữu cơ có nguồn gốc rõ ràng", "Miễn phí trà thảo mộc và bánh nhẹ"]
+        }
+      },
+      {
+        "type": "services",
+        "variant": "cards",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Dịch vụ nổi bật",
+          "title": "Liệu trình được khách quay lại nhiều nhất",
+          "text": "Mỗi liệu trình bắt đầu bằng một buổi trò chuyện ngắn để chuyên viên hiểu tình trạng cơ thể và làn da của bạn.",
+          "items": [
+            { "title": "Massage trị liệu", "text": "Kết hợp ấn huyệt và kỹ thuật Thụy Điển, giảm đau mỏi vai gáy cho dân văn phòng.", "price": "Từ 450.000đ", "image": "tpl:spa/svc-massage.webp" },
+            { "title": "Chăm sóc da mặt", "text": "Quy trình 12 bước với mỹ phẩm hữu cơ, phù hợp cả da nhạy cảm.", "price": "Từ 390.000đ", "image": "tpl:spa/svc-facial.webp" },
+            { "title": "Đá nóng thảo dược", "text": "Đá bazan ấm lăn dọc sống lưng giúp lưu thông khí huyết, ngủ sâu hơn.", "price": "Từ 650.000đ", "image": "tpl:spa/svc-hotstone.webp" },
+            { "title": "Tắm thảo mộc", "text": "Bồn tắm lá thuốc người Dao đỏ, thư giãn toàn thân sau ngày dài.", "price": "Từ 350.000đ", "image": "tpl:spa/svc-herbal.webp" }
+          ]
+        }
+      },
+      {
+        "type": "about",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Về {brand}",
+          "title": "Một khoảng lặng giữa lòng thành phố",
+          "text": "{brand} ra đời từ mong muốn rất giản dị: để mỗi người khách bước vào đều được chăm sóc như người nhà. Chúng tôi chọn thảo mộc Việt, ánh sáng dịu và âm nhạc nhẹ để bạn quên đi điện thoại trong vài giờ.\n\nPhòng trị liệu riêng tư, khăn và dụng cụ được tiệt trùng sau mỗi lượt khách. Chuyên viên được đào tạo bài bản và cập nhật kỹ thuật mới mỗi quý.",
+          "image": "tpl:spa/about.webp",
+          "points": ["8 phòng trị liệu riêng, có phòng đôi cho cặp đôi", "Quy trình vô khuẩn theo tiêu chuẩn Bộ Y tế", "Không bán thêm sản phẩm, không ép mua liệu trình"]
+        }
+      },
+      {
+        "type": "pricing",
+        "variant": "table",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Bảng giá",
+          "title": "Giá niêm yết rõ ràng, không phát sinh",
+          "note": "Giá đã gồm VAT. Giảm 10% cho khách đặt lịch trước qua website hoặc Zalo."
+        }
+      },
+      {
+        "type": "team",
+        "variant": "cards",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Đội ngũ",
+          "title": "Bàn tay của những chuyên viên tận tâm",
+          "items": [
+            { "title": "Nguyễn Thu Hà", "meta": "Trưởng chuyên viên da liễu", "text": "9 năm kinh nghiệm chăm sóc da, chứng chỉ Esthetician quốc tế.", "image": "tpl:spa/team-1.webp" },
+            { "title": "Trần Minh Thư", "meta": "Chuyên viên trị liệu", "text": "Thành thạo massage Thụy Điển, đá nóng và ấn huyệt.", "image": "tpl:spa/team-2.webp" },
+            { "title": "Lê Phương Anh", "meta": "Chuyên viên chăm sóc da", "text": "Tận tâm với làn da nhạy cảm, mụn và da sau sinh.", "image": "tpl:spa/team-3.webp" }
+          ]
+        }
+      },
+      {
+        "type": "testimonials",
+        "variant": "cards",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Khách hàng nói gì",
+          "title": "Hơn 2.000 lượt khách hài lòng mỗi năm",
+          "items": [
+            { "title": "Chị Ngọc Trâm", "meta": "Nhân viên văn phòng, Quận 3", "text": "Mình bị đau vai gáy kinh niên, sau 3 buổi massage đá nóng ngủ ngon hẳn. Không gian yên tĩnh, các bạn nhẹ nhàng, không mời mua thêm gì.", "rating": 5 },
+            { "title": "Anh Quốc Bảo", "meta": "Khách đi cùng vợ", "text": "Đặt phòng đôi dịp kỷ niệm ngày cưới, được tặng trà và bánh rất chu đáo. Giá đúng như bảng niêm yết.", "rating": 5 },
+            { "title": "Chị Mai Linh", "meta": "Khách quen 2 năm", "text": "Da mình nhạy cảm nhưng làm da mặt ở đây chưa bị kích ứng lần nào. Chị Hà tư vấn rất kỹ trước khi làm.", "rating": 5 }
+          ]
+        }
+      },
+      {
+        "type": "gallery",
+        "variant": "grid",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Không gian",
+          "title": "Ghé thăm {brand}",
+          "items": [
+            { "title": "Phòng trị liệu với nến thơm và hoa tươi", "image": "tpl:spa/gal-1.webp" },
+            { "title": "Khăn bông, nến và mật ong cho liệu trình", "image": "tpl:spa/gal-2.webp" },
+            { "title": "Mỹ phẩm hữu cơ dùng tại spa", "image": "tpl:spa/gal-3.webp" },
+            { "title": "Khay tinh dầu và oải hương", "image": "tpl:spa/gal-4.webp" },
+            { "title": "Khu nghỉ thư giãn sau liệu trình", "image": "tpl:spa/gal-5.webp" }
+          ]
+        }
+      },
+      {
+        "type": "faq",
+        "variant": "accordion",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Hỏi đáp",
+          "title": "Những điều khách hay hỏi",
+          "items": [
+            { "title": "Tôi có cần đặt lịch trước không?", "text": "Nên đặt trước ít nhất 2 giờ, nhất là cuối tuần, để chúng tôi giữ phòng và chuyên viên cho bạn. Đặt qua website hoặc Zalo được giảm 10%." },
+            { "title": "Spa có phòng riêng cho nam không?", "text": "Có. Chúng tôi có phòng riêng và chuyên viên trị liệu nam theo yêu cầu, vui lòng ghi chú khi đặt lịch." },
+            { "title": "Bà bầu có làm được dịch vụ không?", "text": "Có liệu trình massage dành riêng cho mẹ bầu từ tháng thứ 4, dùng tinh dầu an toàn. Vui lòng báo trước để chuyên viên chuẩn bị." },
+            { "title": "Có chỗ gửi xe không?", "text": "Có chỗ gửi xe máy miễn phí ngay trước cửa. Ô tô có thể đỗ tại bãi xe cách spa khoảng 100m." }
+          ]
+        }
+      },
+      {
+        "type": "contact",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Đặt lịch",
+          "title": "Giữ chỗ cho buổi thư giãn của bạn",
+          "text": "Để lại thông tin, lễ tân sẽ gọi xác nhận trong ít phút. Hoặc nhắn Zalo cho {brand} bất cứ lúc nào.",
+          "cta": "Đặt lịch ngay",
+          "formKind": "booking"
+        }
+      },
+      {
+        "type": "map",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Đường đến spa",
+          "title": "Giờ mở cửa"
+        }
+      },
+      {
+        "type": "offer",
+        "variant": "band",
+        "enabled": false,
+        "content": {
+          "eyebrow": "Ưu đãi tháng này",
+          "title": "Giảm 30% liệu trình đầu tiên",
+          "text": "Áp dụng cho khách lần đầu đến {brand}, đặt lịch trước qua website.",
+          "price": "315.000đ",
+          "oldPrice": "450.000đ",
+          "cta": "Nhận ưu đãi"
+        }
+      },
+      {
+        "type": "footer",
+        "variant": "columns",
+        "enabled": true,
+        "content": {}
+      }
+    ]
+  }
+}

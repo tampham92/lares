@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { Branding, TemplateInfo } from '@lares/shared';
 import { auth, get } from '../api';
@@ -30,6 +31,9 @@ export function TemplatePicker({
     return `/api/templates/${tpl.id}/preview?${p.toString()}`;
   };
 
+  // bundled thumbnails are served by the panel API, which needs the session token
+  const thumbUrl = (src: string) => (src.startsWith('/api/') ? `${src}?token=${encodeURIComponent(auth.token ?? '')}` : src);
+
   return (
     <div className="stack">
       <h3>{t('Giao diện')}</h3>
@@ -41,10 +45,17 @@ export function TemplatePicker({
             <span className="sub">{t('Tự dựng giao diện từ đầu')}</span>
           </div>
         </button>
+        <Link to="/sites/new/builder" className="tpl">
+          <div className="tpl-thumb blank">{t('Trả lời vài câu hỏi → website hoàn chỉnh')}</div>
+          <div className="tpl-body">
+            <strong>{t('Tự tạo giao diện')}</strong>
+            <span className="sub">{t('Chọn ngành, màu thương hiệu, phong cách và các khối nội dung')}</span>
+          </div>
+        </Link>
         {list.map((tpl) => (
           <button type="button" key={tpl.id} className={`tpl ${value === tpl.id ? 'active' : ''}`} onClick={() => onChange(tpl.id)}>
             <div className="tpl-thumb" style={{ backgroundColor: tpl.colors.primary }}>
-              {tpl.previewImage && <img src={tpl.previewImage} alt="" loading="lazy" />}
+              {tpl.previewImage && <img src={thumbUrl(tpl.previewImage)} alt="" loading="lazy" />}
               <span className="tpl-colors">
                 <i style={{ background: tpl.colors.primary }} />
                 <i style={{ background: tpl.colors.accent }} />

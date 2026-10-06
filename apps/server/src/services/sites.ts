@@ -17,6 +17,7 @@ import { resolvePhpVersion } from './php.js';
 import { siteClientMaxBodyMb } from './phpSettings.js';
 import * as ssl from './ssl.js';
 import * as templates from './templates.js';
+import { manifestFromSpec as builderManifest } from './builder/index.js';
 import { ensurePortHostFix, installWordpress, wordpressReplaceUrl } from './wordpress.js';
 
 interface SiteRow {
@@ -248,7 +249,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
 
     switch (input.type) {
       case 'wordpress': {
-        const tpl = input.template ? await templates.getTemplate(input.template) : null;
+        const tpl = input.builder ? builderManifest(input.builder) : input.template ? await templates.getTemplate(input.template) : null;
         const vars = tpl ? templates.templateVars(tpl, input.branding) : null;
         const wp = { ...input.wordpress, title: input.wordpress.title || vars?.SITE_NAME };
         // A template needs a finished install to import its content, so generate an admin account if none was given.
@@ -262,7 +263,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
           wordpressAdmin = { url: `${url}/wp-admin/`, user: wp.adminUser, password: wp.adminPassword };
         }
         if (tpl && vars) {
-          if (installed) await templates.installWordpressTemplate(tpl.id, site.webRoot, vars, log);
+          if (installed) await templates.installWordpressTemplate(tpl, site.webRoot, vars, log);
           else log(t('Cảnh báo: cần wp-cli trên máy chủ để cài giao diện mẫu WordPress - site được tạo với giao diện mặc định'));
         }
         if (wordpressAdmin) log(t('Tài khoản quản trị WordPress: {user} / {password} - đăng nhập tại {url}', { user: wordpressAdmin.user, password: wordpressAdmin.password, url: wordpressAdmin.url }));
@@ -272,9 +273,9 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
         await host.writeFile(path.join(site.webRoot, 'index.php'), `<?php\necho '<h1>${domain}</h1><p>${tDefault('Site được tạo bởi Lares.')}</p>';\n`);
         break;
       case 'static':
-        if (input.template) {
-          const tpl = await templates.getTemplate(input.template);
-          await templates.installStaticTemplate(tpl.id, site.webRoot, templates.templateVars(tpl, input.branding), log);
+        if (input.builder || input.template) {
+          const tpl = input.builder ? builderManifest(input.builder) : await templates.getTemplate(input.template!);
+          await templates.installStaticTemplate(tpl, site.webRoot, templates.templateVars(tpl, input.branding), log);
         } else {
           await host.writeFile(path.join(site.webRoot, 'index.html'), `<!doctype html><meta charset="utf-8"><title>${domain}</title><h1>${domain}</h1><p>${tDefault('Site được tạo bởi Lares.')}</p>\n`);
         }

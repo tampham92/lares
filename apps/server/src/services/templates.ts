@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { Branding, TemplateInfo } from '@lares/shared';
+import type { Branding, BuilderSpec, TemplateInfo } from '@lares/shared';
 import { config } from '../config.js';
 import { t } from '../i18n/index.js';
 import { randomSuffix } from '../lib/crypto.js';
@@ -8,14 +8,17 @@ import { notFound } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
 import { wpCli } from './wordpress.js';
+import * as builder from './builder/index.js';
 
 interface NavLink {
   label: string;
   url: string;
 }
 
-interface TemplateManifest extends TemplateInfo {
+export interface TemplateManifest extends TemplateInfo {
   font: string;
+  /** Site builder spec: the template is rendered from it (see services/builder). */
+  builder?: BuilderSpec;
   wordpress?: {
     nav: NavLink[];
     categories: Array<{ slug: string; name: string }>;
@@ -31,6 +34,10 @@ const exists = (p: string) => fs.access(p).then(() => true, () => false);
 /** Custom templates (survive upgrades) win over built-in ones with the same id. */
 const templateDirs = () => [config.customTemplatesDir, config.templatesDir];
 
+export async function templateDir(id: string): Promise<string> {
+  return dir(id);
+}
+
 async function dir(id: string): Promise<string> {
   for (const base of templateDirs()) {
     const d = path.join(base, id);
@@ -45,7 +52,8 @@ export async function getTemplate(id: string): Promise<TemplateManifest> {
   if (!ID_RE.test(id)) throw notFound(t('Template không tồn tại'));
   const d = await dir(id);
   try {
-    const t = JSON.parse(await fs.readFile(path.join(d, 'template.json'), 'utf8')) as TemplateManifest;
+    const raw = JSON.parse(await fs.readFile(path.join(d, 'template.json'), 'utf8')) as TemplateManifest;
+    const t = raw.builder ? builder.normalizeBuilderManifest(raw, id) : raw;
     return { ...t, id, custom: d.startsWith(config.customTemplatesDir) };
   } catch (err) {
     throw notFound(t('template.json của "{id}" không hợp lệ: {error}', { id, error: err instanceof Error ? err.message : String(err) }));
@@ -63,7 +71,7 @@ export async function listTemplates(): Promise<TemplateInfo[]> {
   for (const id of ids) {
     const t = await getTemplate(id).catch(() => null);
     if (!t) continue;
-    out.push({ id: t.id, name: t.name, description: t.description, types: t.types, colors: t.colors, previewImage: t.previewImage ?? null, defaults: t.defaults, custom: t.custom });
+    out.push({ id: t.id, name: t.name, description: t.description, types: t.types, colors: t.colors, previewImage: builder.publicPreviewImage(t.id, t.previewImage), defaults: t.defaults, custom: t.custom });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
@@ -113,14 +121,21 @@ export const contactFormBlock = (themeSlug: string) => `<!-- wp:template-part ${
 // Static HTML
 // ---------------------------------------------------------------------------
 
-export async function renderStaticPage(id: string, vars: TemplateVars): Promise<string> {
+/** `id` may also be an in-memory manifest (site builder); `token` authenticates preview assets. */
+export async function renderStaticPage(idOrTpl: string | TemplateManifest, vars: TemplateVars, opts: { token?: string } = {}): Promise<string> {
+  const tpl = typeof idOrTpl === 'string' ? await getTemplate(idOrTpl) : idOrTpl;
+  if (tpl.builder) return builder.renderBuilderPage(tpl, vars, opts);
+  const id = tpl.id;
   const html = await fs.readFile(path.join(await dir(id), 'index.html'), 'utf8');
   const css = await readCss(id, false);
   const leadJs = await readLeadJs();
   return fill(html, vars).replace('{{CSS}}', () => css).replace('{{LEAD_JS}}', () => leadJs);
 }
 
-export async function installStaticTemplate(id: string, webRoot: string, vars: TemplateVars, log: HostLogger) {
+export async function installStaticTemplate(idOrTpl: string | TemplateManifest, webRoot: string, vars: TemplateVars, log: HostLogger) {
+  const tpl = typeof idOrTpl === 'string' ? await getTemplate(idOrTpl) : idOrTpl;
+  if (tpl.builder) return builder.installBuilderStatic(tpl, webRoot, vars, log);
+  const id = tpl.id;
   await host.writeFile(path.join(webRoot, 'index.html'), await renderStaticPage(id, vars));
   log(t('Đã áp dụng giao diện "{id}"', { id }));
 }
@@ -306,6 +321,7 @@ ${FOOTER}`,
 
 /** Write the block theme into wp-content/themes. Pure file generation (testable without WordPress). */
 export async function writeWordpressTheme(t: TemplateManifest, webRoot: string, vars: TemplateVars): Promise<string> {
+  if (t.builder) return builder.writeBuilderTheme(t, webRoot, vars);
   const slug = `lares-${t.id}`;
   const themeDir = path.join(webRoot, 'wp-content', 'themes', slug);
   const nav = t.wordpress?.nav ?? [{ label: THEME_TEXT.home, url: '/' }];
@@ -383,8 +399,8 @@ export function fillCategoryIds(html: string, ids: Record<string, string>): stri
  * Activate the theme and create demo content. Runs on a fresh WordPress that Lares itself just
  * installed (no third-party code yet), so wp-cli as root is acceptable here.
  */
-export async function installWordpressTemplate(id: string, webRoot: string, vars: TemplateVars, log: HostLogger) {
-  const tpl = await getTemplate(id);
+export async function installWordpressTemplate(idOrTpl: string | TemplateManifest, webRoot: string, vars: TemplateVars, log: HostLogger) {
+  const tpl = typeof idOrTpl === 'string' ? await getTemplate(idOrTpl) : idOrTpl;
   const slug = await writeWordpressTheme(tpl, webRoot, vars);
   const wp = (args: string) => host.mutate(wpCli(webRoot, args), { log, timeoutMs: 5 * 60_000 });
   const tmp = path.join(config.dataDir, `wp-seed-${randomSuffix(8)}`);
@@ -447,7 +463,7 @@ export async function installWordpressTemplate(id: string, webRoot: string, vars
       await wp(`post create ${shq(file)} --post_type=page --post_status=publish --post_title=${shq(pg.title)} --post_name=${shq(pg.slug)}`);
     }
 
-    const homeHtml = await fs.readFile(path.join(await dir(tpl.id), 'wordpress', 'home.html'), 'utf8');
+    const homeHtml = tpl.builder ? await builder.builderHomeBlocks(tpl, vars) : await fs.readFile(path.join(await dir(tpl.id), 'wordpress', 'home.html'), 'utf8');
     const homeFile = await writeContent('home.html', fillCategoryIds(fill(homeHtml, vars), catIds));
     const homeId = (await wp(`post create ${shq(homeFile)} --post_type=page --post_status=publish --post_title=${shq(THEME_TEXT.home)} --post_name=trang-chu --porcelain`)).trim();
     if (/^\d+$/.test(homeId)) {

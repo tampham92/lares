@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LANG_LABELS, LOCALHOST, SITE_TYPES, msg, type AutoDnsInput, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
 import { get, post, type TaskInfo } from '../api';
@@ -151,6 +151,9 @@ export function SiteNew() {
           <h1>{t('Thêm website')}</h1>
           <div className="sub">{t('Chọn loại site, Lares sẽ tạo vhost Nginx, thư mục và runtime tương ứng')}</div>
         </div>
+        <Link to="/sites/new/builder" className="btn">
+          {t('Tự tạo giao diện')}
+        </Link>
       </div>
       <ErrorBox error={error} />
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
