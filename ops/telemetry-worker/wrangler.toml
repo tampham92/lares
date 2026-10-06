@@ -13,7 +13,7 @@ routes = [
 [[d1_databases]]
 binding = "DB"
 database_name = "lares-telemetry"
-database_id = "REPLACE_WITH_THE_ID_PRINTED_BY_wrangler_d1_create"
+database_id = "0f1ebd4d-72fb-405a-8ca4-4dd68e40b62c"
 
 # Daily clean-up of old per-day rows
 [triggers]
