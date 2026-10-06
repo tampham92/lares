@@ -10,7 +10,9 @@ every shell command, path and generated config as security-sensitive.
 - `apps/web` - React + Vite SPA, plain CSS in `src/styles.css` (no CSS framework).
 - `packages/shared` - zod schemas and types shared by server and web (`@lares/shared`).
 - `templates/` - site templates; `install.sh` / `uninstall.sh` - the VPS installer; `ops/` - telemetry worker.
-- `docs/vi` and `docs/en`, `README.md` and `README.en.md` are pairs: change both.
+- `site/` - the landing page at lares.thocode.dev (static, Cloudflare Worker, see `site/README.md`).
+- `docs/vi` and `docs/en`, `README.md` and `README.en.md`, `site/index.html` and `site/en/index.html`
+  are pairs: change both.
 
 ## Commands
 

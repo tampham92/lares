@@ -1,0 +1,5 @@
+# Not part of the public site
+wrangler.jsonc
+.assetsignore
+README.md
+.wrangler

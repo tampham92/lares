@@ -1,9 +1,12 @@
 name: CI
 
 on:
+  # The landing page (site/) is deployed as a Cloudflare Worker and never reaches a VPS build.
   push:
     branches: [main]
+    paths-ignore: ['site/**']
   pull_request:
+    paths-ignore: ['site/**']
   workflow_dispatch:
 
 permissions:

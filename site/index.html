@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lares Panel: panel quản lý VPS cho WordPress và Next.js</title>
+<meta name="description" content="Panel hosting mã nguồn mở cho VPS Ubuntu/Debian, cài bằng một lệnh. WordPress, Next.js, PHP, SSL tự động, sao lưu, cập nhật WordPress có tự khôi phục, chuyển site từ aaPanel, CyberPanel, cPanel.">
+<link rel="canonical" href="https://lares.thocode.dev/">
+<link rel="alternate" hreflang="vi" href="https://lares.thocode.dev/">
+<link rel="alternate" hreflang="en" href="https://lares.thocode.dev/en/">
+<link rel="alternate" hreflang="x-default" href="https://lares.thocode.dev/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0d14" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Lares Panel">
+<meta property="og:locale" content="vi_VN">
+<meta property="og:url" content="https://lares.thocode.dev/">
+<meta property="og:title" content="Lares Panel: quản lý mọi website trên VPS từ một panel">
+<meta property="og:description" content="Cài bằng một lệnh. WordPress, Next.js, PHP, SSL tự động, sao lưu, cập nhật WordPress có tự khôi phục, chuyển site từ panel khác. Mã nguồn mở, đang beta miễn phí.">
+<meta property="og:image" content="https://lares.thocode.dev/assets/og-vi.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Bỏ qua, tới nội dung chính</a>
+
+<header class="site-head">
+  <div class="wrap head-in">
+    <a class="brand" href="/" aria-label="Lares Panel, trang chủ">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d65ff"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M7.5 15.2 16 8l8.5 7.2M10.6 13v11h10.8V13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path transform="translate(0 -.7)" d="M16 16.4c1.9 1.8 2.8 3.2 2.8 4.8a2.8 2.8 0 0 1-5.6 0c0-1 .4-2 1.2-2.8.1.8.5 1.4 1.1 1.7-.2-1.2 0-2.5.5-3.7z" fill="#f59e0b"/></svg>
+      <span>Lares Panel</span>
+    </a>
+    <nav class="nav" aria-label="Mục chính">
+      <a href="#features">Tính năng</a>
+      <a href="#migrate">Chuyển site</a>
+      <a href="#security">Bảo mật</a>
+      <a href="#faq">Hỏi đáp</a>
+    </nav>
+    <div class="head-actions">
+      <a class="lang" href="/en/" hreflang="en" lang="en">EN</a>
+      <a class="icon-link" href="https://github.com/tampham92/lares" aria-label="Mã nguồn trên GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+      <a class="btn primary sm" href="#install">Cài đặt</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" id="install">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot" aria-hidden="true"></span>Đang beta miễn phí · Mã nguồn mở</span>
+    <h1>Quản lý mọi website trên VPS từ một panel gọn gàng</h1>
+    <p class="lead">Lares Panel cài bằng một lệnh trên Ubuntu hoặc Debian. Tạo site WordPress, Next.js, PHP trong vài cú nhấp, SSL tự gia hạn, sao lưu hằng ngày, cập nhật WordPress có tự khôi phục, và chuyển site từ aaPanel, CyberPanel, cPanel về.</p>
+    <div class="install">
+      <code><span class="prompt" aria-hidden="true">$</span><span id="cmd">curl -sSL https://lares.thocode.dev/install | sudo bash</span></code>
+      <button class="copy" type="button" data-copy="cmd" data-done="Đã chép"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Sao chép</span></button>
+    </div>
+    <p class="hero-meta">Ubuntu 22.04 / 24.04 · Debian 12 · x86_64 &amp; arm64 · RAM từ 1 GB</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#beta">Đăng ký dùng thử beta</a>
+      <a class="btn" href="https://github.com/tampham92/lares/blob/main/docs/vi/installation.md">Hướng dẫn cài đặt</a>
+    </div>
+    <figure class="shot">
+      <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i><span>https://vps-cua-ban:8686/sites</span></div>
+      <picture>
+        <source srcset="/assets/shots/vi/sites-dark.webp" media="(prefers-color-scheme: dark)">
+        <img src="/assets/shots/vi/sites.webp" width="1600" height="733" alt="Danh sách website trong Lares: WordPress, Next.js, PHP và HTML tĩnh, kèm trạng thái SSL Let's Encrypt">
+      </picture>
+    </figure>
+  </div>
+</section>
+
+<div class="stack">
+  <div class="wrap">
+    <strong>Chạy được</strong>
+    <span>WordPress</span><span>Next.js &amp; Node.js</span><span>PHP &amp; Laravel</span><span>HTML tĩnh</span><span>Nginx</span><span>MariaDB / MySQL</span><span>Let's Encrypt</span>
+  </div>
+</div>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Tính năng</div>
+      <h2>Việc quản lý site hằng ngày, không cần gõ lệnh</h2>
+      <p>Việc lớn chạy thành tác vụ có log để bạn theo dõi. Tạo site, khôi phục, cập nhật và chuyển site đều tự hoàn tác khi gặp lỗi.</p>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div>
+        <h3>Website trong vài cú nhấp</h3>
+        <p>WordPress tự tải, tạo database và tài khoản admin. Next.js clone từ Git, chạy bằng systemd sau Nginx. PHP và HTML tĩnh. Chưa có tên miền thì chạy tạm qua port.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h3>SSL tự động</h3>
+        <p>Let's Encrypt cho cả alias như www, tự gia hạn, bắt buộc HTTPS và HSTS. Cảnh báo khi DNS chưa trỏ về hoặc chứng chỉ sắp hết hạn.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></div>
+        <h3>Sao lưu và khôi phục</h3>
+        <p>Sao lưu file và database hằng ngày theo lịch, giữ nhiều bản. Khôi phục tự tạo bản an toàn trước và quay lại nếu có lỗi.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 3v4h4M4 13a8 8 0 0 0 14.9 4M20 21v-4h-4"/></svg></div>
+        <h3>Cập nhật WordPress an toàn</h3>
+        <p>Core, plugin, theme: Lares sao lưu trước, cập nhật, kiểm tra lại site và tự khôi phục nếu site lỗi.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg></div>
+        <h3>Khách liên hệ</h3>
+        <p>Form trên mọi site đổ về một hộp thư chung, báo ngay qua Telegram hoặc webhook, xuất CSV.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <h3>Trình tạo giao diện</h3>
+        <p>Chọn ngành, nhập thông tin, chọn màu và bố cục, có ngay website WordPress hoặc HTML tĩnh. Sẵn 5 mẫu cho spa, nhà hàng, bất động sản, doanh nghiệp, bán hàng.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div>
+        <h3>Log traffic</h3>
+        <p>Request, IP, băng thông, mã lỗi 2xx đến 5xx, top URL và IP theo giờ hoặc ngày cho từng site. Đọc được cả log đã nén.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H8a5 5 0 1 1 1.6-9.7A6 6 0 0 1 21 12.5a3.5 3.5 0 0 1-3.5 6.5z"/></svg></div>
+        <h3>Cloudflare</h3>
+        <p>Tự tạo bản ghi DNS cho site mới, bật tắt proxy ngay trong panel, và giữ IP thật của khách khi site đứng sau Cloudflare.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></div>
+        <h3>Tiện ích hằng ngày</h3>
+        <p>Vào WP Admin một chạm, Adminer, chỉnh giới hạn upload và bộ nhớ PHP, nhân bản site làm bản thử, viết bài chuẩn SEO bằng AI.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="wrap rows">
+
+    <div class="row">
+      <div class="row-copy">
+        <h3>Cập nhật WordPress mà không sợ vỡ site</h3>
+        <p>Plugin lỗi sau khi cập nhật là nỗi lo quen thuộc của người giữ site WordPress. Lares xử lý từng lần cập nhật theo một quy trình cố định.</p>
+        <ul class="checks">
+          <li>Ghi nhận tình trạng site trước khi cập nhật</li>
+          <li>Sao lưu file và database</li>
+          <li>Cập nhật core, plugin, theme rồi kiểm tra lại site</li>
+          <li>Site lỗi thì tự khôi phục bản sao lưu</li>
+          <li>Mọi lần cập nhật đều được lưu vào lịch sử</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/vi/updates.webp" width="1400" height="955" loading="lazy" decoding="async" alt="Tab Cập nhật của một site WordPress: WordPress core, plugin và phiên bản mới có sẵn">
+      </figure>
+    </div>
+
+    <div class="row flip">
+      <div class="row-copy">
+        <h3>Dựng website cho khách hàng trong vài phút</h3>
+        <p>Trả lời vài câu hỏi, Lares dựng sẵn một website hoàn chỉnh. Sau đó bạn vẫn sửa bình thường trong WordPress hoặc file HTML.</p>
+        <ul class="checks">
+          <li>Chọn ngành, màu thương hiệu, phong cách và các khối nội dung</li>
+          <li>Xem trước trực tiếp trước khi tạo site</li>
+          <li>WordPress dùng block theme, sửa được trong wp-admin</li>
+          <li>Form liên hệ gửi thẳng về hộp thư Khách liên hệ</li>
+          <li>Lưu thiết kế thành mẫu riêng, xuất và nhập bằng JSON</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/vi/builder.webp" width="1400" height="677" loading="lazy" decoding="async" alt="Trình tạo giao diện: chọn ngành Spa, Nhà hàng hoặc Landing page bán một sản phẩm">
+      </figure>
+    </div>
+
+    <div class="row">
+      <div class="row-copy">
+        <h3>Không bỏ lỡ khách nào từ form liên hệ</h3>
+        <p>Mọi site do Lares quản lý đều nhận form liên hệ mà không cần cài plugin. Khách để lại thông tin là bạn biết ngay.</p>
+        <ul class="checks">
+          <li>Một hộp thư cho mọi site: lọc, ghi chú, đánh dấu trạng thái</li>
+          <li>Báo qua Telegram hoặc webhook</li>
+          <li>Chống spam bằng trường bẫy và giới hạn tần suất</li>
+          <li>Tự xoá dữ liệu cũ theo thời hạn bạn đặt</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/vi/leads.webp" width="1400" height="631" loading="lazy" decoding="async" alt="Hộp thư Khách liên hệ: tên, số điện thoại, lời nhắn từ các website">
+      </figure>
+    </div>
+
+    <div class="row flip" id="migrate">
+      <div class="row-copy">
+        <h3>Chuyển site về Lares từ panel đang dùng</h3>
+        <p>Nhập SSH của VPS cũ, quét, chọn site và bấm bắt đầu. Lares nén database và mã nguồn, chuyển về, kiểm tra toàn vẹn rồi cài lại.</p>
+        <div class="chips" aria-label="Panel được hỗ trợ">
+          <span>aaPanel</span><span>CyberPanel</span><span>HestiaCP / VestaCP</span><span>cPanel</span><span>DirectAdmin</span><span>CloudPanel</span><span>Plesk</span><span>Webinoly</span><span>Nginx / Apache thuần</span>
+        </div>
+        <ul class="checks">
+          <li>Tự sửa cấu hình database, đổi tên miền WordPress bằng wp-cli</li>
+          <li>Lỗi giữa chừng thì tự hoàn tác, dữ liệu ở máy nguồn không bị thay đổi</li>
+          <li>Panel cũ chạy chung VPS cũng được: copy trực tiếp, không qua mạng</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/vi/migrate.webp" width="1400" height="793" loading="lazy" decoding="async" alt="Màn hình Chuyển site: nhập IP, user SSH và chọn panel nguồn">
+      </figure>
+    </div>
+
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Cài đặt</div>
+      <h2>Cài, nâng cấp, gỡ mà không đụng vào thứ đang chạy</h2>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></div>
+        <h3>Cài lên VPS đang dùng</h3>
+        <p>Dùng lại nginx, MariaDB/MySQL và PHP-FPM có sẵn, không cài đè. Nếu port 80/443 đang do web server khác giữ, Lares chờ tới khi bạn sẵn sàng chuyển.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+        <h3>Nâng cấp bằng đúng lệnh cài</h3>
+        <p>Chỉ panel gián đoạn vài giây, website vẫn chạy. Cấu hình và dữ liệu của panel được tự sao lưu trước khi nâng cấp.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+        <h3>Gỡ mà vẫn giữ site</h3>
+        <p>Gỡ mặc định chỉ bỏ panel, các site vẫn chạy. Muốn xoá sạch thì thêm <code>--purge</code>, bản sao lưu vẫn luôn được giữ lại.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="security">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Bảo mật</div>
+      <h2>Panel chạy quyền root, nên bảo mật là việc đầu tiên</h2>
+      <p>Lares chạy trên máy chủ thật của bạn. Vì vậy mọi thứ đều có thể kiểm chứng: mã nguồn mở, dữ liệu gửi đi được liệt kê rõ.</p>
+    </div>
+    <div class="split">
+      <ul class="sec-list">
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></div>
+          <div><strong>Đăng nhập được bảo vệ nhiều lớp</strong><p>Xác thực 2 lớp (TOTP và mã khôi phục), giới hạn IP, khoá tạm khi nhập sai nhiều lần, đăng xuất mọi nơi.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+          <div><strong>Mã của site không chạy bằng root</strong><p>wp-cli, npm và các lệnh của ứng dụng chạy bằng user web riêng.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M15 8l2 2"/></svg></div>
+          <div><strong>Bí mật được mã hoá</strong><p>API key, mật khẩu database được mã hoá AES-256-GCM và không bao giờ gửi về trình duyệt.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div>
+          <div><strong>Adminer khoá sau panel</strong><p>Chỉ mở được qua panel đã đăng nhập, bằng vé dùng một lần. Không có trang quản trị database lộ ra internet.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg></div>
+          <div><strong>Mã nguồn mở AGPL-3.0</strong><p>Ai cũng đọc được Lares làm gì trên máy của mình: <a href="https://github.com/tampham92/lares">github.com/tampham92/lares</a>.</p></div>
+        </li>
+      </ul>
+      <aside class="card data-card">
+        <h3>Minh bạch về dữ liệu gửi đi</h3>
+        <p class="off">Để biết có bao nhiêu máy đang chạy Lares, installer gửi một bộ đếm ẩn danh khi cài và nâng cấp, panel gửi một lần mỗi ngày. Chỉ gồm:</p>
+        <ul>
+          <li>mã cài đặt ngẫu nhiên</li>
+          <li>phiên bản Lares và sự kiện (cài, nâng cấp, hằng ngày)</li>
+          <li>tên và phiên bản hệ điều hành, kiến trúc CPU</li>
+          <li>ngôn ngữ của panel</li>
+        </ul>
+        <p class="never">Không gửi IP, tên miền hay bất kỳ dữ liệu nào của site.</p>
+        <p class="off">Tắt bằng <code>--no-telemetry</code> khi cài, hoặc <code>LARES_TELEMETRY=0</code> trong <code>/etc/lares/lares.env</code>.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Có hợp với bạn?</div>
+      <h2>Nói thẳng Lares làm được gì và chưa làm được gì</h2>
+    </div>
+    <div class="fit">
+      <div class="card">
+        <h3>Hợp với</h3>
+        <ul class="checks">
+          <li>Freelancer, agency giữ nhiều site WordPress cho khách</li>
+          <li>Chủ doanh nghiệp nhỏ tự thuê VPS cho website của mình</li>
+          <li>Dev triển khai Next.js hoặc Node.js lên VPS riêng</li>
+          <li>Người muốn rời panel cũ mà không phải chuyển tay từng site</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Hiện chưa có</h3>
+        <ul class="checks no">
+          <li>Email hosting và DNS hosting</li>
+          <li>Docker và container</li>
+          <li>Tài khoản đại lý (reseller) chia cho khách</li>
+          <li>CentOS, AlmaLinux, Windows Server</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="beta">
+  <div class="wrap">
+    <div class="beta">
+      <h2>Tham gia closed beta</h2>
+      <p>Lares đang ở bản 0.x. Chúng tôi tìm những người dùng VPS sẵn sàng thử, báo lỗi và góp ý để định hình bản 1.0.</p>
+      <ul class="checks">
+        <li>Hỗ trợ trực tiếp từ người làm ra Lares</li>
+        <li>Góp ý của bạn được ưu tiên đưa vào lộ trình</li>
+        <li>Miễn phí, mã nguồn mở</li>
+      </ul>
+      <div class="hero-actions">
+        <a class="btn primary" href="mailto:hello@thocode.dev?subject=%C4%90%C4%83ng%20k%C3%BD%20beta%20Lares%20Panel&amp;body=VPS%20%28nh%C3%A0%20cung%20c%E1%BA%A5p%2C%20RAM%2C%20h%E1%BB%87%20%C4%91i%E1%BB%81u%20h%C3%A0nh%29%3A%0AS%E1%BB%91%20website%3A%0A%C4%90ang%20d%C3%B9ng%20panel%20n%C3%A0o%3A%0AC%C3%A1ch%20b%E1%BA%A1n%20bi%E1%BA%BFt%20Lares%3A%0A">Đăng ký qua email</a>
+        <a class="btn" href="https://github.com/tampham92/lares/issues">Báo lỗi trên GitHub</a>
+      </div>
+      <p class="note">Hãy thử trên một VPS không quan trọng trước, và luôn có bản sao lưu.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Hỏi đáp</div>
+      <h2>Câu hỏi thường gặp</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Lares có miễn phí không?</summary>
+        <div class="answer"><p>Có. Lares là phần mềm tự do theo giấy phép GNU AGPL-3.0: bạn được dùng, sửa và phân phối lại. Nếu bạn sửa Lares rồi cho người khác dùng qua mạng (ví dụ làm dịch vụ hosting), bạn phải cung cấp mã nguồn bản đã sửa cho họ.</p></div>
+      </details>
+      <details>
+        <summary>VPS cần cấu hình thế nào?</summary>
+        <div class="answer"><p>Ubuntu 22.04 / 24.04 hoặc Debian 12, 64-bit (x86_64 hoặc arm64), quyền root qua SSH. RAM tối thiểu 1 GB, nên có 2 GB (máy 1 GB nên thêm swap vì bước build cần nhiều RAM). Khoảng 3 GB ổ đĩa cho Lares và các gói. Mở port 22, 80, 443 và 8686 (port panel, đổi được).</p></div>
+      </details>
+      <details>
+        <summary>Cài lên VPS đang có site hoặc panel khác được không?</summary>
+        <div class="answer"><p>Được. Lares dùng lại nginx, MySQL/MariaDB và PHP-FPM đang có, không cài đè. Nếu port 80/443 đang do web server khác giữ, nginx của Lares sẽ chờ (chế độ cùng tồn tại) cho tới khi bạn chuyển hẳn sang. Sau đó dùng Chuyển site để đưa các site về Lares.</p></div>
+      </details>
+      <details>
+        <summary>Nâng cấp có làm gián đoạn website không?</summary>
+        <div class="answer"><p>Không. Chạy lại đúng lệnh cài đặt: chỉ panel gián đoạn vài giây, website vẫn chạy bình thường. Khi có bản mới, panel hiện thông báo kèm lệnh nâng cấp.</p></div>
+      </details>
+      <details>
+        <summary>Gỡ Lares có mất site không?</summary>
+        <div class="answer"><p>Mặc định thì không: lệnh gỡ chỉ bỏ panel, các site vẫn chạy. Chỉ khi thêm <code>--purge</code> thì mới xoá những gì Lares đã tạo, trừ bản sao lưu.</p><p><code>curl -sSL https://lares.thocode.dev/uninstall | sudo bash</code></p></div>
+      </details>
+      <details>
+        <summary>Lares gửi gì về máy chủ của ThoCode?</summary>
+        <div class="answer"><p>Chỉ một bộ đếm ẩn danh: mã cài đặt ngẫu nhiên, phiên bản Lares, sự kiện, tên và phiên bản hệ điều hành, kiến trúc CPU, ngôn ngữ panel. Không gửi IP, tên miền hay dữ liệu site. Tắt bằng <code>--no-telemetry</code> hoặc <code>LARES_TELEMETRY=0</code>.</p></div>
+      </details>
+      <details>
+        <summary>Lares khác gì aaPanel, CyberPanel hay HestiaCP?</summary>
+        <div class="answer"><p>Lares tập trung vào website WordPress và Next.js trên VPS, giao diện tiếng Việt, và ưu tiên thao tác an toàn: sao lưu trước khi thay đổi, tự hoàn tác khi lỗi. Mã nguồn viết bằng TypeScript và mở hoàn toàn. Nếu bạn đang dùng các panel trên, Lares có công cụ chuyển site về.</p></div>
+      </details>
+      <details>
+        <summary>Quên mật khẩu hoặc mất điện thoại có mã 2FA?</summary>
+        <div class="answer"><p>Chạy qua SSH: <code>sudo lares reset-password</code>, <code>sudo lares disable-2fa</code>, hoặc <code>sudo lares allowlist clear</code> nếu tự khoá mình bằng giới hạn IP.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-in">
+    <div>
+      <a class="brand" href="/">
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d65ff"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg2)"/><path d="M7.5 15.2 16 8l8.5 7.2M10.6 13v11h10.8V13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path transform="translate(0 -.7)" d="M16 16.4c1.9 1.8 2.8 3.2 2.8 4.8a2.8 2.8 0 0 1-5.6 0c0-1 .4-2 1.2-2.8.1.8.5 1.4 1.1 1.7-.2-1.2 0-2.5.5-3.7z" fill="#f59e0b"/></svg>
+        <span>Lares Panel <small>by ThoCode</small></span>
+      </a>
+      <p class="foot-copy">© 2026 ThoCode · Giấy phép AGPL-3.0</p>
+    </div>
+    <nav class="foot-links" aria-label="Liên kết">
+      <a href="https://github.com/tampham92/lares">GitHub</a>
+      <a href="https://github.com/tampham92/lares/blob/main/docs/README.md">Tài liệu</a>
+      <a href="https://github.com/tampham92/lares/blob/main/CHANGELOG.md">Thay đổi</a>
+      <a href="https://github.com/tampham92/lares/blob/main/docs/vi/security.md">Bảo mật</a>
+      <a href="mailto:hello@thocode.dev">hello@thocode.dev</a>
+      <a href="/en/" hreflang="en" lang="en">English</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

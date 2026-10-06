@@ -1,0 +1,17 @@
+// Landing page as a Worker with static assets (Workers Builds: root directory "site", deploy
+// command "npx wrangler deploy", no build command). "name" must match the Worker in the dashboard.
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "lares-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": ".",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  // A route rather than a custom domain: the proxied placeholder DNS record stays as it is. The more
+  // specific route lares.thocode.dev/ping (telemetry Worker) still wins, and the Redirect Rules for
+  // /install and /uninstall run before any Worker.
+  "routes": [{ "pattern": "lares.thocode.dev/*", "zone_name": "thocode.dev" }],
+  "observability": { "enabled": false }
+}

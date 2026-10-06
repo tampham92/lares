@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lares Panel: a VPS control panel for WordPress and Next.js</title>
+<meta name="description" content="Open-source hosting panel for Ubuntu/Debian VPS, installed with one command. WordPress, Next.js, PHP, automatic SSL, backups, WordPress updates with automatic rollback, migration from aaPanel, CyberPanel, cPanel.">
+<link rel="canonical" href="https://lares.thocode.dev/en/">
+<link rel="alternate" hreflang="vi" href="https://lares.thocode.dev/">
+<link rel="alternate" hreflang="en" href="https://lares.thocode.dev/en/">
+<link rel="alternate" hreflang="x-default" href="https://lares.thocode.dev/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0d14" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Lares Panel">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://lares.thocode.dev/en/">
+<meta property="og:title" content="Lares Panel: every website on your VPS, one tidy panel">
+<meta property="og:description" content="One-command install. WordPress, Next.js, PHP, automatic SSL, backups, WordPress updates with automatic rollback, migration from other panels. Open source, free during the beta.">
+<meta property="og:image" content="https://lares.thocode.dev/assets/og-en.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site-head">
+  <div class="wrap head-in">
+    <a class="brand" href="/en/" aria-label="Lares Panel, home">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d65ff"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M7.5 15.2 16 8l8.5 7.2M10.6 13v11h10.8V13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path transform="translate(0 -.7)" d="M16 16.4c1.9 1.8 2.8 3.2 2.8 4.8a2.8 2.8 0 0 1-5.6 0c0-1 .4-2 1.2-2.8.1.8.5 1.4 1.1 1.7-.2-1.2 0-2.5.5-3.7z" fill="#f59e0b"/></svg>
+      <span>Lares Panel</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#migrate">Migration</a>
+      <a href="#security">Security</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="head-actions">
+      <a class="lang" href="/" hreflang="vi" lang="vi">VI</a>
+      <a class="icon-link" href="https://github.com/tampham92/lares" aria-label="Source code on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+      <a class="btn primary sm" href="#install">Install</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" id="install">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot" aria-hidden="true"></span>Free during the beta · Open source</span>
+    <h1>Every website on your VPS, managed from one tidy panel</h1>
+    <p class="lead">Lares Panel installs with one command on Ubuntu or Debian. Create WordPress, Next.js and PHP sites in a few clicks, with self-renewing SSL, daily backups, WordPress updates that roll back on failure, and migration from aaPanel, CyberPanel and cPanel.</p>
+    <div class="install">
+      <code><span class="prompt" aria-hidden="true">$</span><span id="cmd">curl -sSL https://lares.thocode.dev/install | sudo bash</span></code>
+      <button class="copy" type="button" data-copy="cmd" data-done="Copied"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button>
+    </div>
+    <p class="hero-meta">Ubuntu 22.04 / 24.04 · Debian 12 · x86_64 &amp; arm64 · 1 GB RAM or more</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#beta">Join the beta</a>
+      <a class="btn" href="https://github.com/tampham92/lares/blob/main/docs/en/installation.md">Installation guide</a>
+    </div>
+    <figure class="shot">
+      <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i><span>https://your-vps:8686/sites</span></div>
+      <picture>
+        <source srcset="/assets/shots/en/sites-dark.webp" media="(prefers-color-scheme: dark)">
+        <img src="/assets/shots/en/sites.webp" width="1600" height="733" alt="Website list in Lares: WordPress, Next.js, PHP and static sites with their Let's Encrypt status">
+      </picture>
+    </figure>
+  </div>
+</section>
+
+<div class="stack">
+  <div class="wrap">
+    <strong>Runs</strong>
+    <span>WordPress</span><span>Next.js &amp; Node.js</span><span>PHP &amp; Laravel</span><span>Static HTML</span><span>Nginx</span><span>MariaDB / MySQL</span><span>Let's Encrypt</span>
+  </div>
+</div>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Features</div>
+      <h2>Day-to-day site work, without typing commands</h2>
+      <p>Long jobs run as tasks with a live log. Creating a site, restoring, updating and migrating all undo themselves if something fails.</p>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div>
+        <h3>Sites in a few clicks</h3>
+        <p>WordPress downloaded with its database and admin account. Next.js cloned from Git and run by systemd behind Nginx. PHP and static sites. No domain yet? Serve it on a port for now.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h3>Automatic SSL</h3>
+        <p>Let's Encrypt including aliases such as www, auto-renewal, forced HTTPS and HSTS. Warnings when DNS does not point here yet or a certificate is about to expire.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></div>
+        <h3>Backups and restore</h3>
+        <p>Scheduled daily backups of files and databases, keeping several copies. A restore takes a safety copy first and rolls back on error.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 3v4h4M4 13a8 8 0 0 0 14.9 4M20 21v-4h-4"/></svg></div>
+        <h3>Safe WordPress updates</h3>
+        <p>Core, plugins, themes: Lares backs up, updates, checks the site again and restores it automatically if it broke.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg></div>
+        <h3>Contact leads</h3>
+        <p>Forms on every site land in one inbox, with instant Telegram or webhook alerts and CSV export.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <h3>Site builder</h3>
+        <p>Pick an industry, enter the business details, choose colours and layout, and get a WordPress or static site. Five ready templates: spa, restaurant, real estate, company, product landing page.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div>
+        <h3>Traffic logs</h3>
+        <p>Requests, IPs, bandwidth, 2xx to 5xx status codes, top URLs and IPs by hour or day for each site, rotated logs included.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H8a5 5 0 1 1 1.6-9.7A6 6 0 0 1 21 12.5a3.5 3.5 0 0 1-3.5 6.5z"/></svg></div>
+        <h3>Cloudflare</h3>
+        <p>DNS records created for new sites, the proxy toggled from the panel, and real visitor IPs kept when a site sits behind Cloudflare.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></div>
+        <h3>Everyday tools</h3>
+        <p>One-click WP Admin login, Adminer, PHP upload and memory limits, site cloning for staging, an AI writer for SEO-ready posts.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="wrap rows">
+
+    <div class="row">
+      <div class="row-copy">
+        <h3>Update WordPress without fearing a broken site</h3>
+        <p>A plugin that breaks after an update is every WordPress maintainer's worry. Lares runs each update through the same fixed routine.</p>
+        <ul class="checks">
+          <li>Records how the site looks before the update</li>
+          <li>Backs up files and the database</li>
+          <li>Updates core, plugins and themes, then checks the site again</li>
+          <li>Restores the backup automatically if the site broke</li>
+          <li>Keeps every run in the update history</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/en/updates.webp" width="1400" height="955" loading="lazy" decoding="async" alt="Updates tab of a WordPress site: WordPress core, plugins and available versions">
+      </figure>
+    </div>
+
+    <div class="row flip">
+      <div class="row-copy">
+        <h3>A client website in minutes</h3>
+        <p>Answer a few questions and Lares builds a complete website. You keep editing it as usual in WordPress or the HTML files.</p>
+        <ul class="checks">
+          <li>Industry, brand colour, style and content blocks</li>
+          <li>Live preview before the site is created</li>
+          <li>WordPress output is a block theme you edit in wp-admin</li>
+          <li>Contact forms post straight to the Leads inbox</li>
+          <li>Save designs as your own templates, export and import as JSON</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/en/builder.webp" width="1400" height="677" loading="lazy" decoding="async" alt="Site builder: choose Spa, Restaurant or single-product landing page">
+      </figure>
+    </div>
+
+    <div class="row">
+      <div class="row-copy">
+        <h3>Never miss a lead from a contact form</h3>
+        <p>Every site Lares manages accepts contact forms without a plugin. When a visitor leaves their details, you know right away.</p>
+        <ul class="checks">
+          <li>One inbox for all sites: filters, notes, statuses</li>
+          <li>Telegram or webhook alerts</li>
+          <li>Spam protection with a honeypot field and rate limits</li>
+          <li>Old entries deleted after the retention period you set</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/en/leads.webp" width="1400" height="631" loading="lazy" decoding="async" alt="Leads inbox: names, phone numbers and messages from the websites">
+      </figure>
+    </div>
+
+    <div class="row flip" id="migrate">
+      <div class="row-copy">
+        <h3>Move your sites over from the panel you use now</h3>
+        <p>Enter the old VPS's SSH details, scan, pick the sites and start. Lares packs the databases and files, transfers them, verifies integrity and sets everything up again.</p>
+        <div class="chips" aria-label="Supported panels">
+          <span>aaPanel</span><span>CyberPanel</span><span>HestiaCP / VestaCP</span><span>cPanel</span><span>DirectAdmin</span><span>CloudPanel</span><span>Plesk</span><span>Webinoly</span><span>Plain Nginx / Apache</span>
+        </div>
+        <ul class="checks">
+          <li>Database settings rewritten, WordPress domain changed with wp-cli</li>
+          <li>Rolled back on failure; nothing on the source server is changed</li>
+          <li>Old panel on the same VPS? Files are copied locally, not over the network</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="/assets/shots/en/migrate.webp" width="1400" height="793" loading="lazy" decoding="async" alt="Migration screen: IP, SSH user and source panel">
+      </figure>
+    </div>
+
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Install</div>
+      <h2>Install, upgrade and remove without touching what already runs</h2>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></div>
+        <h3>Install on a server in use</h3>
+        <p>Existing nginx, MariaDB/MySQL and PHP-FPM are reused, never replaced. If another web server holds ports 80/443, Lares waits until you are ready to switch.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+        <h3>Upgrade with the same command</h3>
+        <p>Only the panel pauses for a few seconds; websites keep running. The panel's settings and data are backed up before each upgrade.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+        <h3>Uninstall and keep your sites</h3>
+        <p>By default only the panel is removed and sites keep running. Add <code>--purge</code> to remove everything; backups are always kept.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="security">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Security</div>
+      <h2>It runs as root, so security comes first</h2>
+      <p>Lares runs on your real servers, so everything is verifiable: the code is open and the data it sends is listed below.</p>
+    </div>
+    <div class="split">
+      <ul class="sec-list">
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></div>
+          <div><strong>Layered login protection</strong><p>Two-factor authentication (TOTP and recovery codes), IP allowlist, lockout after repeated failures, sign out everywhere.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+          <div><strong>Site code never runs as root</strong><p>wp-cli, npm and application commands run as the web user.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M15 8l2 2"/></svg></div>
+          <div><strong>Secrets are encrypted</strong><p>API keys and database passwords are encrypted with AES-256-GCM and never sent back to the browser.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div>
+          <div><strong>Adminer locked behind the panel</strong><p>Only reachable through a signed-in panel with one-time tickets. No database admin page exposed to the internet.</p></div>
+        </li>
+        <li>
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg></div>
+          <div><strong>Open source, AGPL-3.0</strong><p>Anyone can read what Lares does on their server: <a href="https://github.com/tampham92/lares">github.com/tampham92/lares</a>.</p></div>
+        </li>
+      </ul>
+      <aside class="card data-card">
+        <h3>What Lares sends, in full</h3>
+        <p class="off">To know how many servers run Lares, the installer sends an anonymous counter on install and upgrade, and the panel once a day. It contains only:</p>
+        <ul>
+          <li>a random install id</li>
+          <li>the Lares version and event (install, upgrade, daily)</li>
+          <li>OS name and version, CPU architecture</li>
+          <li>the panel language</li>
+        </ul>
+        <p class="never">No IPs, domains or site data, ever.</p>
+        <p class="off">Turn it off with <code>--no-telemetry</code> at install time, or <code>LARES_TELEMETRY=0</code> in <code>/etc/lares/lares.env</code>.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Is it for you?</div>
+      <h2>What Lares does, and what it does not do yet</h2>
+    </div>
+    <div class="fit">
+      <div class="card">
+        <h3>A good fit for</h3>
+        <ul class="checks">
+          <li>Freelancers and agencies running many client WordPress sites</li>
+          <li>Small business owners hosting their own site on a VPS</li>
+          <li>Developers deploying Next.js or Node.js to their own VPS</li>
+          <li>Anyone leaving an old panel without moving sites by hand</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not available yet</h3>
+        <ul class="checks no">
+          <li>Email hosting and DNS hosting</li>
+          <li>Docker and containers</li>
+          <li>Reseller accounts for your customers</li>
+          <li>CentOS, AlmaLinux, Windows Server</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="beta">
+  <div class="wrap">
+    <div class="beta">
+      <h2>Join the closed beta</h2>
+      <p>Lares is at version 0.x. We are looking for VPS users willing to try it, report bugs and share feedback to shape 1.0.</p>
+      <ul class="checks">
+        <li>Direct support from the people who build Lares</li>
+        <li>Your feedback goes to the front of the roadmap</li>
+        <li>Free and open source</li>
+      </ul>
+      <div class="hero-actions">
+        <a class="btn primary" href="mailto:hello@thocode.dev?subject=Lares%20Panel%20beta%20sign-up&amp;body=VPS%20%28provider%2C%20RAM%2C%20OS%29%3A%0ANumber%20of%20websites%3A%0ACurrent%20panel%3A%0AHow%20you%20heard%20about%20Lares%3A%0A">Sign up by email</a>
+        <a class="btn" href="https://github.com/tampham92/lares/issues">Report a bug on GitHub</a>
+      </div>
+      <p class="note">Try it on a non-critical VPS first, and always keep backups.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">FAQ</div>
+      <h2>Frequently asked questions</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Is Lares free?</summary>
+        <div class="answer"><p>Yes. Lares is free software under the GNU AGPL-3.0: you may use, modify and redistribute it. If you modify Lares and let others use it over a network (for example as a hosting service), you must give them the source of your modified version.</p></div>
+      </details>
+      <details>
+        <summary>What server do I need?</summary>
+        <div class="answer"><p>Ubuntu 22.04 / 24.04 or Debian 12, 64-bit (x86_64 or arm64), root access over SSH. At least 1 GB of RAM, 2 GB recommended (add swap on a 1 GB machine, the build needs memory). About 3 GB of disk for Lares and its packages. Open ports 22, 80, 443 and 8686 (the panel port, configurable).</p></div>
+      </details>
+      <details>
+        <summary>Can I install it on a server that already hosts sites or another panel?</summary>
+        <div class="answer"><p>Yes. Lares reuses the existing nginx, MySQL/MariaDB and PHP-FPM instead of replacing them. If another web server holds ports 80/443, Lares's nginx waits (coexist mode) until you switch over. Then use Migration to bring the sites into Lares.</p></div>
+      </details>
+      <details>
+        <summary>Do upgrades interrupt my websites?</summary>
+        <div class="answer"><p>No. Run the install command again: only the panel pauses for a few seconds while websites keep running. When a new version is out, the panel shows it along with the upgrade command.</p></div>
+      </details>
+      <details>
+        <summary>Do I lose my sites if I uninstall Lares?</summary>
+        <div class="answer"><p>Not by default: the uninstaller removes only the panel and your sites keep running. Only <code>--purge</code> deletes what Lares created, backups excepted.</p><p><code>curl -sSL https://lares.thocode.dev/uninstall | sudo bash</code></p></div>
+      </details>
+      <details>
+        <summary>What does Lares send to ThoCode?</summary>
+        <div class="answer"><p>Only an anonymous counter: a random install id, the Lares version, the event, OS name and version, CPU architecture and panel language. No IPs, domains or site data. Turn it off with <code>--no-telemetry</code> or <code>LARES_TELEMETRY=0</code>.</p></div>
+      </details>
+      <details>
+        <summary>How is Lares different from aaPanel, CyberPanel or HestiaCP?</summary>
+        <div class="answer"><p>Lares focuses on WordPress and Next.js sites on a VPS and puts safe operations first: back up before changing anything, roll back on failure. It is written in TypeScript and fully open source, in English and Vietnamese. If you use one of those panels today, Lares can migrate your sites.</p></div>
+      </details>
+      <details>
+        <summary>Forgot the password or lost the 2FA phone?</summary>
+        <div class="answer"><p>Over SSH: <code>sudo lares reset-password</code>, <code>sudo lares disable-2fa</code>, or <code>sudo lares allowlist clear</code> if the IP allowlist locked you out.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-in">
+    <div>
+      <a class="brand" href="/en/">
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d65ff"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg2)"/><path d="M7.5 15.2 16 8l8.5 7.2M10.6 13v11h10.8V13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path transform="translate(0 -.7)" d="M16 16.4c1.9 1.8 2.8 3.2 2.8 4.8a2.8 2.8 0 0 1-5.6 0c0-1 .4-2 1.2-2.8.1.8.5 1.4 1.1 1.7-.2-1.2 0-2.5.5-3.7z" fill="#f59e0b"/></svg>
+        <span>Lares Panel <small>by ThoCode</small></span>
+      </a>
+      <p class="foot-copy">© 2026 ThoCode · Licensed under AGPL-3.0</p>
+    </div>
+    <nav class="foot-links" aria-label="Links">
+      <a href="https://github.com/tampham92/lares">GitHub</a>
+      <a href="https://github.com/tampham92/lares/blob/main/docs/README.md">Docs</a>
+      <a href="https://github.com/tampham92/lares/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/tampham92/lares/blob/main/docs/en/security.md">Security</a>
+      <a href="mailto:hello@thocode.dev">hello@thocode.dev</a>
+      <a href="/" hreflang="vi" lang="vi">Tiếng Việt</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

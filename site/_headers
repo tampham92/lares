@@ -1,0 +1,12 @@
+# Response headers (Workers static assets read this file). The page loads nothing from third parties (no fonts, analytics or
+# CDNs), so the CSP can stay this strict. Turning on Cloudflare Web Analytics for the Worker
+# injects a script from static.cloudflareinsights.com that this policy blocks: add it here first.
+/*
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; script-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000
+
+/assets/*
+  Cache-Control: public, max-age=86400
