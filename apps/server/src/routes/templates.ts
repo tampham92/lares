@@ -17,6 +17,6 @@ export async function templateRoutes(app: FastifyInstance) {
     const t = await getTemplate(id);
     reply.header('Content-Security-Policy', 'sandbox allow-scripts; frame-ancestors \'self\'');
     reply.type('text/html; charset=utf-8');
-    return renderStaticPage(t.id, templateVars(t, branding));
+    return renderStaticPage(t, templateVars(t, branding), { token: q.token });
   });
 }

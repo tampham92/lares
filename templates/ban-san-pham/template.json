@@ -1,0 +1,168 @@
+{
+  "id": "ban-san-pham",
+  "name": "Landing page bán sản phẩm",
+  "description": "Trang bán một sản phẩm: ưu đãi có đếm ngược, lợi ích, câu chuyện nguồn gốc, đánh giá thật, bảng giá combo và form đặt hàng nhanh.",
+  "types": ["wordpress", "static"],
+  "previewImage": "assets/thumb.webp",
+  "builder": {
+    "version": 1,
+    "industry": "product",
+    "lang": "vi",
+    "business": {
+      "name": "Mật Ong Rừng Tràm U Minh",
+      "slogan": "Mật ong rừng nguyên chất thu hoạch thủ công tại Cà Mau – không pha đường, không qua nấu.",
+      "phone": "0939 868 168",
+      "zalo": "",
+      "email": "donhang@matongumin.vn",
+      "address": "Ấp 7, xã Khánh An, huyện U Minh, tỉnh Cà Mau",
+      "city": "Cà Mau",
+      "hours": [{ "label": "Nhận đơn", "value": "7:00 – 22:00 mỗi ngày" }],
+      "items": [
+        { "title": "1 chai 500ml", "price": "250.000đ", "meta": "Dùng thử", "text": "Mật ong rừng tràm nguyên chất\nPhí giao hàng 30.000đ" },
+        { "title": "Combo 2 chai 500ml", "price": "450.000đ", "meta": "Tiết kiệm 50.000đ", "text": "Miễn phí giao hàng toàn quốc\nTặng muỗng gỗ lấy mật\nĐổi trả trong 7 ngày", "featured": true },
+        { "title": "Combo 4 chai 500ml", "price": "850.000đ", "meta": "Tiết kiệm 150.000đ", "text": "Miễn phí giao hàng toàn quốc\nTặng hộp quà tặng cao cấp\nĐổi trả trong 7 ngày" }
+      ]
+    },
+    "style": { "color": "#c27c0e", "preset": "young" },
+    "floatingContact": true,
+    "sections": [
+      {
+        "type": "hero",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Đặc sản rừng U Minh Hạ",
+          "title": "Mật ong rừng **nguyên chất 100%**, sánh đặc thơm hoa tràm",
+          "text": "{slogan}",
+          "cta": "Đặt hàng ngay",
+          "cta2": "Xem bảng giá",
+          "image": "tpl:ban-san-pham/hero.webp",
+          "points": ["Giao hàng toàn quốc 2–4 ngày", "Kiểm tra hàng trước khi thanh toán", "Hoàn tiền nếu phát hiện pha trộn"]
+        }
+      },
+      {
+        "type": "offer",
+        "variant": "band",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Ưu đãi hôm nay",
+          "title": "Combo 2 chai chỉ còn 450.000đ",
+          "text": "Miễn phí giao hàng và tặng muỗng gỗ lấy mật cho 50 đơn hàng đầu tiên mỗi ngày.",
+          "price": "450.000đ",
+          "oldPrice": "500.000đ",
+          "cta": "Nhận ưu đãi",
+          "note": "Ưu đãi làm mới lúc 0 giờ mỗi ngày."
+        }
+      },
+      {
+        "type": "services",
+        "variant": "icons",
+        "enabled": true,
+        "content": {
+          "nav": "Lợi ích",
+          "anchor": "loi-ich",
+          "eyebrow": "Vì sao chọn chúng tôi",
+          "title": "Mật ong thật – nhìn, nếm là biết",
+          "items": [
+            { "title": "Nguyên chất 100%", "text": "Không pha đường, không nấu cô đặc, giữ nguyên enzyme và hương hoa tràm tự nhiên.", "icon": "drop" },
+            { "title": "Khai thác thủ công", "text": "Người dân gác kèo ong theo cách truyền thống, chỉ thu hoạch khi mật đã đủ già.", "icon": "leaf" },
+            { "title": "Kiểm nghiệm định kỳ", "text": "Mỗi lô hàng có phiếu kiểm nghiệm độ ẩm, đường khử và HMF của trung tâm được công nhận.", "icon": "shield" },
+            { "title": "Đóng chai thuỷ tinh", "text": "Chai thuỷ tinh dày, nắp kín, không ám mùi nhựa, an toàn cho cả gia đình.", "icon": "award" },
+            { "title": "Giao nhanh toàn quốc", "text": "Đóng gói chống sốc 3 lớp, giao 2–4 ngày, được kiểm tra hàng trước khi trả tiền.", "icon": "truck" },
+            { "title": "Đổi trả 7 ngày", "text": "Không hài lòng về chất lượng, hoàn tiền 100% – không cần giải thích.", "icon": "heart" }
+          ]
+        }
+      },
+      {
+        "type": "about",
+        "variant": "split",
+        "enabled": true,
+        "content": {
+          "nav": "Nguồn gốc",
+          "anchor": "nguon-goc",
+          "eyebrow": "Câu chuyện nguồn gốc",
+          "title": "Từ những cánh rừng tràm ngập nước của Cà Mau",
+          "text": "Mỗi mùa tràm nở, đàn ong rừng tìm về những chiếc kèo do người dân U Minh gác sẵn. Mật được thu hoạch bằng tay, lọc qua vải mùng và đóng chai ngay trong ngày.\n\n{brand} làm việc trực tiếp với hơn 30 hộ gác kèo, trả giá cao hơn thương lái để bà con giữ nghề và giữ rừng.",
+          "image": "tpl:ban-san-pham/story.webp",
+          "points": ["Truy xuất được hộ gác kèo trên từng lô", "Thu hoạch theo mùa, không ép sản lượng"],
+          "cta": "Đặt hàng ngay"
+        }
+      },
+      {
+        "type": "testimonials",
+        "variant": "cards",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Khách hàng đánh giá",
+          "title": "Hơn 12.000 gia đình đã tin dùng",
+          "items": [
+            { "title": "Chị Hồng Nhung", "meta": "Hà Nội", "text": "Mật sánh, để tủ lạnh không bị đông đường. Con mình ho hay pha mật ong chanh ấm, rất hợp.", "rating": 5 },
+            { "title": "Anh Tuấn Kiệt", "meta": "Đà Nẵng", "text": "Đóng gói kỹ, chai thuỷ tinh không sứt mẻ. Vị thơm hoa tràm đúng như mô tả.", "rating": 5 },
+            { "title": "Cô Kim Oanh", "meta": "TP. Hồ Chí Minh", "text": "Mua lần thứ ba rồi. Shop tư vấn nhiệt tình, giao hàng nhanh hơn hẹn.", "rating": 5 }
+          ]
+        }
+      },
+      {
+        "type": "gallery",
+        "variant": "strip",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Hình ảnh thực tế",
+          "title": "Sánh, trong, thơm – từng giọt mật",
+          "items": [
+            { "title": "Sáp ong rừng tràm", "image": "tpl:ban-san-pham/gal-1.webp" },
+            { "title": "Hũ mật ong làm quà tặng", "image": "tpl:ban-san-pham/gal-2.webp" },
+            { "title": "Mật ong sánh đặc chảy từ muỗng gỗ", "image": "tpl:ban-san-pham/gal-3.webp" },
+            { "title": "Chai mật ong nguyên chất", "image": "tpl:ban-san-pham/gal-4.webp" }
+          ]
+        }
+      },
+      {
+        "type": "pricing",
+        "variant": "plans",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Bảng giá",
+          "title": "Chọn combo phù hợp với gia đình bạn",
+          "cta": "Chọn combo này",
+          "note": "Thanh toán khi nhận hàng (COD) hoặc chuyển khoản. Xuất hoá đơn VAT theo yêu cầu."
+        }
+      },
+      {
+        "type": "faq",
+        "variant": "accordion",
+        "enabled": true,
+        "content": {
+          "eyebrow": "Câu hỏi thường gặp",
+          "title": "Bạn còn băn khoăn?",
+          "items": [
+            { "title": "Làm sao biết mật ong là thật?", "text": "Mật thật sánh, nhỏ lên giấy không loang, có vị ngọt dịu và hậu hơi chát của hoa tràm. Mỗi đơn hàng kèm bản sao phiếu kiểm nghiệm của lô." },
+            { "title": "Mật ong bị kết tinh có sao không?", "text": "Kết tinh là hiện tượng tự nhiên khi trời lạnh, không ảnh hưởng chất lượng. Ngâm chai vào nước ấm dưới 40°C để mật lỏng lại." },
+            { "title": "Bao lâu thì nhận được hàng?", "text": "Nội thành TP. Hồ Chí Minh và Hà Nội 1–2 ngày, các tỉnh khác 2–4 ngày. Bạn được kiểm tra hàng trước khi thanh toán." },
+            { "title": "Trẻ nhỏ dùng được không?", "text": "Không dùng mật ong cho trẻ dưới 1 tuổi. Trẻ từ 1 tuổi trở lên dùng được với lượng nhỏ." }
+          ]
+        }
+      },
+      {
+        "type": "contact",
+        "variant": "centered",
+        "enabled": true,
+        "content": {
+          "nav": "Đặt hàng",
+          "anchor": "dat-hang",
+          "eyebrow": "Đặt hàng",
+          "title": "Đặt hàng trong 30 giây",
+          "text": "Điền thông tin, {brand} gọi xác nhận đơn trong vòng 15 phút (7:00 – 22:00).",
+          "cta": "Đặt hàng ngay",
+          "formKind": "order"
+        }
+      },
+      {
+        "type": "footer",
+        "variant": "simple",
+        "enabled": true,
+        "content": {}
+      }
+    ]
+  }
+}

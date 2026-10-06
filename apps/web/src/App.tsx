@@ -11,6 +11,7 @@ import { Migrations } from './pages/Migrations';
 import { Settings } from './pages/Settings';
 import { SiteDetail } from './pages/SiteDetail';
 import { SiteNew } from './pages/SiteNew';
+import { SiteBuilder } from './pages/SiteBuilder';
 import { Sites } from './pages/Sites';
 
 function Protected({ children }: { children: ReactNode }) {
@@ -31,6 +32,7 @@ export function App() {
         <Route index element={<Dashboard />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/new" element={<SiteNew />} />
+        <Route path="sites/new/builder" element={<SiteBuilder />} />
         <Route path="sites/:id" element={<SiteDetail />} />
         <Route path="databases" element={<Databases />} />
         <Route path="migrations" element={<Migrations />} />

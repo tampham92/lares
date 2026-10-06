@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { builderSpecSchema } from './builder.js';
 
 export * from './i18n.js';
 export { SHARED_EN } from './i18n-en.js';
@@ -6,6 +7,7 @@ export * from './network.js';
 export * from './security.js';
 export * from './backup.js';
 export * from './release.js';
+export * from './builder.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)
@@ -148,6 +150,8 @@ const siteBase = {
 const templateFields = {
   template: templateIdSchema.optional(),
   branding: brandingSchema.default({}),
+  /** Site builder: render this spec instead of a template (see builder.ts). */
+  builder: builderSpecSchema.optional(),
 };
 const phpVersionSchema = z.string().regex(PHP_VERSION_RE).optional();
 
