@@ -111,6 +111,12 @@ IPs, domains, hostnames, site counts and site data are never sent. **To disable 
 | Panel security | Two-factor auth (TOTP + 10 recovery codes), IP allowlist (`sudo lares allowlist`), temporary lockout after repeated failed logins, **Log out everywhere**, security headers. See [docs/en/security.md](docs/en/security.md) |
 | Panel domain | A Settings card: give the panel a domain and Lares issues a Let's Encrypt certificate (`lares-panel`, auto-renewed), so there is no more self-signed warning. In Cloudflare the record must be **DNS only** (Cloudflare does not proxy port 8686) |
 | Real IP behind Cloudflare | On by default (toggle in Settings): nginx restores the visitor IP via `/etc/nginx/conf.d/lares-cloudflare.conf`, Cloudflare ranges are refreshed daily and rolled back if `nginx -t` fails |
+| Site builder | **Add website → Build my own design**: pick an industry, enter business info, a brand colour and a style, toggle and reorder sections, watch the live preview, then create a static or WordPress site. Save the design as your own template (stored in `/var/lib/lares/templates/`) |
+| Contact leads | Every site answers `POST /_lares/lead`; the built-in templates' forms use it. Leads go to the **Contact leads** inbox (all sites, filters, notes, CSV) and to Telegram or a webhook. See [docs/en/leads.md](docs/en/leads.md) |
+| Safe WordPress updates | **Updates** tab of a WordPress site: core, plugins, themes with available versions. A backup is taken first, the site is checked afterwards and restored automatically if it broke; every run is kept in the history |
+| Cloudflare DNS | **Settings → Cloudflare DNS**: paste an API token (Zone DNS Edit + Zone Read). New sites and assigned domains get their A/AAAA records automatically (DNS only, never overwriting foreign records without confirmation); DNS status and proxy toggle in the SSL tab |
+| PHP settings | **PHP** tab of PHP/WordPress/Laravel sites: upload size, memory, execution time, input vars (managed `.user.ini`); nginx upload limit follows |
+| Adminer | **Open Adminer** on the Databases page logs straight into the database; reachable only through the panel login and IP allowlist |
 | Migration | See below |
 
 ## Migrating sites from another VPS / panel

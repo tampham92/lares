@@ -241,7 +241,15 @@ if [[ $PURGE == 1 ]]; then
 
   step "$(L 'Xoá cấu hình, dữ liệu và log của Lares' "Deleting Lares's configuration, data and logs")"
   rm -f /etc/nginx/conf.d/00-lares.conf /etc/nginx/conf.d/99-lares-default.conf /etc/logrotate.d/lares \
-    /etc/nginx/conf.d/lares-cloudflare.conf /etc/nginx/conf.d/lares-panel.conf
+    /etc/nginx/conf.d/lares-cloudflare.conf /etc/nginx/conf.d/lares-panel.conf /etc/nginx/conf.d/lares-adminer.conf
+  # Adminer (database GUI): its PHP-FPM pool, files and system user
+  for pool in /etc/php/*/fpm/pool.d/lares-adminer.conf; do
+    [[ -f "$pool" ]] || continue
+    rm -f "$pool"; v=$(echo "$pool" | cut -d/ -f4)
+    systemctl reload "php$v-fpm" >/dev/null 2>&1 || true
+  done
+  rm -rf /var/lib/lares-adminer
+  id lares-adminer >/dev/null 2>&1 && userdel lares-adminer >/dev/null 2>&1 || true
   # Let's Encrypt certificate of the panel domain (Settings -> panel domain)
   if command -v certbot >/dev/null; then certbot delete --cert-name lares-panel --non-interactive >/dev/null 2>&1 || true; fi
   if command -v nginx >/dev/null && nginx -t >/dev/null 2>&1; then

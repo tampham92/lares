@@ -8,6 +8,26 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Added
+- **Site builder** ("Tự tạo giao diện"): answer a few questions (industry, business info, brand
+  colour, style, sections) and get a complete static or WordPress site with a live preview. 12
+  section types / 27 layouts, a palette generated from one colour with WCAG AA contrast, 4 styles
+  with bundled fonts (no external CDN). Save a design as your own template, import/export JSON.
+- **Three new free templates**: Spa, Restaurant / café (`nha-hang`) and Single-product landing page
+  (`ban-san-pham`), built with the site builder.
+- **Contact leads**: forms on every site post to `/_lares/lead`; leads land in a "Contact leads"
+  inbox (filters, notes, CSV export) and are sent to Telegram and/or a webhook (Make, n8n, Google
+  Sheets). Retention is configurable (default 12 months). The built-in templates use it.
+- **Safe WordPress updates**: core/plugin/theme inventory with a "Updates" tab; updates run after a
+  backup, the site is health-checked afterwards and automatically restored if it broke. History of
+  every run.
+- **Cloudflare DNS**: connect an API token; creating a site or assigning a domain creates the A/AAAA
+  records (DNS only), with conflict protection, DNS status and a proxy toggle in the SSL tab.
+- **Per-site PHP settings** (upload size, memory, execution time, input vars) with presets; nginx
+  `client_max_body_size` follows the upload size.
+- **Adminer** with one-click login from the Databases page, reachable only through the panel.
+- **Getting started checklist** on the dashboard (allowlist, 2FA, panel domain, first site, backups).
+
 ## [0.2.0-beta] - 2026-10-04
 
 First public beta under the name **Lares Panel by ThoCode**.

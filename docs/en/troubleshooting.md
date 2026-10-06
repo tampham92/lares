@@ -99,6 +99,18 @@ automatically (the source is never changed). Fix the cause, then use **Retry fai
 - **Next.js build fails**: read the build log in the migration and app logs. Secret environment
   variables that lived outside the code (for example in PM2) must be entered again.
 
+## Cloudflare: redirect loop after turning the proxy on
+
+Keep records **DNS only** (grey cloud) until SSL is installed. Before turning the proxy on (orange cloud), set **SSL/TLS → Full (strict)** in Cloudflare; Flexible together with "force HTTPS" causes a redirect loop. A zone in "pending" state means the nameservers have not moved to Cloudflare yet.
+
+## Adminer does not open
+
+The first time, Lares downloads Adminer from github.com and verifies its SHA-256, so the server needs outbound access to github.com. Adminer needs an installed PHP-FPM version with `mysqli`. It cannot run in coexist mode (nginx stopped).
+
+## A WordPress update was rolled back
+
+Lares restores the backup when the home page breaks, a new PHP fatal error appears, or an active plugin got deactivated. Check **Updates → History** to see which item broke it, then update items one by one. Content created during the update (orders, comments) is lost on restore.
+
 ## Reporting a bug
 
 Open an issue at https://github.com/tampham92/lares/issues with your Lares version (sidebar

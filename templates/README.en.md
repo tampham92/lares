@@ -82,3 +82,11 @@ Written in block markup (`<!-- wp:group -->...`). The header, footer, and post/c
 - Complex decorative parts can use a `wp:html` block.
 
 Check before use (in the repo): `npm test` checks the block structure of every built-in `home.html`; for your own templates, preview them in the panel (the **Preview** button).
+
+## Contact form (`/_lares/lead`)
+
+Template forms post to `POST /_lares/lead` (see [docs/en/leads.md](../docs/en/leads.md)). Static templates include `{{LEAD_JS}}` to submit with JavaScript and show the result inline; without JS the page comes back with `#lares-sent` / `#lares-error` (classes `.lead-msg`, `.lead-ok`, `.lead-err`, spam trap `.lares-hp`). WordPress templates put the form in `wordpress/contact-form.html` and mark the page with `"contactForm": true` in `pages[]` of `template.json`.
+
+## Templates made with the site builder
+
+A template with a `"builder"` key in `template.json` (e.g. `spa`, `nha-hang`, `ban-san-pham`) is rendered from that spec instead of `index.html` / `home.html`: sections, layout variants, brand colour, style and sample copy with the placeholders `{brand}`, `{slogan}`, `{phone}`, `{email}`, `{address}`, `{city}`. Images live in `assets/` (with `CREDITS.md`); the preview image is `previewImage: "assets/thumb.webp"`. Fonts and shared strings are in `templates/_builder/`. Designs saved from the builder go to the custom templates folder (`LARES_CUSTOM_TEMPLATES_DIR`).

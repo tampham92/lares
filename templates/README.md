@@ -80,3 +80,11 @@ Viết bằng block markup (`<!-- wp:group -->...`). Header, footer, trang bài 
 - Phần trang trí phức tạp có thể dùng block `wp:html`.
 
 Kiểm tra trước khi dùng (trong repo): `npm test` kiểm tra cấu trúc block của mọi `home.html` có sẵn; với template riêng, xem trước trong panel (nút **Xem trước**).
+
+## Form liên hệ (`/_lares/lead`)
+
+Form của template gửi về `POST /_lares/lead` (xem [docs/vi/leads.md](../docs/vi/leads.md)). Bản HTML tĩnh chèn `{{LEAD_JS}}` để gửi bằng JavaScript và hiện thông báo ngay; không có JS thì trang quay lại với `#lares-sent` / `#lares-error` (class `.lead-msg`, `.lead-ok`, `.lead-err`, ô bẫy spam `.lares-hp`). Bản WordPress đặt form trong `wordpress/contact-form.html` và đánh dấu trang bằng `"contactForm": true` trong `pages[]` của `template.json`.
+
+## Template dựng bằng trình tạo giao diện
+
+Template có khoá `"builder"` trong `template.json` (ví dụ `spa`, `nha-hang`, `ban-san-pham`) được dựng từ spec đó thay cho `index.html` / `home.html`: danh sách khối, kiểu trình bày, màu thương hiệu, phong cách và nội dung mẫu với các chỗ trống `{brand}`, `{slogan}`, `{phone}`, `{email}`, `{address}`, `{city}`. Ảnh nằm trong `assets/` (kèm `CREDITS.md`), ảnh xem trước là `previewImage: "assets/thumb.webp"`. Font và chuỗi chung nằm trong `templates/_builder/`. Thiết kế lưu từ trình tạo giao diện được ghi vào thư mục template riêng (`LARES_CUSTOM_TEMPLATES_DIR`).

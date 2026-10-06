@@ -104,6 +104,18 @@ liệu trên máy nguồn không bao giờ bị thay đổi. Sửa nguyên nhân
 - **Next.js build lỗi**: xem log build trong trang chuyển site và log ứng dụng. Các biến môi trường bí
   mật nằm ngoài mã nguồn (ví dụ trong PM2) cần được nhập lại.
 
+## Cloudflare: vòng lặp chuyển hướng sau khi bật proxy
+
+Giữ bản ghi ở chế độ **DNS only** (đám mây xám) cho tới khi cài xong SSL. Trước khi bật proxy (đám mây cam), đặt **SSL/TLS → Full (strict)** trong Cloudflare. Chế độ Flexible kèm "Bắt buộc HTTPS" sẽ gây vòng lặp chuyển hướng. Zone ở trạng thái "pending" nghĩa là nameserver chưa chuyển sang Cloudflare.
+
+## Adminer không mở được
+
+Lần đầu mở, Lares tải Adminer từ github.com và kiểm tra SHA-256, nên VPS cần truy cập được github.com. Adminer cần một phiên bản PHP-FPM có `mysqli` đã cài sẵn. Ở chế độ cùng tồn tại (nginx đang tắt), Adminer không chạy được.
+
+## Cập nhật WordPress bị hoàn tác
+
+Lares khôi phục bản backup khi trang chủ lỗi, xuất hiện lỗi PHP nghiêm trọng, hoặc plugin đang bật bị tắt sau khi cập nhật. Xem tab **Cập nhật → Lịch sử** để biết mục nào gây lỗi, rồi cập nhật từng mục một. Nội dung phát sinh trong lúc cập nhật (đơn hàng, bình luận) sẽ mất khi khôi phục.
+
 ## Báo lỗi
 
 Mở issue tại https://github.com/tampham92/lares/issues, kèm phiên bản Lares (ở cuối thanh bên), hệ điều
