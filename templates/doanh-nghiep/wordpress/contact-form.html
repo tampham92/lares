@@ -1,0 +1,23 @@
+<form class="form" method="post" action="/_lares/lead" data-lares-lead>
+  <h3>Nhận báo giá miễn phí</h3>
+  <div class="row2">
+    <input name="name" placeholder="Họ và tên" autocomplete="name" maxlength="120" required>
+    <input name="company" placeholder="Công ty" autocomplete="organization" maxlength="200">
+  </div>
+  <div class="row2">
+    <input name="phone" type="tel" placeholder="Số điện thoại" autocomplete="tel" maxlength="40" required>
+    <input name="email" type="email" placeholder="Email" autocomplete="email" maxlength="200">
+  </div>
+  <select name="service" aria-label="Dịch vụ quan tâm">
+    <option>Tư vấn chiến lược</option>
+    <option>Marketing số</option>
+    <option>Thiết kế website</option>
+    <option>Phát triển phần mềm</option>
+    <option>Khác</option>
+  </select>
+  <textarea name="message" placeholder="Mô tả ngắn nhu cầu của bạn..." maxlength="5000"></textarea>
+  <div class="lares-hp" aria-hidden="true"><label>Website <input name="_hp" tabindex="-1" autocomplete="off"></label></div>
+  <button class="btn btn-primary" type="submit">Gửi yêu cầu</button>
+  <p class="lead-msg lead-ok" id="lares-sent" data-lares-ok role="status">Cảm ơn bạn! {{SITE_NAME}} đã nhận được yêu cầu và sẽ liên hệ trong vòng 24 giờ làm việc.</p>
+  <p class="lead-msg lead-err" id="lares-error" data-lares-error role="alert"><span data-lares-error-text>Chưa gửi được yêu cầu. Vui lòng kiểm tra lại thông tin hoặc gọi {{PHONE}}.</span></p>
+</form>

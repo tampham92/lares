@@ -333,3 +333,38 @@ details summary { cursor: pointer; color: var(--primary); }
 .seo-list li.ok::before { content: '✓'; color: var(--ok); }
 .seo-list li.bad::before { content: '!'; color: var(--warn); }
 textarea.prose-input { font-family: inherit; font-size: 14px; min-height: 0; }
+
+/* ---- Leads (contact-form inbox) -------------------------------------------------------------- */
+.sidebar nav a .nav-count {
+  margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--primary-solid); color: var(--on-primary); font-size: 11px; font-weight: 700;
+  line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.lead-toolbar .lead-search { flex: 1 1 220px; width: auto; height: 30px; font-size: 13px; }
+.lead-table td.nowrap { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lead-table .lead-site { max-width: 200px; overflow-wrap: anywhere; }
+.lead-table .lead-contact { min-width: 160px; overflow-wrap: anywhere; }
+.lead-preview {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  max-width: 420px; overflow-wrap: anywhere; margin-top: 2px;
+}
+.lead-table tr.lead-new td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+.lead-notes { margin-top: 6px; gap: 4px; }
+select.lead-status { font-weight: 550; }
+select.lead-status.info { color: var(--primary); }
+select.lead-status.warn { color: var(--warn); }
+select.lead-status.ok { color: var(--ok); }
+.lead-table tr.lead-detail-row td, .lead-table tbody tr.lead-detail-row:hover td { background: var(--panel-2); }
+.lead-message {
+  white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.lead-notify-list { gap: 6px; }
+.lead-help { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.lead-details { margin-top: 8px; gap: 8px; }
+.lead-code {
+  background: var(--code-bg); color: var(--code-text); border-radius: var(--radius-sm); padding: 10px 12px;
+  margin: 0; overflow-x: auto; white-space: pre; font-size: 12px; line-height: 1.5;
+}
+.lead-chats { gap: 6px; }
+.lead-failures { margin: 6px 0; padding-left: 18px; }

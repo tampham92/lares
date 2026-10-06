@@ -20,7 +20,8 @@ interface TemplateManifest extends TemplateInfo {
     nav: NavLink[];
     categories: Array<{ slug: string; name: string }>;
     posts: Array<{ title: string; category: string; tags?: string[]; image?: string; excerpt: string; content: string }>;
-    pages: Array<{ title: string; slug: string; content: string }>;
+    /** contactForm: append the theme's contact form (wordpress/contact-form.html) to the page. */
+    pages: Array<{ title: string; slug: string; content: string; contactForm?: boolean }>;
   };
 }
 
@@ -101,6 +102,13 @@ async function readCss(id: string, forWordpress: boolean): Promise<string> {
   return (await Promise.all(parts.map((p) => fs.readFile(p, 'utf8')))).join('\n');
 }
 
+// ---- Lead capture: shared form script + WordPress contact form part ----
+/** templates/_lead.js: sends form[data-lares-lead] to /_lares/lead without a reload ({{LEAD_JS}} in index.html). */
+const readLeadJs = () => fs.readFile(path.join(config.templatesDir, '_lead.js'), 'utf8').catch(() => '');
+const contactFormFile = async (id: string) => path.join(await dir(id), 'wordpress', 'contact-form.html');
+/** Block that renders the theme's contact-form part inside a page (theme attribute: post content gets none injected). */
+export const contactFormBlock = (themeSlug: string) => `<!-- wp:template-part ${attrs({ slug: 'contact-form', theme: themeSlug })} /-->`;
+
 // ---------------------------------------------------------------------------
 // Static HTML
 // ---------------------------------------------------------------------------
@@ -108,7 +116,8 @@ async function readCss(id: string, forWordpress: boolean): Promise<string> {
 export async function renderStaticPage(id: string, vars: TemplateVars): Promise<string> {
   const html = await fs.readFile(path.join(await dir(id), 'index.html'), 'utf8');
   const css = await readCss(id, false);
-  return fill(html, vars).replace('{{CSS}}', () => css);
+  const leadJs = await readLeadJs();
+  return fill(html, vars).replace('{{CSS}}', () => css).replace('{{LEAD_JS}}', () => leadJs);
 }
 
 export async function installStaticTemplate(id: string, webRoot: string, vars: TemplateVars, log: HostLogger) {
@@ -310,6 +319,7 @@ Text Domain: ${slug}
 */
 `;
   const font = t.font.replace(/'/g, '');
+  const contactForm = await fs.readFile(await contactFormFile(t.id), 'utf8').catch(() => null);
   const files: Record<string, string> = {
     'style.css': header + (await readCss(t.id, true)) + '\n.front-content > *{margin-block:0!important}\n.wp-block-columns.footer-grid{display:grid!important}\n',
     'functions.php': `<?php
@@ -317,6 +327,7 @@ Text Domain: ${slug}
 add_action('wp_enqueue_scripts', function () {
 \twp_enqueue_style('${slug}-font', '${font}', [], null);
 \twp_enqueue_style('${slug}', get_stylesheet_uri(), [], wp_get_theme()->get('Version'));
+\twp_enqueue_script('${slug}-lead', get_theme_file_uri('lares-lead.js'), [], wp_get_theme()->get('Version'), true);
 });
 add_action('after_setup_theme', function () {
 \tadd_theme_support('post-thumbnails');
@@ -347,6 +358,7 @@ add_action('after_setup_theme', function () {
         templateParts: [
           { name: 'header', title: 'Header', area: 'header' },
           { name: 'footer', title: 'Footer', area: 'footer' },
+          ...(contactForm !== null ? [{ name: 'contact-form', title: 'Contact form', area: 'uncategorized' }] : []),
         ],
       },
       null,
@@ -355,6 +367,8 @@ add_action('after_setup_theme', function () {
     'parts/header.html': fill(headerPart(nav), vars),
     'parts/footer.html': fill(footerPart(nav), vars),
     ...Object.fromEntries(Object.entries(THEME_TEMPLATES).map(([f, c]) => [`templates/${f}`, c])),
+    'lares-lead.js': await readLeadJs(),
+    ...(contactForm !== null ? { 'parts/contact-form.html': `<!-- wp:html -->\n${fill(contactForm.trim(), vars)}\n<!-- /wp:html -->\n` } : {}),
   };
   for (const [rel, content] of Object.entries(files)) await host.writeFile(path.join(themeDir, rel), content);
   return slug;
@@ -428,7 +442,8 @@ export async function installWordpressTemplate(id: string, webRoot: string, vars
     if (tpl.wordpress?.posts.length) log(t('Đã tạo {count} bài viết mẫu', { count: tpl.wordpress.posts.length }));
 
     for (const pg of tpl.wordpress?.pages ?? []) {
-      const file = await writeContent(`page-${pg.slug}.html`, fill(textToBlocks(pg.content), vars));
+      const form = pg.contactForm && (await fs.access(await contactFormFile(tpl.id)).then(() => true, () => false)) ? `\n\n${contactFormBlock(slug)}` : '';
+      const file = await writeContent(`page-${pg.slug}.html`, fill(textToBlocks(pg.content), vars) + form);
       await wp(`post create ${shq(file)} --post_type=page --post_status=publish --post_title=${shq(pg.title)} --post_name=${shq(pg.slug)}`);
     }
 

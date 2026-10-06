@@ -145,3 +145,53 @@ CREATE TABLE IF NOT EXISTS site_backups (
   last_run_at TEXT
 );
 `);
+
+// ---- Lead capture: contact form submissions + notifications (services/leads.ts, leadNotify.ts) ----
+// Leads hold personal data: they live only here and are purged after the retention period.
+// site_id is nulled when a site is deleted; site_domain keeps the lead readable until it expires.
+// Notifications are a durable queue (one row per lead and channel) so retries survive restarts.
+// site_lead_settings.config_enc: per-site notification override (encrypted JSON, secrets inside).
+db.exec(`
+CREATE TABLE IF NOT EXISTS leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_id INTEGER REFERENCES sites(id) ON DELETE SET NULL,
+  site_domain TEXT NOT NULL,
+  host TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  company TEXT NOT NULL DEFAULT '',
+  service TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
+  page TEXT NOT NULL DEFAULT '',
+  page_url TEXT NOT NULL DEFAULT '',
+  ip TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'new',
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_leads_site ON leads(site_id, id);
+CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at);
+
+CREATE TABLE IF NOT EXISTS lead_notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  channel TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  next_attempt_at INTEGER,
+  sent_at TEXT,
+  updated_at TEXT,
+  UNIQUE(lead_id, channel)
+);
+CREATE INDEX IF NOT EXISTS idx_lead_notifications_due ON lead_notifications(status, next_attempt_at);
+
+CREATE TABLE IF NOT EXISTS site_lead_settings (
+  site_id INTEGER PRIMARY KEY REFERENCES sites(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'inherit',
+  config_enc TEXT
+);
+`);

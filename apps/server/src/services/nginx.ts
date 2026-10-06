@@ -6,6 +6,7 @@ import { t, tDefault } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { syncDevNginx } from './devNginx.js';
 import { host, type HostLogger } from './host.js';
+import { leadLocation } from './leadsNginx.js';
 import { phpSocket } from './php.js';
 
 export interface VhostSpec {
@@ -71,6 +72,8 @@ function appBody(spec: VhostSpec): string {
     '',
     'location ~ /\\.(?!well-known) {\n    deny all;\n}',
   ];
+  // ---- Lead capture (contact forms -> panel), see services/leadsNginx.ts ----
+  if (!spec.disabled) common.push('', leadLocation(spec.domain));
 
   if (spec.disabled) {
     return [...common, '', `location / {\n    default_type text/html;\n    return 503 "<h1>${tDefault('Site tạm ngưng hoạt động')}</h1>";\n}`].join('\n');
