@@ -1,0 +1,18 @@
+<form class="form" method="post" action="/_lares/lead" data-lares-lead>
+  <h3>Nhận tư vấn miễn phí</h3>
+  <div class="row2">
+    <input name="name" placeholder="Họ và tên" autocomplete="name" maxlength="120" required>
+    <input name="phone" type="tel" placeholder="Số điện thoại" autocomplete="tel" maxlength="40" required>
+  </div>
+  <select name="service" aria-label="Nhu cầu">
+    <option>Tôi muốn mua</option>
+    <option>Tôi muốn thuê</option>
+    <option>Tôi muốn ký gửi bán / cho thuê</option>
+  </select>
+  <textarea name="message" placeholder="Khu vực, ngân sách, số phòng ngủ mong muốn..." maxlength="5000"></textarea>
+  <div class="lares-hp" aria-hidden="true"><label>Website <input name="_hp" tabindex="-1" autocomplete="off"></label></div>
+  <button class="btn btn-primary" type="submit">Gửi yêu cầu</button>
+  <p class="lead-msg lead-ok" id="lares-sent" data-lares-ok role="status">Cảm ơn bạn! {{SITE_NAME}} đã nhận được yêu cầu và sẽ gọi lại cho bạn trong vòng 30 phút.</p>
+  <p class="lead-msg lead-err" id="lares-error" data-lares-error role="alert"><span data-lares-error-text>Chưa gửi được yêu cầu. Vui lòng kiểm tra lại thông tin hoặc gọi {{PHONE}}.</span></p>
+  <p class="form-note">Thông tin của bạn được bảo mật tuyệt đối.</p>
+</form>

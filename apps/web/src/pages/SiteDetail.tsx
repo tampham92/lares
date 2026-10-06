@@ -7,6 +7,7 @@ import { AiWriter } from '../components/AiWriter';
 import { BackupsTab } from '../components/BackupsTab';
 import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
 import { SiteDnsCard } from '../components/SiteDnsCard';
+import { LeadsTab } from '../components/LeadsTab';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
 import { WpUpdatesTab, useWpUpdatesTabLabel } from '../components/WpUpdatesTab';
@@ -19,7 +20,7 @@ interface SiteDetailResponse {
   nodeConfig: { gitUrl?: string; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
-type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'updates' | 'backups' | 'clone' | 'danger';
+type Tab = 'overview' | 'ssl' | 'logs' | 'leads' | 'nextjs' | 'ai' | 'updates' | 'backups' | 'clone' | 'danger';
 
 export function SiteDetail() {
   const id = Number(useParams().id);
@@ -38,6 +39,7 @@ function SitePage({ id }: { id: number }) {
     ['overview', t('Tổng quan')],
     ['ssl', 'SSL'],
     ['logs', t('Log traffic')],
+    ['leads', t('Khách liên hệ')],
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
     ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')], ['updates', updatesLabel]] as Array<[Tab, string]>) : []),
     ['backups', t('Sao lưu')],
@@ -71,6 +73,7 @@ function SitePage({ id }: { id: number }) {
       {tab === 'overview' && <Overview data={q.data} />}
       {tab === 'ssl' && <SslTab site={site} />}
       {tab === 'logs' && <LogsTab site={site} />}
+      {tab === 'leads' && <LeadsTab site={site} />}
       {tab === 'nextjs' && <NextTab data={q.data} />}
       {tab === 'ai' && <AiWriter site={site} />}
       {tab === 'updates' && <WpUpdatesTab site={site} />}

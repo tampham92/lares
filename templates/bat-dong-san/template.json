@@ -81,6 +81,7 @@
       {
         "title": "Liên hệ",
         "slug": "lien-he",
+        "contactForm": true,
         "content": "**Hotline:** {{PHONE}}\n**Email:** {{EMAIL}}\n**Văn phòng:** {{ADDRESS}}\n\nGiờ làm việc: 8:00 – 20:00, tất cả các ngày trong tuần."
       }
     ]

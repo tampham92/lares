@@ -4,6 +4,7 @@ import { auth } from './api';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Databases } from './pages/Databases';
+import { Leads } from './pages/Leads';
 import { Login } from './pages/Login';
 import { MigrationDetail } from './pages/MigrationDetail';
 import { MigrationNew } from './pages/MigrationNew';
@@ -33,6 +34,7 @@ export function App() {
         <Route path="sites/new" element={<SiteNew />} />
         <Route path="sites/:id" element={<SiteDetail />} />
         <Route path="databases" element={<Databases />} />
+        <Route path="leads" element={<Leads />} />
         <Route path="migrations" element={<Migrations />} />
         <Route path="migrations/new" element={<MigrationNew />} />
         <Route path="migrations/:id" element={<MigrationDetail />} />

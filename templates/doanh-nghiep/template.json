@@ -54,6 +54,7 @@
       {
         "title": "Liên hệ",
         "slug": "lien-he",
+        "contactForm": true,
         "content": "**Hotline:** {{PHONE}}\n**Email:** {{EMAIL}}\n**Văn phòng:** {{ADDRESS}}\n\nGiờ làm việc: 8:30 – 17:30, thứ Hai đến thứ Sáu."
       }
     ]

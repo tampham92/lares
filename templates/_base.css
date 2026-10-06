@@ -71,6 +71,12 @@ h1,h2{text-wrap:balance}
 .form .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .form-note{font-size:.85rem;color:var(--muted);margin:0}
 .thanks{background:#e7f6ee;color:#146c3b;padding:12px 16px;border-radius:10px;margin:0}
+.lead-msg{display:none;margin:0;padding:12px 16px;border-radius:10px;font-size:.95rem;scroll-margin-top:120px}
+.lead-msg:target,.lead-msg.is-visible{display:block}
+.lead-ok{background:#e7f6ee;color:#146c3b}
+.lead-err{background:#fdecec;color:#a61b1b}
+.lares-hp{position:absolute!important;left:-10000px!important;width:1px;height:1px;overflow:hidden}
+.form button:disabled{opacity:.6;cursor:wait}
 
 /* footer */
 .site-footer{background:var(--footer-bg);color:rgba(255,255,255,.72);padding:68px 0 26px;font-size:.95rem}
