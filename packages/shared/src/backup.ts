@@ -8,13 +8,14 @@ import { msg } from './i18n.js';
 /** Backup ids are the local creation time, e.g. 20261004-031500 (a -2, -3... suffix on collision). */
 export const BACKUP_ID_RE = /^\d{8}-\d{6}(?:-\d{1,3})?$/;
 
-export const BACKUP_TRIGGERS = ['manual', 'scheduled', 'safety'] as const;
+export const BACKUP_TRIGGERS = ['manual', 'scheduled', 'safety', 'pre-update'] as const;
 export type BackupTrigger = (typeof BACKUP_TRIGGERS)[number];
 
 export const BACKUP_TRIGGER_LABELS: Record<BackupTrigger, string> = {
   manual: msg('Thủ công'),
   scheduled: msg('Tự động'),
   safety: msg('An toàn (trước khi khôi phục)'),
+  'pre-update': msg('Trước khi cập nhật WordPress'),
 };
 
 export const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -94,6 +95,6 @@ export interface SiteBackupsResponse {
   schedule: { globalEnabled: boolean; siteEnabled: boolean; time: string; keep: number };
   last: { date: string | null; status: 'ok' | 'failed' | null; error: string | null; at: string | null };
   /** Backup/restore currently running for this site (attach a TaskLog to follow it). */
-  running: { taskId: string; kind: 'backup' | 'restore' } | null;
+  running: { taskId: string; kind: 'backup' | 'restore' | 'update' } | null;
   root: string;
 }

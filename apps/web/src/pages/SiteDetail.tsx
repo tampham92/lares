@@ -9,6 +9,7 @@ import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
 import { SiteDnsCard } from '../components/SiteDnsCard';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
+import { WpUpdatesTab, useWpUpdatesTabLabel } from '../components/WpUpdatesTab';
 import { locale, t } from '../i18n';
 
 interface SiteDetailResponse {
@@ -18,7 +19,7 @@ interface SiteDetailResponse {
   nodeConfig: { gitUrl?: string; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
-type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'backups' | 'clone' | 'danger';
+type Tab = 'overview' | 'ssl' | 'logs' | 'nextjs' | 'ai' | 'updates' | 'backups' | 'clone' | 'danger';
 
 export function SiteDetail() {
   const id = Number(useParams().id);
@@ -29,6 +30,7 @@ export function SiteDetail() {
 function SitePage({ id }: { id: number }) {
   const q = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetailResponse>(`/api/sites/${id}`) });
   const [tab, setTab] = useState<Tab>('overview');
+  const updatesLabel = useWpUpdatesTabLabel(id, q.data?.site.appType === 'wordpress');
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <div className="sub">{t('Đang tải…')}</div>;
   const { site } = q.data;
@@ -37,7 +39,7 @@ function SitePage({ id }: { id: number }) {
     ['ssl', 'SSL'],
     ['logs', t('Log traffic')],
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
-    ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')]] as Array<[Tab, string]>) : []),
+    ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')], ['updates', updatesLabel]] as Array<[Tab, string]>) : []),
     ['backups', t('Sao lưu')],
     ['clone', t('Nhân bản')],
     ['danger', t('Xoá site')],
@@ -71,6 +73,7 @@ function SitePage({ id }: { id: number }) {
       {tab === 'logs' && <LogsTab site={site} />}
       {tab === 'nextjs' && <NextTab data={q.data} />}
       {tab === 'ai' && <AiWriter site={site} />}
+      {tab === 'updates' && <WpUpdatesTab site={site} />}
       {tab === 'backups' && <BackupsTab site={site} />}
       {tab === 'clone' && <CloneTab site={site} dbs={q.data.databases} />}
       {tab === 'danger' && <DangerTab site={site} dbs={q.data.databases} />}

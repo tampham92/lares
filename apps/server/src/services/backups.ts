@@ -22,7 +22,7 @@ import { badRequest, conflict, errorMessage, notFound } from '../lib/errors.js';
 import { duKb, shq, tarCreate, tarExcludes } from '../lib/shell.js';
 import { parseWpConfig } from '../migration/appDetect.js';
 import { freeBytes, mysqldumpFlags } from '../migration/source.js';
-import { SAFETY_KEEP, backupRootProblem, isDue, isInside, isSafeDomainSegment, isSafeSiteRoot, localDate, newBackupId, selectExpired } from './backupPolicy.js';
+import { PRE_UPDATE_KEEP, SAFETY_KEEP, backupRootProblem, isDue, isInside, isSafeDomainSegment, isSafeSiteRoot, localDate, newBackupId, selectExpired } from './backupPolicy.js';
 import { LocalBackupStorage, MANIFEST_FILE, type BackupStorage } from './backupStorage.js';
 import { databasesSize, findWpConfig } from './clone.js';
 import * as databases from './databases.js';
@@ -35,7 +35,8 @@ import { startTask, type TaskInfo } from './tasks.js';
 /*
  * Site backups: files.tar.gz (the site directory) + db-<name>.sql.gz per database + manifest.json,
  * written through a BackupStorage (local disk today). Manual, scheduled (daily) and "safety"
- * backups taken automatically before a restore. One backup/restore per site at a time.
+ * backups taken automatically before a restore; "pre-update" ones before a WordPress update.
+ * One backup/restore/update per site at a time.
  */
 
 const fmtSize = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(0.1, bytes / 1024 ** 2).toFixed(1)} MB`);
@@ -148,11 +149,25 @@ function recordResult(siteId: number, status: 'ok' | 'failed', error: string | n
 
 // ---- Locks ------------------------------------------------------------------------
 
-const running = new Map<number, { taskId: string; kind: 'backup' | 'restore' }>();
+export type SiteJobKind = 'backup' | 'restore' | 'update';
 
-/** Start `fn` as a background task holding the site's lock (one backup/restore per site). */
-function startLocked<T>(site: Site, kind: 'backup' | 'restore', label: string, fn: (log: HostLogger) => Promise<T>): TaskInfo {
-  if (running.has(site.id)) throw conflict(t('{domain} đang có tác vụ sao lưu/khôi phục chạy - hãy đợi nó xong', { domain: site.domain }));
+const running = new Map<number, { taskId: string; kind: SiteJobKind }>();
+
+/** Backup/restore/update currently holding the site's lock. */
+export const runningJob = (siteId: number) => running.get(siteId) ?? null;
+
+function busy(site: Site) {
+  return running.get(site.id)?.kind === 'update'
+    ? conflict(t('{domain} đang cập nhật WordPress - hãy đợi nó xong', { domain: site.domain }))
+    : conflict(t('{domain} đang có tác vụ sao lưu/khôi phục chạy - hãy đợi nó xong', { domain: site.domain }));
+}
+
+/**
+ * Start `fn` as a background task holding the site's lock (one backup/restore/update per site).
+ * Exported for other site jobs (WordPress updates), which call takeBackup / restoreFromBackup inside it.
+ */
+export function startLocked<T>(site: Site, kind: SiteJobKind, label: string, fn: (log: HostLogger) => Promise<T>): TaskInfo {
+  if (running.has(site.id)) throw busy(site);
   const lock = { taskId: '', kind };
   running.set(site.id, lock);
   try {
@@ -329,7 +344,7 @@ async function createBackup(site: Site, trigger: BackupTrigger, log: HostLogger,
 /** Retention: keep the newest `keep` scheduled backups (SAFETY_KEEP safety ones); manual ones stay. */
 async function prune(store: BackupStorage, domain: string, trigger: BackupTrigger, keep: number, log: HostLogger, protect?: string) {
   const all = (await store.list(domain)).flatMap((b) => (b.manifest ? [{ id: b.id, trigger: b.manifest.trigger, createdAt: b.manifest.createdAt }] : []));
-  const n = trigger === 'safety' ? SAFETY_KEEP : keep;
+  const n = trigger === 'safety' ? SAFETY_KEEP : trigger === 'pre-update' ? PRE_UPDATE_KEEP : keep;
   for (const b of selectExpired(all, trigger, n)) {
     if (b.id === protect) continue; // the backup being restored from
     await store.remove(domain, b.id);
@@ -348,7 +363,7 @@ const notFoundIfMissing = (err: unknown): never => {
 
 export async function deleteBackup(siteId: number, id: string) {
   const site = sites.getSite(siteId);
-  if (running.has(site.id)) throw conflict(t('{domain} đang có tác vụ sao lưu/khôi phục chạy - hãy đợi nó xong', { domain: site.domain }));
+  if (running.has(site.id)) throw busy(site);
   await storage().remove(site.domain, id).catch(notFoundIfMissing);
 }
 
@@ -416,7 +431,7 @@ async function sameDependencies(currentApp: string, restoredApp: string): Promis
  * re-imported. If the swap or an import fails, files and databases are put back from the old
  * tree / the safety backup.
  */
-async function restoreBackup(site: Site, id: string, log: HostLogger): Promise<{ safetyId: string }> {
+async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { safety?: boolean } = {}): Promise<{ safetyId: string }> {
   await assertSiteRoot(site, false);
   const store = storage();
   const src = await store.open(site.domain, id);
@@ -443,7 +458,9 @@ async function restoreBackup(site: Site, id: string, log: HostLogger): Promise<{
 
     // 1. safety backup of the current state (skipped when the site directory is gone)
     let safetyId = '';
-    if (await host.exists(site.rootPath)) {
+    if (opts.safety === false) {
+      log(t('Bước 1/4: bỏ qua bản sao lưu an toàn (trạng thái hiện tại là bản cập nhật lỗi)'));
+    } else if (await host.exists(site.rootPath)) {
       log(t('Bước 1/4: tạo bản sao lưu an toàn của trạng thái hiện tại...'));
       safetyId = (await createBackup(site, 'safety', log, { protect: id })).id;
     } else {
@@ -594,6 +611,17 @@ export function startRestore(siteId: number, id: string): TaskInfo {
   const site = sites.getSite(siteId);
   return startLocked(site, 'restore', t('Khôi phục {domain} từ {id}', { domain: site.domain, id }), (log) => restoreBackup(site, id, log));
 }
+
+// ---- API for other site jobs (call inside startLocked) ------------------------------------
+
+/** Take a backup while already holding the site's lock. */
+export const takeBackup = (site: Site, trigger: BackupTrigger, log: HostLogger) => createBackup(site, trigger, log);
+
+/**
+ * Restore while already holding the site's lock. `safety: false` skips the safety backup of the
+ * current state (used to undo a failed WordPress update: that state is the broken one).
+ */
+export const restoreFromBackup = (site: Site, id: string, log: HostLogger, opts: { safety?: boolean } = {}) => restoreBackup(site, id, log, opts);
 
 // ---- Scheduler --------------------------------------------------------------------------
 
