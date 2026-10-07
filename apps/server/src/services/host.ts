@@ -6,6 +6,8 @@ import { shq } from '../lib/shell.js';
 
 export type HostLogger = (msg: string) => void;
 
+const PROXY_VARS = ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
+
 /**
  * Operations against the Lares machine itself.
  * `mutate` is for commands that change the system (nginx reload, chown, mysql import, certbot...):
@@ -31,7 +33,10 @@ export const host = {
     // `env -i`: site code must not inherit the panel's environment. It holds LARES_SECRET and the
     // admin/MySQL passwords, and its NODE_ENV=production makes `npm ci` skip the devDependencies
     // (tailwind, typescript...) that `next build` needs.
-    const env = Object.entries({ CI: '1', NEXT_TELEMETRY_DISABLED: '1', LANG: 'C.UTF-8', ...opts.env })
+    // Proxy settings are the one thing passed through: a server that reaches the internet only via
+    // a proxy (set in the panel's env file) still needs it for npm, git and next/font downloads.
+    const proxy = Object.fromEntries(PROXY_VARS.filter((k) => process.env[k]).map((k) => [k, process.env[k]!]));
+    const env = Object.entries({ CI: '1', NEXT_TELEMETRY_DISABLED: '1', LANG: 'C.UTF-8', ...proxy, ...opts.env })
       .map(([k, v]) => `${k}=${shq(v)}`)
       .join(' ');
     const inner = `cd ${shq(opts.cwd)} && ${command}`;

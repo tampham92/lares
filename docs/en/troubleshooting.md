@@ -121,6 +121,15 @@ The first time, Lares downloads Adminer from github.com and verifies its SHA-256
   the install step now runs without the panel's `NODE_ENV=production`, so devDependencies are
   installed. Click **Build & start** again.
 
+## IPv6 address without a working route
+
+Some VPS get an IPv6 address but cannot reach the Internet over IPv6 (`curl -6 https://www.google.com`
+fails while `curl -4` works). Most tools fall back to IPv4, but some do not: `next build` then fails
+with "Failed to fetch … from Google Fonts", and Let's Encrypt, which prefers IPv6, fails when an AAAA
+record exists. The installer detects this and adds `precedence ::ffff:0:0/96  100` to `/etc/gai.conf`
+so the system prefers IPv4, and the panel stops using that IPv6 address for DNS records. Do not
+disable IPv6 with sysctl instead: nginx listens on `[::]` and would no longer start.
+
 ## A WordPress update was rolled back
 
 Lares restores the backup when the home page breaks, a new PHP fatal error appears, or an active plugin got deactivated. Check **Updates → History** to see which item broke it, then update items one by one. Content created during the update (orders, comments) is lost on restore.

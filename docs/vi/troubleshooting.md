@@ -126,6 +126,15 @@ Lần đầu mở, Lares tải Adminer từ github.com và kiểm tra SHA-256, n
   này; bước cài đặt không còn nhận `NODE_ENV=production` của panel nên devDependencies được cài đủ.
   Bấm lại **Build & khởi động**.
 
+## Có địa chỉ IPv6 nhưng IPv6 không hoạt động
+
+Một số VPS được cấp địa chỉ IPv6 nhưng không ra được Internet qua IPv6 (`curl -6 https://www.google.com`
+lỗi trong khi `curl -4` chạy được). Phần lớn công cụ tự chuyển sang IPv4, nhưng không phải tất cả:
+`next build` sẽ lỗi "Failed to fetch … from Google Fonts", và Let's Encrypt (ưu tiên IPv6) sẽ thất bại
+nếu có bản ghi AAAA. Installer tự phát hiện trường hợp này và thêm `precedence ::ffff:0:0/96  100` vào
+`/etc/gai.conf` để hệ thống ưu tiên IPv4; panel cũng không dùng địa chỉ IPv6 đó cho bản ghi DNS nữa.
+Đừng tắt IPv6 bằng sysctl: nginx lắng nghe trên `[::]` và sẽ không khởi động được.
+
 ## Cập nhật WordPress bị hoàn tác
 
 Lares khôi phục bản backup khi trang chủ lỗi, xuất hiện lỗi PHP nghiêm trọng, hoặc plugin đang bật bị tắt sau khi cập nhật. Xem tab **Cập nhật → Lịch sử** để biết mục nào gây lỗi, rồi cập nhật từng mục một. Nội dung phát sinh trong lúc cập nhật (đơn hàng, bình luận) sẽ mất khi khôi phục.

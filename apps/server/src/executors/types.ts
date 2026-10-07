@@ -42,13 +42,30 @@ export interface Executor {
   close(): Promise<void>;
 }
 
+const STACK_FRAME = /^\s*\[?at\s/;
+const ERROR_LINE = /\b(error|failed|fatal|cannot|denied|refused|timed? ?out)\b|ERR!/i;
+
+/**
+ * The few lines of a failed command worth showing. Usually its last 5 lines; but when the output
+ * ends in stack traces (node, next build) those say nothing, so show the error lines instead,
+ * e.g. "Failed to fetch Jost from Google Fonts." rather than five "at <unknown>" frames.
+ */
+export function summarizeOutput(output: string): string {
+  const lines = output.split('\n').map((l) => l.trimEnd()).filter((l) => l.trim());
+  const tail = lines.slice(-5);
+  if (!tail.some((l) => STACK_FRAME.test(l))) return tail.join('\n');
+  const meaningful = lines.filter((l) => !STACK_FRAME.test(l));
+  const errors = [...new Set(meaningful.filter((l) => ERROR_LINE.test(l) && !/^\s*warn(ing)?\b/i.test(l)).map((l) => l.trim()))];
+  return (errors.length ? errors.slice(-5) : meaningful.slice(-5)).join('\n');
+}
+
 export class CommandError extends Error {
   constructor(
     public command: string,
     public result: ExecResult,
   ) {
-    const tail = (result.stderr || result.stdout).trim().split('\n').slice(-5).join('\n');
-    super(t('Lệnh thất bại (exit {code}): {output}', { code: result.code, output: tail || t('không có output') }));
+    const output = summarizeOutput((result.stderr || result.stdout).trim());
+    super(t('Lệnh thất bại (exit {code}): {output}', { code: result.code, output: output || t('không có output') }));
   }
 }
 

@@ -123,6 +123,17 @@ async function echo(family: 4 | 6): Promise<string | null> {
 
 const interfaceIp = (family: 4 | 6) => localAddresses().find((a) => net.isIP(a) === family && isPublicIp(a)) ?? null;
 
+/**
+ * IPv6 address for AAAA records. An address on an interface is not proof that IPv6 works: some VPS
+ * get one without a route to the Internet. When the IPv4 echo answered but no IPv6 echo did, IPv6
+ * is treated as broken (an AAAA record would also make Let's Encrypt, which prefers IPv6, fail).
+ * With neither answering (offline, echo services down) the interface address is still used.
+ */
+export function pickIpv6(echoV4: string | null, echoV6: string | null, ifaceV6: string | null): string | null {
+  if (echoV6) return echoV6;
+  return echoV4 ? null : ifaceV6;
+}
+
 interface Stored {
   ipv4Override: string | null;
   ipv6Override: string | null;
@@ -152,7 +163,7 @@ export async function detectPublicIp(): Promise<void> {
       detected: {
         // a transient IPv4 failure keeps the last known address; IPv6 follows the machine (it may really be gone)
         ipv4: v4 ?? interfaceIp(4) ?? prev.detected.ipv4,
-        ipv6: v6 ?? interfaceIp(6),
+        ipv6: pickIpv6(v4, v6, interfaceIp(6)),
         at: new Date().toISOString(),
       },
     } satisfies Stored);

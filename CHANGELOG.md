@@ -44,6 +44,13 @@ breaking changes; upgrading is always the install command run again
   panel's environment, including `LARES_SECRET` and the admin and MySQL passwords. It now runs with
   a clean environment.
 - Changing a Next.js site's Git URL now takes effect on the next deploy.
+- Failed builds show the actual error (e.g. "Failed to fetch Jost from Google Fonts") instead of
+  the last lines of a stack trace.
+- **Servers with an IPv6 address but no IPv6 route**: the installer detects it and makes the system
+  prefer IPv4 (`/etc/gai.conf`), which fixes `next build` failing to download Google Fonts; the panel
+  no longer uses such an address for AAAA records (Let's Encrypt would fail on it).
+- `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` set in the panel's env file reach npm, git and builds,
+  for servers that only have internet access through a proxy.
 
 ## [0.2.0-beta] - 2026-10-04
 

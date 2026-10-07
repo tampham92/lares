@@ -266,6 +266,11 @@ if [[ $PURGE == 1 ]]; then
   fi
   rm -rf "$DATA_DIR" "$CONF_DIR" /var/log/lares
   ok "$(L 'Đã xoá' 'Deleted') $DATA_DIR, $CONF_DIR, /var/log/lares"
+  # The IPv4 preference install.sh added on a server without working IPv6 (marker + the next line).
+  if grep -q '^# Added by Lares: no working IPv6 route' /etc/gai.conf 2>/dev/null; then
+    sed -i '/^# Added by Lares: no working IPv6 route/,+1d' /etc/gai.conf
+    ok "$(L 'Đã gỡ dòng ưu tiên IPv4 trong /etc/gai.conf' 'Removed the IPv4 preference from /etc/gai.conf')"
+  fi
 else
   # Keep the sites alive: their vhosts reference $DATA_DIR/acme, /etc/lares/ssl and /etc/lares/apps.
   rm -f "$CONF_DIR/panel.crt" "$CONF_DIR/panel.key"

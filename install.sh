@@ -287,6 +287,21 @@ $APT install curl ca-certificates gnupg git tar gzip pigz rsync unzip openssl ls
   iproute2 procps sudo apt-transport-https
 ok "$(L 'Gói cơ bản' 'Base packages')"
 
+# ---- IPv6 without a route ---------------------------------------------------
+# Some VPS get a global IPv6 address but no IPv6 route to the Internet. curl and Node fall back to
+# IPv4 at once; other clients do not (Turbopack's Google Fonts download in `next build` fails).
+# When IPv4 works and IPv6 does not, make getaddrinfo prefer IPv4 (RFC 6724 precedence for
+# v4-mapped addresses). IPv6 itself stays on: nginx keeps listening on [::]. A precedence the
+# admin already set for ::ffff:0:0/96 is left alone. uninstall.sh --purge removes the line.
+GAI_MARK='# Added by Lares: no working IPv6 route on this server, prefer IPv4'
+probe_net() { curl "-$1" -fsS -o /dev/null --max-time 8 https://www.google.com/generate_204 2>/dev/null; }
+if ip -6 addr show scope global 2>/dev/null | grep -q inet6 \
+  && ! grep -qE '^[[:space:]]*precedence[[:space:]]+::ffff:0:0/96' /etc/gai.conf 2>/dev/null \
+  && probe_net 4 && ! probe_net 6; then
+  printf '%s\nprecedence ::ffff:0:0/96  100\n' "$GAI_MARK" >> /etc/gai.conf
+  warn "$(L 'IPv6 trên máy chủ này không ra được Internet: đã cho hệ thống ưu tiên IPv4 (/etc/gai.conf). Lares sẽ không tạo bản ghi AAAA cho máy chủ này.' 'IPv6 on this server cannot reach the Internet: the system now prefers IPv4 (/etc/gai.conf). Lares will not create AAAA records for it.')"
+fi
+
 # ---- PHP repository (ondrej / sury) -----------------------------------------
 step "$(L 'Thêm kho PHP nhiều phiên bản' 'Adding the multi-version PHP repository')"
 if [[ "$ID" == ubuntu ]]; then

@@ -4,6 +4,7 @@ import { nextjsConfigSchema } from '@lares/shared';
 import { credentialLine, isGitAuthError, tokenUsername } from '../src/services/gitAuth.js';
 import { host } from '../src/services/host.js';
 import { ngxPath } from '../src/lib/shell.js';
+import { summarizeOutput } from '../src/executors/types.js';
 
 describe('git access tokens', () => {
   it('uses the username each host expects', () => {
@@ -62,5 +63,37 @@ describe('ngxPath', () => {
     expect(ngxPath('/var/www/example.com/public_html')).toBe('/var/www/example.com/public_html');
     expect(ngxPath('/Users/me/My Projects/data/acme')).toBe('"/Users/me/My Projects/data/acme"');
     expect(ngxPath('/tmp/a;b"c')).toBe('"/tmp/a;b\\"c"');
+  });
+});
+
+describe('summarizeOutput', () => {
+  it('shows the error lines instead of a stack-trace tail', () => {
+    const out = [
+      '> Build error occurred',
+      'Error: Turbopack build failed with 1 error:',
+      'Warning: Error while requesting resource',
+      "Error: Cannot find module '@tailwindcss/postcss'",
+      '    [at Module._load (node:internal/modules/cjs/loader:1285:25)]',
+      '    at <unknown> (https://nextjs.org/docs/messages/module-not-found)',
+      '    at <unknown> ([next]/internal/font/google/x.module.css:169:8)',
+    ].join('\n');
+    expect(summarizeOutput(out)).toBe("> Build error occurred\nError: Turbopack build failed with 1 error:\nError: Cannot find module '@tailwindcss/postcss'");
+  });
+
+  it('keeps the plain tail when there is no stack trace', () => {
+    const out = ['a', 'b', 'nginx: [emerg] unknown directive "foo"', 'nginx: configuration file test failed'].join('\n');
+    expect(summarizeOutput(out)).toBe(out);
+  });
+});
+
+describe('asWebUser proxy', () => {
+  it('passes proxy settings through to site commands', async () => {
+    process.env.HTTPS_PROXY = 'http://proxy.local:3128';
+    try {
+      const r = await host.exec(host.asWebUser('echo "$HTTPS_PROXY"', { cwd: os.tmpdir(), home: os.tmpdir() }));
+      expect(r.stdout.trim()).toBe('http://proxy.local:3128');
+    } finally {
+      delete process.env.HTTPS_PROXY;
+    }
   });
 });

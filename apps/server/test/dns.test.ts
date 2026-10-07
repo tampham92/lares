@@ -20,7 +20,7 @@ import {
   tokenHint,
   type Ownership,
 } from '../src/services/cloudflareDns.js';
-import { ipInCidr, isPublicIp, sameIp, saveServerIp } from '../src/services/publicIp.js';
+import { ipInCidr, isPublicIp, pickIpv6, sameIp, saveServerIp } from '../src/services/publicIp.js';
 
 const TOKEN = 'cfTOKEN_abcdefghijklmnopqrstuvwxyz0123456789';
 const SERVER_V4 = '45.76.10.20';
@@ -444,4 +444,11 @@ describe('Cloudflare records', () => {
     setSetting('serverPublicIp', { ipv4Override: null, ipv6Override: null, ipv6Disabled: true, detected: { ipv4: null, ipv6: null, at: new Date().toISOString() } });
     await expect(applyDnsRecords(['thocode.dev'], { overwrite: [] }, collectOut().out)).rejects.toThrow(/IP/);
   });
+});
+
+describe('pickIpv6', () => {
+  const iface = '2a01:4f8::1';
+  it('uses the address the Internet sees', () => expect(pickIpv6('1.2.3.4', '2a01:4f8::2', iface)).toBe('2a01:4f8::2'));
+  it('drops IPv6 when only IPv4 reaches the Internet (an address without a route)', () => expect(pickIpv6('1.2.3.4', null, iface)).toBeNull());
+  it('falls back to the interface when no echo service answered at all', () => expect(pickIpv6(null, null, iface)).toBe(iface));
 });
