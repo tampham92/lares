@@ -39,6 +39,8 @@ export function SiteDnsCard({ site }: { site: Site }) {
   const proxy = (hostnames: string[], proxied: boolean) => void act('proxy', { hostnames, proxied });
 
   const dnsOnly = s?.hostnames.filter((h) => h.proxied === false).map((h) => h.hostname) ?? [];
+  // Missing or outdated records Lares may write without asking (conflicts keep their own button).
+  const fixable = s?.hostnames.filter((h) => h.zone && !h.error && ['create', 'update'].includes(summarize(h))).map((h) => h.hostname) ?? [];
   const warnings = result?.messages.filter((m) => m.level === 'warn') ?? [];
 
   return (
@@ -101,8 +103,13 @@ export function SiteDnsCard({ site }: { site: Site }) {
         <button className="btn" disabled={q.isFetching || busy} onClick={() => void q.refetch()}>
           {q.isFetching ? t('Đang kiểm tra…') : t('Kiểm tra lại')}
         </button>
+        {s?.connected && fixable.length > 0 && (
+          <button className="btn primary" disabled={busy} onClick={() => void act('records', { hostnames: fixable, overwrite: [] })}>
+            {t('Tạo bản ghi còn thiếu ({n})', { n: fixable.length })}
+          </button>
+        )}
         {s?.connected && dnsOnly.length > 0 && (
-          <button className="btn primary" disabled={busy || !s.sslEnabled} title={s.sslEnabled ? undefined : t('Cài SSL trước')} onClick={() => proxy(dnsOnly, true)}>
+          <button className={fixable.length ? 'btn' : 'btn primary'} disabled={busy || !s.sslEnabled} title={s.sslEnabled ? undefined : t('Cài SSL trước')} onClick={() => proxy(dnsOnly, true)}>
             {s.sslEnabled ? t('Bật proxy Cloudflare') : t('Bật proxy Cloudflare sau khi cài SSL')}
           </button>
         )}

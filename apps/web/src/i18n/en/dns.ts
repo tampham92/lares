@@ -99,4 +99,5 @@ export const DNS_EN: Dict = {
   'Ghi đè': 'Overwrite',
   'Bật proxy': 'Proxy on',
   'Tắt proxy': 'Proxy off',
+  'Tạo bản ghi còn thiếu ({n})': 'Create missing records ({n})',
 };

@@ -190,6 +190,8 @@ export const SITES_EN: Dict = {
   'Mã nguồn Next.js': 'Next.js source code',
   'Bỏ trống Git URL nếu bạn muốn upload code qua SFTP vào': 'Leave Git URL blank if you want to upload code via SFTP to',
   'Access token (repo private)': 'Access token (private repo)',
+  'Bản ghi DNS trên Cloudflare cho {domain}: kiểm tra và tạo ở tab SSL, mục DNS.': 'Cloudflare DNS records for {domain}: check and create them in the SSL tab, DNS section.',
+  'Mở tab SSL': 'Open the SSL tab',
   'GitHub: fine-grained token, chỉ repo này, quyền Contents: Read-only. Bỏ trống nếu repo public.':
     'GitHub: a fine-grained token for this repo only, with Contents: Read-only. Leave blank for a public repo.',
   'Đã lưu token; để trống = giữ nguyên.': 'A token is saved; leave blank to keep it.',

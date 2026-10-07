@@ -44,6 +44,9 @@ breaking changes; upgrading is always the install command run again
   panel's environment, including `LARES_SECRET` and the admin and MySQL passwords. It now runs with
   a clean environment.
 - Changing a Next.js site's Git URL now takes effect on the next deploy.
+- Site page: the Domain card points to the DNS section of the SSL tab for the current domain's
+  Cloudflare records (it only creates records when the domain changes), and the DNS section can
+  create all missing records in one click.
 - Failed builds show the actual error (e.g. "Failed to fetch Jost from Google Fonts") instead of
   the last lines of a stack trace.
 - **Servers with an IPv6 address but no IPv6 route**: the installer detects it and makes the system

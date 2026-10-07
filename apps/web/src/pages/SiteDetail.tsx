@@ -6,7 +6,7 @@ import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, 
 import { AdminerButton } from '../components/AdminerButton';
 import { AiWriter } from '../components/AiWriter';
 import { BackupsTab } from '../components/BackupsTab';
-import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
+import { CloudflareDnsOption, useCloudflareDns } from '../components/CloudflareDnsOption';
 import { GitSourceFields } from '../components/GitSourceFields';
 import { SiteDnsCard } from '../components/SiteDnsCard';
 import { LeadsTab } from '../components/LeadsTab';
@@ -74,7 +74,7 @@ function SitePage({ id }: { id: number }) {
         </div>
       </div>
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
-      {tab === 'overview' && <Overview data={q.data} />}
+      {tab === 'overview' && <Overview data={q.data} onOpenSsl={() => setTab('ssl')} />}
       {tab === 'ssl' && <SslTab site={site} />}
       {tab === 'logs' && <LogsTab site={site} />}
       {tab === 'leads' && <LeadsTab site={site} />}
@@ -97,11 +97,11 @@ function useRefreshSite(id: number) {
   };
 }
 
-function Overview({ data }: { data: SiteDetailResponse }) {
+function Overview({ data, onOpenSsl }: { data: SiteDetailResponse; onOpenSsl: () => void }) {
   return (
     <>
       <OverviewCards data={data} />
-      <DomainCard key={`${data.site.domain}-${data.site.listenPort}`} site={data.site} />
+      <DomainCard key={`${data.site.domain}-${data.site.listenPort}`} site={data.site} onOpenSsl={onOpenSsl} />
     </>
   );
 }
@@ -220,8 +220,9 @@ function OverviewCards({ data }: { data: SiteDetailResponse }) {
   );
 }
 
-function DomainCard({ site }: { site: Site }) {
+function DomainCard({ site, onOpenSsl }: { site: Site; onOpenSsl: () => void }) {
   const refresh = useRefreshSite(site.id);
+  const cf = useCloudflareDns();
   const [domain, setDomain] = useState(site.listenPort ? '' : site.domain);
   const [addWww, setAddWww] = useState(true);
   const [cfDns, setCfDns] = useState<AutoDnsInput | null>(null);
@@ -266,11 +267,23 @@ function DomainCard({ site }: { site: Site }) {
         {t('Thêm alias www.{domain}', { domain: d || 'example.com' })}
       </Check>
       <CloudflareDnsOption hostnames={hostnames} onChange={setCfDns} />
-      {!cfDns && (
+      {!changed && !site.listenPort && cf.data?.connected ? (
+        // The form only handles a new domain; records for the current one are managed in the SSL tab.
         <Alert tone="info">
-          {t('Trước hoặc sau khi gán: tạo bản ghi DNS')} <strong>A</strong>{' '}
-          {t('cho {domain} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab', { domain: d || t('tên miền') })} <strong>SSL</strong>.
+          <div className="row">
+            <span style={{ flex: 1, minWidth: 200 }}>{t('Bản ghi DNS trên Cloudflare cho {domain}: kiểm tra và tạo ở tab SSL, mục DNS.', { domain: site.domain })}</span>
+            <button className="btn sm" onClick={onOpenSsl}>
+              {t('Mở tab SSL')}
+            </button>
+          </div>
         </Alert>
+      ) : (
+        !cfDns && (
+          <Alert tone="info">
+            {t('Trước hoặc sau khi gán: tạo bản ghi DNS')} <strong>A</strong>{' '}
+            {t('cho {domain} (và www) trỏ về IP máy chủ. Khi DNS đã trỏ về, cài SSL ở tab', { domain: d || t('tên miền') })} <strong>SSL</strong>.
+          </Alert>
+        )
       )}
       {task && <TaskLog taskId={task} onDone={(t) => t.status === 'completed' && refresh()} />}
     </div>
