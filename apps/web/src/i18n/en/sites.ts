@@ -189,6 +189,12 @@ export const SITES_EN: Dict = {
   'Tiêu đề site': 'Site title',
   'Mã nguồn Next.js': 'Next.js source code',
   'Bỏ trống Git URL nếu bạn muốn upload code qua SFTP vào': 'Leave Git URL blank if you want to upload code via SFTP to',
+  'Access token (repo private)': 'Access token (private repo)',
+  'GitHub: fine-grained token, chỉ repo này, quyền Contents: Read-only. Bỏ trống nếu repo public.':
+    'GitHub: a fine-grained token for this repo only, with Contents: Read-only. Leave blank for a public repo.',
+  'Đã lưu token; để trống = giữ nguyên.': 'A token is saved; leave blank to keep it.',
+  'Bỏ trống nếu repo public.': 'Leave blank for a public repo.',
+  'Xoá token đã lưu': 'Remove the saved token',
   'rồi bấm “Build & khởi động” trong trang site.': 'and then click “Build & start” on the site page.',
   'https://github.com/org/repo.git hoặc git@...': 'https://github.com/org/repo.git or git@...',
   'Tự nhận (theo lockfile)': 'Auto-detect (from lockfile)',

@@ -16,6 +16,8 @@ export const SHARED_EN: Dict = {
   'Lệnh chỉ được nằm trên 1 dòng': 'Command must be a single line',
   'Tên biến môi trường không hợp lệ': 'Invalid environment variable name',
   'Git URL phải bắt đầu bằng https:// hoặc git@': 'Git URL must start with https:// or git@',
+  'Không đặt token trong Git URL, hãy dùng ô Access token': 'Do not put a token in the Git URL, use the Access token field',
+  'Access token không được chứa khoảng trắng': 'Access token must not contain spaces',
   'Host không hợp lệ': 'Invalid host',
   'Không được chứa xuống dòng hoặc < >': 'Must not contain line breaks or < >',
   'Số điện thoại không hợp lệ': 'Invalid phone number',

@@ -71,7 +71,8 @@ export const PANEL_CSP = [
   "frame-ancestors 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // GitHub App setup: the manifest is a form POST to github.com (see services/githubApp.ts).
+  "form-action 'self' https://github.com",
 ].join('; ');
 
 /** Registers the allowlist gate and the security headers on the root instance (call before routes). */

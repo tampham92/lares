@@ -196,6 +196,7 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); widt
 .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .form-grid > * { min-width: 0; }
+.form-grid > .span-all { grid-column: 1 / -1; }
 /* small selects for toolbars and the login footer */
 select.lang-switch, select.compact { width: auto; height: 30px; padding: 0 8px; font-size: 13px; }
 .topbar select.lang-switch { height: 34px; }

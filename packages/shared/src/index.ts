@@ -10,6 +10,7 @@ export * from './release.js';
 export * from './dns.js';
 export * from './wpupdates.js';
 export * from './leads.js';
+export * from './github.js';
 export * from './sitetools.js';
 export * from './builder.js';
 
@@ -90,6 +91,16 @@ export const nextjsConfigSchema = z.object({
     .string()
     .trim()
     .regex(/^(https:\/\/|git@)[^\s'"`$;&|<>]+$/, 'Git URL phải bắt đầu bằng https:// hoặc git@')
+    // A token inside the URL would be saved in .git/config and printed in task logs.
+    .refine((u) => !/^https:\/\/[^/]*@/.test(u), 'Không đặt token trong Git URL, hãy dùng ô Access token')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Access token for a private HTTPS repo. Stored encrypted with the rest of the config, never sent back. */
+  gitToken: z
+    .string()
+    .trim()
+    .max(1000)
+    .regex(/^\S+$/, 'Access token không được chứa khoảng trắng')
     .optional()
     .or(z.literal('').transform(() => undefined)),
   branch: z.string().trim().regex(/^[\w.\-/]+$/).default('main'),
@@ -598,7 +609,7 @@ export const migrationItemInputSchema = z.object({
   configPath: absPathSchema.optional(),
   phpVersion: z.string().regex(PHP_VERSION_RE).optional(),
   /** Next.js: build/start settings used when re-installing on Lares. */
-  nextjs: nextjsConfigSchema.omit({ gitUrl: true, branch: true }).optional(),
+  nextjs: nextjsConfigSchema.omit({ gitUrl: true, gitToken: true, branch: true }).optional(),
   db: z.object({
     strategy: z.enum(DB_STRATEGIES).default('import'),
     source: dbCredentialsSchema.optional(),

@@ -14,7 +14,7 @@ install, port 8686 is open to every IP. Work through this checklist:
 
 ## Built-in protection
 
-- HTTPS only. Secrets (DB/SSH passwords, API keys, Next.js env values) are encrypted with
+- HTTPS only. Secrets (DB/SSH passwords, API keys, Next.js env values, Git access tokens, the GitHub App key) are encrypted with
   AES-256-GCM in SQLite. Security headers (HSTS, frame, content-type and referrer policies) are sent.
 - **Brute-force protection**: at most 10 login attempts per minute per IP. After 5 failed logins in
   15 minutes, the username is locked for 15 minutes. `sudo lares reset-password [user]` clears the
@@ -22,6 +22,11 @@ install, port 8686 is open to every IP. Work through this checklist:
 - **Sessions can be revoked**: **Settings → Sessions → Log out everywhere** ends all sessions. Changing the
   password logs out the other sessions, and `sudo lares reset-password` logs out every session of
   that user.
+- **Site code runs with a clean environment**: npm scripts, `next build`, wp-cli and artisan run as
+  the web user without the panel's environment variables (secret key, admin and MySQL passwords).
+- **GitHub App**: each panel registers its own App (Settings → Integrations → GitHub) with read-only
+  access to code. Its private key stays on the server; git only receives a one-hour token scoped to
+  the one repo being cloned, through a temporary file that is deleted afterwards.
 - `X-Forwarded-For` is **not trusted** by default (see [Reverse proxy](#running-the-panel-behind-a-reverse-proxy)).
 
 ## Two-factor authentication (2FA)

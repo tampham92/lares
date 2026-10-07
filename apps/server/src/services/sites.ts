@@ -5,10 +5,11 @@ import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { t, tDefault } from '../i18n/index.js';
 import { decrypt, encrypt, randomPassword } from '../lib/crypto.js';
-import { conflict, notFound } from '../lib/errors.js';
+import { conflict, errorMessage, notFound } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import { UndoStack } from '../lib/undo.js';
 import * as databases from './databases.js';
+import * as githubApp from './githubApp.js';
 import { host, type HostLogger } from './host.js';
 import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type VhostSpec } from './nginx.js';
 import * as nodeapp from './nodeapp.js';
@@ -283,7 +284,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
       case 'nextjs': {
         undo.push(t('xoá service {name}', { name: nodeapp.serviceName(site.domain) }), () => nodeapp.removeService(site.domain, log));
         if (input.nextjs.gitUrl) {
-          await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, input.nextjs.gitUrl, input.nextjs.branch, log);
+          await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, await gitRepoFor({ ...input.nextjs, gitUrl: input.nextjs.gitUrl }, log), log);
           await nodeapp.buildAndRestart({ ...site, appPort: site.appPort! }, input.nextjs, log);
         } else {
           await nodeapp.writeServiceFiles(site.domain, site.webRoot, site.rootPath, site.appPort!, input.nextjs, log);
@@ -303,11 +304,26 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
   }
 }
 
+/** Git credentials for a site: its own access token, else the GitHub App when it can read the repo. */
+async function gitRepoFor(cfg: { gitUrl: string; branch?: string; gitToken?: string }, log: HostLogger): Promise<nodeapp.GitRepo> {
+  let token = cfg.gitToken;
+  if (!token) {
+    try {
+      token = (await githubApp.cloneTokenFor(cfg.gitUrl)) ?? undefined;
+      if (token) log(t('Dùng GitHub App để đọc repo (token chỉ đọc, hết hạn sau 1 giờ)'));
+    } catch (err) {
+      // A public repo still clones without it; a private one fails with git's own message.
+      log(t('Cảnh báo: không lấy được token từ GitHub App: {error}', { error: errorMessage(err) }));
+    }
+  }
+  return { gitUrl: cfg.gitUrl, branch: cfg.branch ?? 'main', token };
+}
+
 export async function deploySite(id: number, log: HostLogger, signal?: AbortSignal) {
   const site = getSite(id);
   if (site.appType !== 'nextjs' || !site.appPort) throw conflict(t('Chỉ site Next.js mới có thể build/deploy'));
   const cfg = getNodeConfig(id);
-  if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, cfg.gitUrl, cfg.branch ?? 'main', log, signal);
+  if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, await gitRepoFor({ ...cfg, gitUrl: cfg.gitUrl }, log), log, signal);
   await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, cfg, log, signal);
   return getSite(id);
 }

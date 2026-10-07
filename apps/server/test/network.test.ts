@@ -15,6 +15,7 @@ import {
 import { writeNginxConf } from '../src/services/nginxConf.js';
 import { PANEL_DEPLOY_HOOK, panelUrl, renderPanelVhost, upsertEnv } from '../src/services/panelTls.js';
 import { config } from '../src/config.js';
+import { ngxPath } from '../src/lib/shell.js';
 
 const fakeFetch = (bodies: Record<string, string | number>) => async (url: string) => {
   const b = bodies[url];
@@ -123,7 +124,7 @@ describe('panel certificate', () => {
   it('renders the port-80 block: ACME webroot + redirect to the panel', () => {
     const conf = renderPanelVhost('panel.example.com', 8686);
     expect(conf).toContain('server_name panel.example.com;');
-    expect(conf).toContain(`root ${config.acmeDir};`);
+    expect(conf).toContain(`root ${ngxPath(config.acmeDir)};`);
     expect(conf).toContain('return 301 https://panel.example.com:8686$request_uri;');
     expect(panelUrl('panel.example.com', 443)).toBe('https://panel.example.com');
     expect(PANEL_DEPLOY_HOOK).toContain('lares');

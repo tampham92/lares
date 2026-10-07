@@ -28,13 +28,17 @@ export const host = {
    * (wp-cli, artisan, npm scripts) must go through this: migrated code is not trusted with root.
    */
   asWebUser(command: string, opts: { cwd: string; home: string; env?: Record<string, string> }): string {
-    const env = Object.entries({ CI: '1', NEXT_TELEMETRY_DISABLED: '1', ...opts.env })
+    // `env -i`: site code must not inherit the panel's environment. It holds LARES_SECRET and the
+    // admin/MySQL passwords, and its NODE_ENV=production makes `npm ci` skip the devDependencies
+    // (tailwind, typescript...) that `next build` needs.
+    const env = Object.entries({ CI: '1', NEXT_TELEMETRY_DISABLED: '1', LANG: 'C.UTF-8', ...opts.env })
       .map(([k, v]) => `${k}=${shq(v)}`)
       .join(' ');
     const inner = `cd ${shq(opts.cwd)} && ${command}`;
+    const user = shq(config.webUser);
     return process.getuid?.() === 0
-      ? `runuser -u ${shq(config.webUser)} -- env HOME=${shq(opts.home)} PATH="$PATH" ${env} bash -c ${shq(inner)}`
-      : `env ${env} bash -c ${shq(inner)}`;
+      ? `runuser -u ${user} -- env -i HOME=${shq(opts.home)} USER=${user} LOGNAME=${user} PATH="$PATH" ${env} bash -c ${shq(inner)}`
+      : `env -i HOME="$HOME" PATH="$PATH" ${env} bash -c ${shq(inner)}`;
   },
 
   async has(bin: string): Promise<boolean> {

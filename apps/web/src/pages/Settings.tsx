@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AI_MODELS, AI_PROVIDER_LABELS, AI_PROVIDERS, ANTHROPIC_MODELS, msg, type AiProvider, type AiSettingsView, type LogrotateSettings } from '@lares/shared';
 import { auth, del, errMsg, get, post, put } from '../api';
 import { CloudflareDnsCard } from '../components/CloudflareDnsCard';
+import { GithubAppCard } from '../components/GithubAppCard';
 import { CloudflareRealIpCard, PanelDomainCard } from '../components/NetworkSettings';
 import { AllowlistCard, SessionsCard, TwoFactorCard } from '../components/SecuritySettings';
 import { BackupSettingsCard } from '../components/BackupSettingsCard';
@@ -37,7 +38,7 @@ export function Settings() {
         <Columns left={[<PasswordCard key="pw" />, <SessionsCard key="sessions" />]} right={[<TwoFactorCard key="2fa" />, <AllowlistCard key="allowlist" />]} />
       )}
       {tab === 'backup' && <Columns left={<BackupSettingsCard />} right={<LogrotateCard />} />}
-      {tab === 'integrations' && <Columns left={<AiSettingsCard />} right={<LeadSettingsCard />} />}
+      {tab === 'integrations' && <Columns left={[<GithubAppCard key="github" />, <AiSettingsCard key="ai" />]} right={<LeadSettingsCard />} />}
     </>
   );
 }

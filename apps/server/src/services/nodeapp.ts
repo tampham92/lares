@@ -1,9 +1,12 @@
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import type { NextjsConfig, NodeAppStatus, PackageManager } from '@lares/shared';
 import { config } from '../config.js';
 import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
+import { CommandError } from '../executors/types.js';
+import { credentialLine, isGitAuthError } from './gitAuth.js';
 import { host, type HostLogger } from './host.js';
 
 type PM = Exclude<PackageManager, 'auto'>;
@@ -33,12 +36,16 @@ export async function defaultCommands(appDir: string, pm: PM) {
   return { install, build, start };
 }
 
-/** Run a command inside the app dir as the unprivileged web user. */
-async function runAsWebUser(appDir: string, homeDir: string, command: string, log: HostLogger, signal?: AbortSignal) {
+/**
+ * Run a command inside the app dir as the unprivileged web user. `alsoInDryRun` is only for git
+ * clone/pull: it writes nothing outside the site's folder (under LARES_DATA_DIR in dry-run) and runs
+ * no code from the repo, so a laptop can fetch the real source and test the rest of the flow.
+ */
+async function runAsWebUser(appDir: string, homeDir: string, command: string, log: HostLogger, signal?: AbortSignal, alsoInDryRun = false) {
   const full = host.asWebUser(command, { cwd: appDir, home: homeDir });
   log(`$ ${command}`);
   let pending = '';
-  await host.mutate(full, {
+  await (alsoInDryRun ? host.run.bind(host) : host.mutate.bind(host))(full, {
     signal,
     log,
     timeoutMs: 30 * 60_000,
@@ -120,20 +127,63 @@ export async function buildAndRestart(
   await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(site.rootPath)}`, { log });
   await writeServiceFiles(site.domain, appDir, site.rootPath, site.appPort, cfg, log);
   await runAsWebUser(appDir, site.rootPath, cfg.installCommand || defaults.install, log, signal);
+  // Turbopack caches failed module lookups across builds: a build that once ran without
+  // devDependencies keeps failing ("Cannot find module '@tailwindcss/postcss'") until this is cleared.
+  await runAsWebUser(appDir, site.rootPath, 'rm -rf .next/cache/turbopack', log, signal);
   await runAsWebUser(appDir, site.rootPath, `NODE_ENV=production ${cfg.buildCommand || defaults.build}`, log, signal);
   await host.mutate(`systemctl restart ${shq(serviceName(site.domain))}`, { log });
   log(t('Đã khởi động {service} trên 127.0.0.1:{port}', { service: serviceName(site.domain), port: String(site.appPort) }));
 }
 
-export async function gitCloneOrPull(appDir: string, homeDir: string, gitUrl: string, branch: string, log: HostLogger, signal?: AbortSignal) {
-  if (await host.exists(path.join(appDir, '.git'))) {
-    await runAsWebUser(appDir, homeDir, `git fetch --depth 1 origin ${shq(branch)} && git reset --hard FETCH_HEAD`, log, signal);
-    return;
+export type GitRepo = { gitUrl: string; branch: string; token?: string };
+
+/**
+ * Run `fn` with the git options that authenticate with the repo's access token, if it has one.
+ * The token goes into a credential-store file in a fresh 0700 temp dir owned by the web user,
+ * removed afterwards, so it is never on a command line, in the task log or in .git/config.
+ */
+async function withGitAuth<T>(repo: GitRepo, log: HostLogger, fn: (git: string) => Promise<T>): Promise<T> {
+  // No prompts: without a tty git cannot ask for a password anyway, so fail fast with a clear message.
+  const git = 'GIT_TERMINAL_PROMPT=0 git';
+  if (!repo.token) return fn(git);
+  const line = credentialLine(repo.gitUrl, repo.token);
+  if (!line) throw new Error(t('Access token chỉ dùng được với Git URL dạng https://'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lares-git-'));
+  const file = path.join(dir, 'credentials');
+  try {
+    await fs.writeFile(file, `${line}\n`, { mode: 0o600 });
+    await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(dir)}`, { log });
+    // The empty helper first drops any helper configured on the machine.
+    return await fn(`${git} -c credential.helper= -c ${shq(`credential.helper=store --file=${file}`)}`);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
   }
-  if (!(await host.isEmptyDir(appDir))) throw new Error(t('{dir} không trống, không thể git clone', { dir: appDir }));
-  await fs.mkdir(appDir, { recursive: true });
-  await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(homeDir)}`, { log });
-  await runAsWebUser(appDir, homeDir, `git clone --depth 1 --branch ${shq(branch)} ${shq(gitUrl)} .`, log, signal);
+}
+
+export async function gitCloneOrPull(appDir: string, homeDir: string, repo: GitRepo, log: HostLogger, signal?: AbortSignal) {
+  const branch = shq(repo.branch);
+  try {
+    if (await host.exists(path.join(appDir, '.git'))) {
+      // set-url: a Git URL changed in the build settings takes effect on the next deploy.
+      await withGitAuth(repo, log, (git) =>
+        runAsWebUser(appDir, homeDir, `git remote set-url origin ${shq(repo.gitUrl)} && ${git} fetch --depth 1 origin ${branch} && git reset --hard FETCH_HEAD`, log, signal, true),
+      );
+      return;
+    }
+    if (!(await host.isEmptyDir(appDir))) throw new Error(t('{dir} không trống, không thể git clone', { dir: appDir }));
+    await fs.mkdir(appDir, { recursive: true });
+    await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(homeDir)}`, { log });
+    await withGitAuth(repo, log, (git) => runAsWebUser(appDir, homeDir, `${git} clone --depth 1 --branch ${branch} ${shq(repo.gitUrl)} .`, log, signal, true));
+  } catch (err) {
+    if (err instanceof CommandError && isGitAuthError(`${err.result.stderr}\n${err.result.stdout}`)) {
+      throw new Error(
+        repo.token
+          ? t('Git từ chối access token: token sai, đã hết hạn hoặc không có quyền đọc repo này.')
+          : t('Không truy cập được repo. Nếu repo private: kết nối GitHub trong Cài đặt → Tích hợp và cấp quyền repo này cho App, hoặc nhập Access token.'),
+      );
+    }
+    throw err;
+  }
 }
 
 export async function serviceAction(domain: string, action: 'start' | 'stop' | 'restart', log?: HostLogger) {

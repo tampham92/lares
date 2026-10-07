@@ -14,13 +14,18 @@ cài, port 8686 mở cho mọi IP. Hãy làm lần lượt danh sách sau:
 
 ## Lares tự bảo vệ những gì
 
-- Panel chỉ chạy qua HTTPS. Thông tin bí mật (mật khẩu DB/SSH, API key, biến môi trường Next.js) được
+- Panel chỉ chạy qua HTTPS. Thông tin bí mật (mật khẩu DB/SSH, API key, biến môi trường Next.js, Git access token, khoá GitHub App) được
   mã hoá AES-256-GCM trong SQLite. Panel gửi kèm các security header: HSTS, chống nhúng frame,
   content-type và referrer policy.
 - **Chống dò mật khẩu**: mỗi IP được thử đăng nhập tối đa 10 lần mỗi phút. Một tài khoản đăng nhập sai
   5 lần trong 15 phút thì bị khoá 15 phút. Lệnh `sudo lares reset-password [user]` mở khoá ngay.
 - **Thu hồi phiên đăng nhập**: nút **Cài đặt → Phiên đăng nhập → Đăng xuất mọi nơi** kết thúc mọi phiên. Đổi mật khẩu
   sẽ đăng xuất các phiên khác. `sudo lares reset-password` đăng xuất mọi phiên của tài khoản đó.
+- **Code của site chạy với môi trường sạch**: npm script, `next build`, wp-cli và artisan chạy dưới
+  web user và không thấy biến môi trường của panel (khoá bí mật, mật khẩu admin và MySQL).
+- **GitHub App**: mỗi panel tự đăng ký một App riêng (Cài đặt → Tích hợp → GitHub), chỉ có quyền đọc
+  code. Khoá bí mật nằm trên máy chủ; git chỉ nhận token sống 1 giờ, giới hạn đúng repo đang clone,
+  qua một file tạm bị xoá ngay sau đó.
 - Mặc định panel **không tin** header `X-Forwarded-For`. Xem phần [Reverse proxy](#đặt-panel-sau-reverse-proxy).
 
 ## Xác thực 2 lớp (2FA)

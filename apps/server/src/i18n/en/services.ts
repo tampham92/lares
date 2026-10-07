@@ -158,6 +158,13 @@ export const SERVICES_EN: Dict = {
     'package.json not found in {dir}. Upload the source code or configure a Git URL.',
   'Đã khởi động {service} trên 127.0.0.1:{port}': 'Started {service} on 127.0.0.1:{port}',
   '{dir} không trống, không thể git clone': '{dir} is not empty, cannot git clone',
+  'Access token chỉ dùng được với Git URL dạng https://': 'An access token only works with an https:// Git URL',
+  'Git từ chối access token: token sai, đã hết hạn hoặc không có quyền đọc repo này.':
+    'Git rejected the access token: it is wrong, expired or cannot read this repo.',
+  'Không truy cập được repo. Nếu repo private: kết nối GitHub trong Cài đặt → Tích hợp và cấp quyền repo này cho App, hoặc nhập Access token.':
+    'Cannot access the repo. If it is private: connect GitHub in Settings → Integrations and give the App access to this repo, or enter an Access token.',
+  'Dùng GitHub App để đọc repo (token chỉ đọc, hết hạn sau 1 giờ)': 'Using the GitHub App to read the repo (read-only token, expires in 1 hour)',
+  'Cảnh báo: không lấy được token từ GitHub App: {error}': 'Warning: could not get a token from the GitHub App: {error}',
   'journalctl không khả dụng': 'journalctl is not available',
   'Không có nginx trên máy - cài bằng "brew install nginx" để xem trực tiếp các site chạy theo port (http://localhost:8001)':
     'nginx is not installed on this machine - install it with "brew install nginx" to preview port-based sites directly (http://localhost:8001)',

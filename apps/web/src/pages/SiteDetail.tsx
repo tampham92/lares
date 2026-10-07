@@ -7,6 +7,7 @@ import { AdminerButton } from '../components/AdminerButton';
 import { AiWriter } from '../components/AiWriter';
 import { BackupsTab } from '../components/BackupsTab';
 import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
+import { GitSourceFields } from '../components/GitSourceFields';
 import { SiteDnsCard } from '../components/SiteDnsCard';
 import { LeadsTab } from '../components/LeadsTab';
 import { PhpSettingsTab } from '../components/PhpSettingsTab';
@@ -19,7 +20,7 @@ interface SiteDetailResponse {
   site: Site;
   databases: DatabaseRecord[];
   nodeApp: NodeAppStatus | null;
-  nodeConfig: { gitUrl?: string; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
+  nodeConfig: { gitUrl?: string; hasGitToken?: boolean; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
 type Tab = 'overview' | 'ssl' | 'logs' | 'leads' | 'php' | 'nextjs' | 'ai' | 'updates' | 'backups' | 'clone' | 'danger';
@@ -599,6 +600,8 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
   const cfg = data.nodeConfig ?? {};
   const [form, setForm] = useState({
     gitUrl: cfg.gitUrl ?? '',
+    gitToken: '',
+    removeGitToken: false,
     branch: cfg.branch ?? 'main',
     packageManager: cfg.packageManager ?? 'auto',
     installCommand: cfg.installCommand ?? '',
@@ -617,6 +620,7 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
       await put(`/api/sites/${site.id}/nextjs`, {
         ...form,
         gitUrl: form.gitUrl || undefined,
+        gitToken: form.gitToken || undefined,
         installCommand: form.installCommand || undefined,
         buildCommand: form.buildCommand || undefined,
         startCommand: form.startCommand || undefined,
@@ -681,12 +685,31 @@ function NextTab({ data }: { data: SiteDetailResponse }) {
         <h2>{t('Cấu hình build')}</h2>
         {saved && <Alert tone="ok">{t('Đã lưu. Bấm “Build & khởi động” để áp dụng.')}</Alert>}
         <div className="form-grid">
-          <Field label="Git URL">
-            <input value={form.gitUrl} onChange={(e) => setForm({ ...form, gitUrl: e.target.value })} />
-          </Field>
-          <Field label="Branch">
-            <input value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} />
-          </Field>
+          <GitSourceFields
+            gitUrl={form.gitUrl}
+            branch={form.branch}
+            onChange={(v) => setForm({ ...form, ...v })}
+            keepTokenField={cfg.hasGitToken}
+            tokenField={
+              <>
+                <Field label={t('Access token (repo private)')} hint={cfg.hasGitToken ? t('Đã lưu token; để trống = giữ nguyên.') : t('Bỏ trống nếu repo public.')}>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.gitToken}
+                    disabled={form.removeGitToken}
+                    placeholder={cfg.hasGitToken ? '••••••••' : ''}
+                    onChange={(e) => setForm({ ...form, gitToken: e.target.value })}
+                  />
+                </Field>
+                {cfg.hasGitToken && (
+                  <Check checked={form.removeGitToken} onChange={(v) => setForm({ ...form, removeGitToken: v, gitToken: '' })}>
+                    {t('Xoá token đã lưu')}
+                  </Check>
+                )}
+              </>
+            }
+          />
           <Field label="Package manager">
             <select value={form.packageManager} onChange={(e) => setForm({ ...form, packageManager: e.target.value })}>
               <option value="auto">{t('Tự nhận')}</option>

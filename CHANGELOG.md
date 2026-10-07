@@ -27,6 +27,23 @@ breaking changes; upgrading is always the install command run again
   `client_max_body_size` follows the upload size.
 - **Adminer** with one-click login from the Databases page, reachable only through the panel.
 - **Getting started checklist** on the dashboard (allowlist, 2FA, panel domain, first site, backups).
+- **Connect GitHub** (Settings → Integrations): Lares registers its own GitHub App for this server
+  in two clicks (manifest flow, no third-party server), you choose which repos it may read, and the
+  Next.js site form becomes a repo + branch picker. Clones use one-hour, read-only tokens scoped to
+  that repo; the App's private key is stored encrypted and never leaves the server.
+- **Private Git repos for Next.js sites**: an optional Access token (GitHub fine-grained token,
+  GitLab/Bitbucket access tokens). Stored encrypted, passed to git through a temporary credential
+  file, never in the clone URL, `.git/config` or the task log. A clear message when a repo needs one.
+
+### Fixed
+- **Next.js builds failing with `Cannot find module '@tailwindcss/postcss'`** (or any other
+  devDependency): commands run as the web user no longer inherit the panel's environment, so
+  `npm ci` installs devDependencies. Turbopack's build cache is cleared before each build so a
+  failure cached by an earlier build does not repeat.
+- **Security**: site code (npm install scripts, `next build`, wp-cli, artisan) could read the
+  panel's environment, including `LARES_SECRET` and the admin and MySQL passwords. It now runs with
+  a clean environment.
+- Changing a Next.js site's Git URL now takes effect on the next deploy.
 
 ## [0.2.0-beta] - 2026-10-04
 

@@ -112,6 +112,20 @@ Giữ bản ghi ở chế độ **DNS only** (đám mây xám) cho tới khi cà
 
 Lần đầu mở, Lares tải Adminer từ github.com và kiểm tra SHA-256, nên VPS cần truy cập được github.com. Adminer cần một phiên bản PHP-FPM có `mysqli` đã cài sẵn. Ở chế độ cùng tồn tại (nginx đang tắt), Adminer không chạy được.
 
+## Next.js: lỗi build hoặc lỗi Git clone
+
+- **Repo private trên GitHub**: kết nối GitHub một lần trong **Cài đặt → Tích hợp → GitHub** (Lares
+  tự tạo GitHub App riêng, rồi bạn chọn các repo App được đọc). Sau đó form tạo site sẽ liệt kê repo
+  và branch. "Không thấy repo?" nghĩa là App chưa được cấp quyền repo đó.
+- **Repo private ở nơi khác**: dùng URL `https://` và điền **Access token** khi tạo site (hoặc sau đó trong
+  **Cấu hình build**). Trên GitHub, tạo fine-grained token chỉ cho repo đó với quyền
+  **Contents: Read-only**. GitLab dùng project access token có `read_repository`; Bitbucket dùng
+  repository access token (hoặc `username:app-password`). Token được mã hoá khi lưu và không bao giờ
+  nằm trong URL clone, `.git/config` hay log tác vụ. Đừng dán token vào chính Git URL.
+- **`Cannot find module '@tailwindcss/postcss'`** (hoặc một devDependency khác): đã sửa ở phiên bản
+  này; bước cài đặt không còn nhận `NODE_ENV=production` của panel nên devDependencies được cài đủ.
+  Bấm lại **Build & khởi động**.
+
 ## Cập nhật WordPress bị hoàn tác
 
 Lares khôi phục bản backup khi trang chủ lỗi, xuất hiện lỗi PHP nghiêm trọng, hoặc plugin đang bật bị tắt sau khi cập nhật. Xem tab **Cập nhật → Lịch sử** để biết mục nào gây lỗi, rồi cập nhật từng mục một. Nội dung phát sinh trong lúc cập nhật (đơn hàng, bình luận) sẽ mất khi khôi phục.

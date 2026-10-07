@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { AppType } from '@lares/shared';
 import { config } from '../config.js';
 import { t, tDefault } from '../i18n/index.js';
-import { shq } from '../lib/shell.js';
+import { ngxPath, shq } from '../lib/shell.js';
 import { syncDevNginx } from './devNginx.js';
 import { host, type HostLogger } from './host.js';
 import { leadLocation } from './leadsNginx.js';
@@ -57,7 +57,7 @@ const indent = (block: string, n = 4) =>
 
 export function acmeLocation(): string {
   return `location ^~ /.well-known/acme-challenge/ {
-    root ${config.acmeDir};
+    root ${ngxPath(config.acmeDir)};
     default_type text/plain;
     try_files $uri =404;
 }`;
@@ -66,8 +66,8 @@ export function acmeLocation(): string {
 function appBody(spec: VhostSpec): string {
   const logs = siteLogPaths(spec.domain);
   const common = [
-    spec.accessLog ? `access_log ${logs.access} lares;` : 'access_log off;',
-    `error_log ${logs.error} warn;`,
+    spec.accessLog ? `access_log ${ngxPath(logs.access)} lares;` : 'access_log off;',
+    `error_log ${ngxPath(logs.error)} warn;`,
     `client_max_body_size ${spec.clientMaxBodyMb ?? 256}m;`,
     '',
     acmeLocation(),
@@ -102,13 +102,13 @@ proxy_read_timeout 300s;`;
   }
 
   if (spec.appType === 'static') {
-    return [`root ${spec.webRoot};`, 'index index.html index.htm;', ...common, '', 'location / {\n    try_files $uri $uri/ =404;\n}'].join('\n');
+    return [`root ${ngxPath(spec.webRoot)};`, 'index index.html index.htm;', ...common, '', 'location / {\n    try_files $uri $uri/ =404;\n}'].join('\n');
   }
 
   // PHP family: wordpress, laravel, generic php
   const php = spec.phpVersion ?? config.defaultPhp;
   const lines = [
-    `root ${spec.webRoot};`,
+    `root ${ngxPath(spec.webRoot)};`,
     'index index.php index.html index.htm;',
     ...common,
     '',
@@ -172,8 +172,8 @@ server {
 ${opts.http2Directive ? '    listen 443 ssl;\n    listen [::]:443 ssl;\n    http2 on;' : '    listen 443 ssl http2;\n    listen [::]:443 ssl http2;'}
     server_name ${names};
 
-    ssl_certificate ${spec.ssl.certificate};
-    ssl_certificate_key ${spec.ssl.privateKey};
+    ssl_certificate ${ngxPath(spec.ssl.certificate)};
+    ssl_certificate_key ${ngxPath(spec.ssl.privateKey)};
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
     ssl_session_cache shared:LARES_SSL:10m;

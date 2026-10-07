@@ -37,8 +37,8 @@ export async function siteRoutes(app: FastifyInstance) {
       site,
       databases: databases.databasesForSite(site.id),
       nodeApp,
-      // env values may be secrets: return keys only
-      nodeConfig: cfg ? { ...cfg, env: Object.fromEntries(Object.keys(cfg.env ?? {}).map((k) => [k, ''])) } : null,
+      // env values and the git token are secrets: return env keys only and whether a token is set
+      nodeConfig: cfg ? { ...cfg, gitToken: undefined, hasGitToken: Boolean(cfg.gitToken), env: Object.fromEntries(Object.keys(cfg.env ?? {}).map((k) => [k, ''])) } : null,
     };
   });
 
@@ -95,11 +95,12 @@ export async function siteRoutes(app: FastifyInstance) {
     const id = idParam(req.params);
     const site = sites.getSite(id);
     if (site.appType !== 'nextjs') throw badRequest(t('Site không phải Next.js'));
-    const input = parse(nextjsConfigSchema.partial({ branch: true }), req.body);
+    const { removeGitToken, ...input } = parse(nextjsConfigSchema.partial({ branch: true }).extend({ removeGitToken: z.boolean().optional() }), req.body);
     const current = sites.getNodeConfig(id);
-    // Empty env values from the UI mean "keep the stored secret".
+    // Empty env values and an empty token from the UI mean "keep the stored secret".
     const env = Object.fromEntries(Object.entries(input.env ?? {}).map(([k, v]) => [k, v === '' ? (current.env?.[k] ?? '') : v]));
-    const next = { ...current, ...input, env };
+    const gitToken = removeGitToken ? undefined : (input.gitToken ?? current.gitToken);
+    const next = { ...current, ...input, env, gitToken };
     sites.saveNodeConfig(id, next);
     return { ok: true };
   });

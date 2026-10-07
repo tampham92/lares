@@ -107,6 +107,20 @@ Keep records **DNS only** (grey cloud) until SSL is installed. Before turning th
 
 The first time, Lares downloads Adminer from github.com and verifies its SHA-256, so the server needs outbound access to github.com. Adminer needs an installed PHP-FPM version with `mysqli`. It cannot run in coexist mode (nginx stopped).
 
+## Next.js: build or Git clone fails
+
+- **Private repo on GitHub**: connect GitHub once in **Settings → Integrations → GitHub** (Lares
+  creates its own GitHub App, then you choose which repos it may read). The site form then lists
+  your repos and branches. "Repo missing?" means the App has not been given access to that repo.
+- **Private repo elsewhere**: use the `https://` URL and fill in **Access token** when creating the site (or
+  under **Build settings** later). On GitHub, create a fine-grained token limited to that repo with
+  **Contents: Read-only**. On GitLab use a project access token with `read_repository`; on Bitbucket
+  a repository access token (or `username:app-password`). The token is stored encrypted and is never
+  written to the clone URL, `.git/config` or the task log. Do not put the token in the Git URL itself.
+- **`Cannot find module '@tailwindcss/postcss'`** (or another devDependency): fixed in this version;
+  the install step now runs without the panel's `NODE_ENV=production`, so devDependencies are
+  installed. Click **Build & start** again.
+
 ## A WordPress update was rolled back
 
 Lares restores the backup when the home page breaks, a new PHP fatal error appears, or an active plugin got deactivated. Check **Updates → History** to see which item broke it, then update items one by one. Content created during the update (orders, comments) is lost on restore.

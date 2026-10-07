@@ -30,3 +30,10 @@ export function tarExcludes(patterns: string[]): string {
 /** Size of a directory in KiB (prints nothing when it cannot be measured within 2 minutes). */
 export const duKb = (dir: string) =>
   `{ if command -v timeout >/dev/null 2>&1; then timeout 120 du -sk ${shq(dir)}; else du -sk ${shq(dir)}; fi; } 2>/dev/null | cut -f1`;
+
+/**
+ * A path as an nginx argument. Server paths (/var/www/<domain>, /etc/...) never need quoting and are
+ * written as is; a path with spaces or nginx syntax characters (a dev checkout in "My Projects") is
+ * double-quoted so nginx reads it as one argument.
+ */
+export const ngxPath = (p: string) => (/^[\w./@:+~-]+$/.test(p) ? p : `"${p.replace(/["\\]/g, '\\$&')}"`);

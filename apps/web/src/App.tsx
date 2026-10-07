@@ -4,6 +4,7 @@ import { auth } from './api';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Databases } from './pages/Databases';
+import { GithubCallback } from './pages/GithubCallback';
 import { Leads } from './pages/Leads';
 import { Login } from './pages/Login';
 import { MigrationDetail } from './pages/MigrationDetail';
@@ -41,6 +42,7 @@ export function App() {
         <Route path="migrations/new" element={<MigrationNew />} />
         <Route path="migrations/:id" element={<MigrationDetail />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/github/callback" element={<GithubCallback />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

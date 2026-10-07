@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LANG_LABELS, LOCALHOST, SITE_TYPES, msg, type AutoDnsInput, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
 import { get, post, type TaskInfo } from '../api';
 import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
+import { GitSourceFields } from '../components/GitSourceFields';
 import { TemplatePicker } from '../components/TemplatePicker';
 import { Alert, Check, ErrorBox, Field, TaskLog } from '../components/ui';
 import { t } from '../i18n';
@@ -24,7 +25,7 @@ export function SiteNew() {
   const [addWww, setAddWww] = useState(true);
   const [php, setPhp] = useState('');
   const [wp, setWp] = useState({ title: '', adminUser: '', adminPassword: '', adminEmail: '', locale: 'vi' });
-  const [next, setNext] = useState({ gitUrl: '', branch: 'main', packageManager: 'auto', installCommand: '', buildCommand: '', startCommand: '', env: '' });
+  const [next, setNext] = useState({ gitUrl: '', gitToken: '', branch: 'main', packageManager: 'auto', installCommand: '', buildCommand: '', startCommand: '', env: '' });
   const [createDb, setCreateDb] = useState(false);
   const [template, setTemplate] = useState<string | null>(null);
   const [branding, setBranding] = useState<Branding>({});
@@ -58,6 +59,7 @@ export function SiteNew() {
       }
       body.nextjs = {
         gitUrl: next.gitUrl || undefined,
+        gitToken: next.gitToken || undefined,
         branch: next.branch || 'main',
         packageManager: next.packageManager,
         installCommand: next.installCommand || undefined,
@@ -257,12 +259,16 @@ export function SiteNew() {
               {t('rồi bấm “Build & khởi động” trong trang site.')}
             </Alert>
             <div className="form-grid">
-              <Field label="Git URL" hint={t('https://github.com/org/repo.git hoặc git@...')}>
-                <input value={next.gitUrl} onChange={(e) => setNext({ ...next, gitUrl: e.target.value })} />
-              </Field>
-              <Field label="Branch">
-                <input value={next.branch} onChange={(e) => setNext({ ...next, branch: e.target.value })} />
-              </Field>
+              <GitSourceFields
+                gitUrl={next.gitUrl}
+                branch={next.branch}
+                onChange={(v) => setNext({ ...next, ...v })}
+                tokenField={
+                  <Field label={t('Access token (repo private)')} hint={t('GitHub: fine-grained token, chỉ repo này, quyền Contents: Read-only. Bỏ trống nếu repo public.')}>
+                    <input type="password" autoComplete="new-password" value={next.gitToken} onChange={(e) => setNext({ ...next, gitToken: e.target.value })} />
+                  </Field>
+                }
+              />
               <Field label="Package manager">
                 <select value={next.packageManager} onChange={(e) => setNext({ ...next, packageManager: e.target.value })}>
                   <option value="auto">{t('Tự nhận (theo lockfile)')}</option>
