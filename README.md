@@ -8,6 +8,19 @@ Hosting control panel viết bằng TypeScript cho VPS Ubuntu/Debian: quản lý
 
 > **Beta**: Lares đang ở giai đoạn `0.x` beta. Hãy sao lưu và thử trên VPS không quan trọng trước khi dùng cho site thật.
 
+**Hỏi đáp, góp ý:** [GitHub Discussions](https://github.com/tampham92/lares/discussions) · Báo lỗi: [Issues](https://github.com/tampham92/lares/issues) · Báo lỗ hổng bảo mật: [SECURITY.md](SECURITY.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/assets/shots/vi/sites-dark.webp">
+  <img src="site/assets/shots/vi/sites.webp" width="1600" alt="Danh sách website trong Lares: WordPress, Next.js, PHP và HTML tĩnh, kèm trạng thái SSL Let's Encrypt">
+</picture>
+
+| Cập nhật WordPress an toàn | Trình tạo giao diện |
+|---|---|
+| ![Tab Cập nhật của một site WordPress: WordPress core, plugin và phiên bản mới có sẵn](site/assets/shots/vi/updates.webp) | ![Trình tạo giao diện: chọn ngành Spa, Nhà hàng hoặc Landing page bán một sản phẩm](site/assets/shots/vi/builder.webp) |
+| **Chuyển site từ VPS / panel khác** | **Khách liên hệ** |
+| ![Màn hình Chuyển site: nhập IP, user SSH và chọn panel nguồn](site/assets/shots/vi/migrate.webp) | ![Hộp thư Khách liên hệ: tên, số điện thoại, lời nhắn từ các website](site/assets/shots/vi/leads.webp) |
+
 ## Cài đặt
 
 Hệ điều hành được hỗ trợ: **Ubuntu 22.04 / 24.04, Debian 12** (x86_64, arm64). Debian 13 cài được nhưng kèm cảnh báo "chưa kiểm thử". Ubuntu 20.04 và Debian 11 đã hết vòng đời nên installer từ chối cài, trừ khi thêm `--force-unsupported`. Chạy bằng root:

@@ -8,6 +8,19 @@ A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **Wo
 
 > **Beta**: Lares is in `0.x` beta. Take backups, and try it on a non-critical VPS before using it for important sites.
 
+**Questions and ideas:** [GitHub Discussions](https://github.com/tampham92/lares/discussions) · Bugs: [Issues](https://github.com/tampham92/lares/issues) · Security reports: [SECURITY.md](SECURITY.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/assets/shots/en/sites-dark.webp">
+  <img src="site/assets/shots/en/sites.webp" width="1600" alt="Website list in Lares: WordPress, Next.js, PHP and static sites with their Let's Encrypt status">
+</picture>
+
+| Safe WordPress updates | Site builder |
+|---|---|
+| ![Updates tab of a WordPress site: WordPress core, plugins and available versions](site/assets/shots/en/updates.webp) | ![Site builder: choose Spa, Restaurant or single-product landing page](site/assets/shots/en/builder.webp) |
+| **Migration from another VPS / panel** | **Contact leads** |
+| ![Migration screen: IP, SSH user and source panel](site/assets/shots/en/migrate.webp) | ![Leads inbox: names, phone numbers and messages from the websites](site/assets/shots/en/leads.webp) |
+
 ## Installation
 
 Supported systems: **Ubuntu 22.04 / 24.04, Debian 12** (x86_64, arm64). Debian 13 installs with a "not yet tested" warning. Ubuntu 20.04 and Debian 11 are end of life, and the installer refuses them unless you add `--force-unsupported`. Run as root:
