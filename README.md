@@ -21,6 +21,10 @@ Hosting control panel viết bằng TypeScript cho VPS Ubuntu/Debian: quản lý
 | **Chuyển site từ VPS / panel khác** | **Khách liên hệ** |
 | ![Màn hình Chuyển site: nhập IP, user SSH và chọn panel nguồn](site/assets/shots/vi/migrate.webp) | ![Hộp thư Khách liên hệ: tên, số điện thoại, lời nhắn từ các website](site/assets/shots/vi/leads.webp) |
 
+**AI viết bài chuẩn SEO rồi đăng thẳng lên WordPress** (tua nhanh):
+
+![AI viết bài: nhập chủ đề và từ khoá, AI viết bài, bảng kiểm tra SEO đạt 11/11, đăng bài và mở bài trên site WordPress](docs/assets/ai-writer-demo.gif)
+
 ## Cài đặt
 
 Hệ điều hành được hỗ trợ: **Ubuntu 22.04 / 24.04, Debian 12** (x86_64, arm64). Debian 13 cài được nhưng kèm cảnh báo "chưa kiểm thử". Ubuntu 20.04 và Debian 11 đã hết vòng đời nên installer từ chối cài, trừ khi thêm `--force-unsupported`. Chạy bằng root:

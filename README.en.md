@@ -21,6 +21,10 @@ A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **Wo
 | **Migration from another VPS / panel** | **Contact leads** |
 | ![Migration screen: IP, SSH user and source panel](site/assets/shots/en/migrate.webp) | ![Leads inbox: names, phone numbers and messages from the websites](site/assets/shots/en/leads.webp) |
 
+**AI Writer: an SEO article written and published to WordPress** (sped up; UI shown in Vietnamese, English is one click away in the sidebar):
+
+![AI Writer: enter a topic and keyword, the AI writes the article, the SEO checklist reaches 11/11, then the post is published and opened on the WordPress site](docs/assets/ai-writer-demo.gif)
+
 ## Installation
 
 Supported systems: **Ubuntu 22.04 / 24.04, Debian 12** (x86_64, arm64). Debian 13 installs with a "not yet tested" warning. Ubuntu 20.04 and Debian 11 are end of life, and the installer refuses them unless you add `--force-unsupported`. Run as root:
