@@ -13,8 +13,5 @@
   // specific route lares.thocode.dev/ping (telemetry Worker) still wins, and the Redirect Rules for
   // /install and /uninstall run before any Worker.
   "routes": [{ "pattern": "lares.thocode.dev/*", "zone_name": "thocode.dev" }],
-  "observability": { "enabled": false },
-  // Workers Builds runs `npx wrangler preview` for every non-production branch (pull requests), which
-  // refuses to run without this block. Previews get their own *.workers.dev URL, never the route above.
-  "previews": {}
+  "observability": { "enabled": false }
 }
