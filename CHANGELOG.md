@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.3.0-beta] - 2026-10-10
+
 ### Added
 - **Site builder** ("Tự tạo giao diện"): answer a few questions (industry, business info, brand
   colour, style, sections) and get a complete static or WordPress site with a live preview. 12
@@ -34,6 +36,15 @@ breaking changes; upgrading is always the install command run again
 - **Private Git repos for Next.js sites**: an optional Access token (GitHub fine-grained token,
   GitLab/Bitbucket access tokens). Stored encrypted, passed to git through a temporary credential
   file, never in the clone URL, `.git/config` or the task log. A clear message when a repo needs one.
+- **Upgrade from the panel** (Settings → Updates): **Upgrade to vX.Y.Z** runs the installer of that
+  release in its own systemd unit (`lares-upgrade`), shows its log and survives the panel restart. A
+  failed upgrade leaves the old version running. **Check now** button and a toggle to turn the daily
+  update check off.
+
+### Changed
+- **Releases are `vX.Y.Z` tags.** `install.sh` installs the newest release tag instead of the `main`
+  branch (`--branch main` or any branch/tag overrides it), and the panel's update check reads the
+  tags too, so code pushed to `main` reaches nobody until it is released.
 
 ### Fixed
 - **Next.js builds failing with `Cannot find module '@tailwindcss/postcss'`** (or any other
@@ -126,5 +137,6 @@ First public beta under the name **Lares Panel by ThoCode**.
 - Re-running the installer (upgrade) no longer resets a custom `--port` to 8686, and no longer
   installs the default PHP versions again: the saved port and PHP list are kept.
 
-[Unreleased]: https://github.com/tampham92/lares/compare/v0.2.0-beta...HEAD
+[Unreleased]: https://github.com/tampham92/lares/compare/v0.3.0-beta...HEAD
+[0.3.0-beta]: https://github.com/tampham92/lares/compare/v0.2.0-beta...v0.3.0-beta
 [0.2.0-beta]: https://github.com/tampham92/lares/releases/tag/v0.2.0-beta

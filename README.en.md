@@ -60,7 +60,7 @@ The installer **detects and reuses** existing services instead of installing ove
 | PHP-FPM | Reused; `php.ini` of existing versions is not modified |
 | Node.js older than 20 in `/usr/bin` | Upgraded to Node 22 (Lares needs ≥ 20). Node installed via nvm is not affected |
 
-> By default the script fetches the source from `https://github.com/tampham92/lares` (branch `main`). To use a fork or another branch: `--repo <git-url> --branch <branch>`, or `--tarball <.tar.gz url>`.
+> By default the script installs the newest release tag (`vX.Y.Z`) of `https://github.com/tampham92/lares`. To use a fork, the `main` branch or another tag: `--repo <git-url> --branch <branch-or-tag>`, or `--tarball <.tar.gz url>`.
 
 ### Does updating Lares lose data?
 
@@ -71,7 +71,7 @@ No. Run the exact install command again; the installer finds `/etc/lares/lares.e
 - Before restarting, the installer backs up `/etc/lares` + the SQLite database + your custom templates to `/var/lib/lares/backups/` (the 5 most recent are kept).
 - Don't edit files in `/opt/lares/src` directly (they are overwritten on update); put custom templates in `/var/lib/lares/templates/`.
 - The port, PHP versions, language and telemetry choice from installation are kept, unless you pass `--port`/`--php`/`--lang` again.
-- The running version is shown at the bottom of the sidebar. The panel checks GitHub once a day and shows **New version x.y.z** with the upgrade command when one is out. Changes: [CHANGELOG.md](CHANGELOG.md).
+- The running version is shown at the bottom of the sidebar. The panel checks the `vX.Y.Z` release tags on GitHub once a day and shows **New version x.y.z** when one is out. Upgrade with the button in **Settings → Updates** or with the command above; the check can be turned off there too. Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ### Admin account
 

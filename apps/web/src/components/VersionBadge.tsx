@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CHANGELOG_URL, type VersionInfo } from '@lares/shared';
 import { get } from '../api';
@@ -27,7 +28,9 @@ export function VersionBadge() {
         <details className="update">
           <summary>{t('Có bản mới {version}', { version: v.latest })}</summary>
           <div>
-            {t('Nâng cấp bằng lệnh sau trên VPS (website và dữ liệu được giữ nguyên):')}
+            <Link to="/settings?tab=update">{t('Nâng cấp trong Cài đặt')}</Link>
+            <br />
+            {t('Hoặc chạy lệnh sau trên VPS (website và dữ liệu được giữ nguyên):')}
             <code>
               {v.upgradeCommand}
             </code>

@@ -9,16 +9,18 @@ import { CloudflareRealIpCard, PanelDomainCard } from '../components/NetworkSett
 import { AllowlistCard, SessionsCard, TwoFactorCard } from '../components/SecuritySettings';
 import { BackupSettingsCard } from '../components/BackupSettingsCard';
 import { LeadSettingsCard } from '../components/LeadSettingsCard';
+import { UpdateSettingsCard } from '../components/UpdateSettingsCard';
 import { Alert, Check, Field, Tabs } from '../components/ui';
 import { t } from '../i18n';
 
-type SettingsTab = 'domain' | 'security' | 'backup' | 'integrations';
+type SettingsTab = 'domain' | 'security' | 'backup' | 'integrations' | 'update';
 
 const TABS: Array<[SettingsTab, string]> = [
   ['domain', msg('Tên miền & Cloudflare')],
   ['security', msg('Bảo mật')],
   ['backup', msg('Sao lưu & log')],
   ['integrations', msg('Tích hợp')],
+  ['update', msg('Cập nhật')],
 ];
 
 export function Settings() {
@@ -39,6 +41,7 @@ export function Settings() {
       )}
       {tab === 'backup' && <Columns left={<BackupSettingsCard />} right={<LogrotateCard />} />}
       {tab === 'integrations' && <Columns left={[<GithubAppCard key="github" />, <AiSettingsCard key="ai" />]} right={<LeadSettingsCard />} />}
+      {tab === 'update' && <Columns left={<UpdateSettingsCard />} right={null} />}
     </>
   );
 }

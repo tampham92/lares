@@ -3,11 +3,13 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
-import { compareVersions, UPGRADE_COMMAND } from '@lares/shared';
+import { compareVersions, pickLatestTag, UPGRADE_COMMAND } from '@lares/shared';
 import { describe, expect, it } from 'vitest';
 import { setSetting } from '../src/db/index.js';
 import { releaseRoutes } from '../src/routes/release.js';
-import { fetchLatestVersion, releaseTick, telemetryPayload, VERSION, versionInfo } from '../src/services/release.js';
+import { fetchLatestVersion, releaseTick, setUpdateCheck, telemetryPayload, VERSION, versionInfo } from '../src/services/release.js';
+import { startUpgrade } from '../src/services/upgrade.js';
+import { exitCodeOf, upgradeCommand, upgradeStatus } from '../src/services/upgradePolicy.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const rootVersion = (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { version: string }).version;
@@ -64,8 +66,25 @@ describe('version', () => {
   });
 });
 
+describe('release tags', () => {
+  it('picks the newest vX.Y.Z tag in semver order', () => {
+    expect(pickLatestTag(['v0.2.0-beta', 'v0.10.0', 'v0.9.1', 'main', 'v1.0'])).toBe('0.10.0');
+    expect(pickLatestTag(['v0.3.0-beta', 'v0.3.0'])).toBe('0.3.0');
+    expect(pickLatestTag(['v0.3.0-beta', 'v0.2.9'])).toBe('0.3.0-beta');
+    expect(pickLatestTag(['latest', 'v1.0.0;rm -rf /', '--upload-pack=x', 'v1.0.0/../x'])).toBeNull();
+    expect(pickLatestTag([])).toBeNull();
+  });
+});
+
 describe('update check', () => {
-  it('reads and validates the remote version', async () => {
+  it('reads the newest release from the GitHub tags API', async () => {
+    const f = fakeFetch([{ name: 'v0.2.0-beta' }, { name: 'v0.3.0' }, { name: 'nightly' }, null, { name: 7 }]);
+    expect(await fetchLatestVersion(f.fn)).toBe('0.3.0');
+    expect(f.calls[0]).toContain('api.github.com/repos/tampham92/lares/tags');
+    expect(await fetchLatestVersion(fakeFetch([]).fn)).toBeNull();
+  });
+
+  it('still reads a package.json given as LARES_UPDATE_URL', async () => {
     expect(await fetchLatestVersion(fakeFetch({ version: '0.3.0' }).fn)).toBe('0.3.0');
     expect(await fetchLatestVersion(fakeFetch({ version: 'v0.3; rm -rf /' }).fn)).toBeNull();
     expect(await fetchLatestVersion(fakeFetch({ version: '0.3.0' }, false).fn)).toBeNull();
@@ -78,17 +97,69 @@ describe('update check', () => {
   it('checks at most once a day and never sends a heartbeat outside production', async () => {
     setSetting('release.update', { latest: null, checkedAt: null });
     setSetting('release.heartbeatAt', null);
-    const f = fakeFetch({ version: '99.1.0' });
+    const f = fakeFetch([{ name: 'v99.1.0' }]);
     const logs: string[] = [];
     const now = Date.now();
     await releaseTick((m) => logs.push(m), f.fn, now);
     await releaseTick((m) => logs.push(m), f.fn, now + 3_600_000);
     expect(f.calls).toHaveLength(1);
-    expect(f.calls[0]).toContain('package.json');
+    expect(f.calls[0]).toContain('/tags');
     expect(logs.join()).toContain('99.1.0');
     await releaseTick(() => {}, f.fn, now + 25 * 3_600_000);
     expect(f.calls).toHaveLength(2);
     setSetting('release.update', { latest: null, checkedAt: null });
+  });
+});
+
+describe('update check toggle', () => {
+  it('turning the check off stops the daily check and clears the known release', async () => {
+    setSetting('release.update', { latest: '99.0.0', checkedAt: new Date().toISOString() });
+    expect(setUpdateCheck(false)).toMatchObject({ updateCheck: false, latest: null, updateAvailable: false });
+    const f = fakeFetch([{ name: 'v99.2.0' }]);
+    await releaseTick(() => {}, f.fn, Date.now() + 48 * 3_600_000);
+    expect(f.calls).toHaveLength(0);
+    expect(setUpdateCheck(true).updateCheck).toBe(true);
+    setSetting('release.update', { latest: null, checkedAt: null });
+  });
+});
+
+describe('one-click upgrade', () => {
+  it('runs the installer of the release tag in its own unit, with validated arguments', () => {
+    const c = upgradeCommand('tampham92/lares', 'v0.3.0', '/var/lib/lares/upgrade.log');
+    expect(c).toMatch(/^systemd-run --unit=lares-upgrade --collect /);
+    expect(c).toContain('https://raw.githubusercontent.com/tampham92/lares/v0.3.0/install.sh');
+    expect(c).toContain("--branch '\\''v0.3.0'\\''");
+    expect(() => upgradeCommand('tampham92/lares', 'main', '/x')).toThrow();
+    expect(() => upgradeCommand('tampham92/lares', "v1.0.0'; rm -rf /", '/x')).toThrow();
+    expect(() => upgradeCommand('evil/repo; id', 'v1.0.0', '/x')).toThrow();
+  });
+
+  it('reads the status from the log file and the unit', () => {
+    const meta = { target: '0.3.0', from: '0.2.0', startedAt: new Date(0).toISOString() };
+    expect(upgradeStatus(null, null, false).state).toBe('idle');
+    expect(upgradeStatus(meta, 'building\n', true).state).toBe('running');
+    expect(upgradeStatus(meta, 'ok\n__LARES_UPGRADE_EXIT__ 0\n', false)).toMatchObject({ state: 'done', exitCode: 0, log: ['ok'] });
+    expect(upgradeStatus(meta, 'npm ERR\n__LARES_UPGRADE_EXIT__ 1\n', false)).toMatchObject({ state: 'failed', exitCode: 1 });
+    // no exit line and no unit long after the start: interrupted
+    expect(upgradeStatus(meta, 'building\n', false)).toMatchObject({ state: 'failed', exitCode: null });
+    // just started: the unit may not be visible yet
+    expect(upgradeStatus({ ...meta, startedAt: new Date().toISOString() }, '', false).state).toBe('running');
+    expect(upgradeStatus(meta, '\x1b[0;32m✔\x1b[0m done\n', true).log).toEqual(['✔ done']);
+    expect(exitCodeOf('x\n__LARES_UPGRADE_EXIT__ 97\n')).toBe(97);
+  });
+
+  it('only upgrades to the newer release the last check found', async () => {
+    setSetting('release.update', { latest: VERSION, checkedAt: new Date().toISOString() });
+    await expect(startUpgrade(VERSION, () => {})).rejects.toThrow();
+    setSetting('release.update', { latest: '99.0.0', checkedAt: new Date().toISOString() });
+    await expect(startUpgrade('98.0.0', () => {})).rejects.toThrow();
+    const logs: string[] = [];
+    const status = await startUpgrade('99.0.0', (m) => logs.push(m));
+    // tests run in dry-run: the command is only logged and the run is recorded as finished
+    expect(logs.join('\n')).toContain('[dry-run] systemd-run');
+    expect(status).toMatchObject({ state: 'done', target: '99.0.0', from: VERSION });
+    setSetting('release.update', { latest: null, checkedAt: null });
+    setSetting('release.upgrade', null);
   });
 });
 

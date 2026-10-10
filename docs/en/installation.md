@@ -55,7 +55,7 @@ Right after the first login:
 | `--node <major>` | `NODE_MAJOR` | `22` | Node.js major version, used only if `/usr/bin/node` is missing or older than 20 |
 | `--mysql-root-user <user>` | `MYSQL_ROOT_USER` | `root` | Admin account of an existing MySQL/MariaDB |
 | `--mysql-root-password <pw>` | `MYSQL_ROOT_PASSWORD` | | Its password, when socket login does not work |
-| `--repo <url>` / `--branch <name>` | `LARES_REPO` / `LARES_BRANCH` | GitHub `main` | Install from a fork or another branch |
+| `--repo <url>` / `--branch <name>` | `LARES_REPO` / `LARES_BRANCH` | newest `vX.Y.Z` tag | Install from a fork, a branch (`main`) or another tag |
 | `--tarball <url\|path>` | `LARES_TARBALL` | | Install from a `.tar.gz` (https://, file:// or a local path) instead of git |
 | `--fresh-data` | | | Old data was found without `/etc/lares/lares.env`: move it aside and install fresh |
 | `--no-telemetry` | `LARES_TELEMETRY=0` | on | Disable the anonymous install counter (see [Telemetry](#telemetry)) |
@@ -92,10 +92,16 @@ curl -sSL https://lares.thocode.dev/install | sudo bash
   telemetry choice are kept.
 - `/etc/lares` + the SQLite database + custom templates are backed up first to
   `/var/lib/lares/backups/` (the 5 newest are kept). See [Backups](backups.md#panel-data).
-- The panel checks GitHub once a day. When a newer version exists, the sidebar shows
-  **New version x.y.z** with this command. Changes are listed in [CHANGELOG.md](../../CHANGELOG.md).
-  To turn the check off, set `LARES_UPDATE_CHECK=0` in `/etc/lares/lares.env`, then run
-  `systemctl restart lares`.
+- Or upgrade from the panel: **Settings → Updates → Upgrade to vX.Y.Z**. It runs the same installer
+  (of that release) in its own systemd unit, `lares-upgrade`, so the panel restart does not stop it;
+  the page shows the log and comes back on the new version. If it fails, the old version keeps
+  running and the command above still works.
+- Releases are `vX.Y.Z` tags on GitHub. The installer installs the newest tag, not the `main`
+  branch; `--branch main` (or any branch or tag) overrides it.
+- The panel checks the release tags on GitHub once a day. When a newer one exists, the sidebar shows
+  **New version x.y.z**. Changes are listed in [CHANGELOG.md](../../CHANGELOG.md). Turn the daily
+  check off in **Settings → Updates** (**Check now** still works), or for good with
+  `LARES_UPDATE_CHECK=0` in `/etc/lares/lares.env` followed by `systemctl restart lares`.
 
 Upgrading to 0.2.0-beta logs every user out once, which is expected (sessions now support
 revocation).
@@ -122,7 +128,7 @@ panel send a tiny anonymous ping. **This is all that is sent:**
 | Field | Example | Notes |
 |---|---|---|
 | `install_id` | `0b5c3f9e-2f4b-…` | Random UUID, generated once and stored in `/etc/lares/install-id`. Not derived from the machine |
-| `version` | `0.2.0-beta` | Lares version |
+| `version` | `0.3.0-beta` | Lares version |
 | `event` | `install` / `upgrade` / `heartbeat` | |
 | `os`, `os_version` | `ubuntu`, `24.04` | From `/etc/os-release` |
 | `arch` | `amd64` | CPU architecture |

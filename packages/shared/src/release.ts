@@ -1,22 +1,64 @@
 // ---------------------------------------------------------------------------
 // Release info: version, update check, anonymous telemetry (shared by server & web)
 // ---------------------------------------------------------------------------
+import { z } from 'zod';
 
 /** The same one-liner installs and upgrades in place (sites, data and accounts are kept). */
 export const UPGRADE_COMMAND = 'curl -sSL https://lares.thocode.dev/install | sudo bash';
 
 export const CHANGELOG_URL = 'https://github.com/tampham92/lares/blob/main/CHANGELOG.md';
 
+/** GitHub repository releases are published from (owner/name). A release is a `vX.Y.Z` tag. */
+export const RELEASE_REPO = 'tampham92/lares';
+
 export interface VersionInfo {
   /** Version of the running panel, e.g. "0.2.0-beta". */
   version: string;
-  /** Latest version published on GitHub `main`, null until the first successful check. */
+  /** Newest release tag on GitHub (without the "v"), null until the first successful check. */
   latest: string | null;
   updateAvailable: boolean;
   checkedAt: string | null;
   upgradeCommand: string;
+  /** Daily check for a new release (Settings toggle). */
+  updateCheck: boolean;
+  /** LARES_UPDATE_CHECK=0 in the env file: the daily check is off and the toggle is locked. */
+  updateCheckLocked: boolean;
   /** Anonymous daily heartbeat enabled (LARES_TELEMETRY != 0). */
   telemetry: boolean;
+}
+
+export const updateCheckSchema = z.object({ enabled: z.boolean() });
+
+/** One-click upgrade: the version the admin confirmed, re-checked against the latest known release. */
+export const upgradeRequestSchema = z.object({ version: z.string().max(48) });
+
+export type UpgradeState = 'idle' | 'running' | 'done' | 'failed';
+
+export interface UpgradeStatus {
+  state: UpgradeState;
+  /** Version being installed (without the "v"). */
+  target: string | null;
+  /** Version that was running when the upgrade started. */
+  from: string | null;
+  startedAt: string | null;
+  /** Exit code of the installer once it has finished. */
+  exitCode: number | null;
+  /** Last lines of the installer output. */
+  log: string[];
+}
+
+/** A release tag: v + semver, nothing that a shell or git could read as an option or a path. */
+export const RELEASE_TAG_RE = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]{1,20})?$/;
+
+/** Newest release among tag names (semver order, a release beats its prereleases); null if none. */
+export function pickLatestTag(names: readonly string[]): string | null {
+  let best: string | null = null;
+  for (const n of names) {
+    if (!RELEASE_TAG_RE.test(n)) continue;
+    const v = n.slice(1);
+    if (!best || compareVersions(v, best) > 0) best = v;
+  }
+  return best;
 }
 
 /** MAJOR.MINOR.PATCH with an optional -prerelease and +build, as written in package.json. */

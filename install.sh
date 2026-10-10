@@ -29,7 +29,7 @@ set -Eeuo pipefail
 
 # ---- Configurable (env vars or flags) ---------------------------------------
 LARES_REPO="${LARES_REPO:-https://github.com/tampham92/lares.git}"
-LARES_BRANCH="${LARES_BRANCH:-main}"
+LARES_BRANCH="${LARES_BRANCH:-}"            # empty = newest release tag (vX.Y.Z); a branch or tag to override
 LARES_TARBALL="${LARES_TARBALL:-}"          # URL/đường dẫn .tar.gz thay cho git (tuỳ chọn)
 PORT_ARG="${LARES_PORT:-}"                  # empty = saved port on upgrade, else 8686
 PHP_ARG="${PHP_VERSIONS:-}"                 # empty = saved versions on upgrade, else the default list
@@ -87,7 +87,7 @@ Options:
   --mysql-root-user <user>     Admin user of an existing MySQL/MariaDB (default: root)
   --mysql-root-password <pw>   Its password, when socket login does not work
   --repo <url>                 Git repository (default: https://github.com/tampham92/lares.git)
-  --branch <name>              Git branch (default: main)
+  --branch <name>              Git branch or tag (default: the newest release tag vX.Y.Z)
   --tarball <url|path>         Install from a .tar.gz (URL, file:// or local path) instead of git
   --fresh-data                 Old data found without its env file: back it up and install fresh
   --no-telemetry               Do not send the anonymous install/upgrade ping or the daily
@@ -117,7 +117,7 @@ Tuỳ chọn:
   --mysql-root-user <user>     User quản trị MySQL/MariaDB đang có (mặc định: root)
   --mysql-root-password <mk>   Mật khẩu của user đó, khi không đăng nhập được qua socket
   --repo <url>                 Kho git (mặc định: https://github.com/tampham92/lares.git)
-  --branch <tên>               Nhánh git (mặc định: main)
+  --branch <tên>               Nhánh hoặc tag git (mặc định: tag phát hành mới nhất vX.Y.Z)
   --tarball <url|đường dẫn>    Cài từ file .tar.gz (URL, file:// hoặc đường dẫn trên máy) thay cho git
   --fresh-data                 Có dữ liệu cũ nhưng thiếu file env: sao lưu dữ liệu cũ rồi cài mới
   --no-telemetry               Không gửi ping ẩn danh khi cài/nâng cấp và heartbeat hằng ngày
@@ -170,6 +170,16 @@ step() { echo -e "\n${c_blue}==>${c_off} $*"; }
 ok()   { echo -e "${c_green}✔${c_off} $*"; }
 warn() { echo -e "${c_yellow}!${c_off} $*"; WARNINGS+=("$*"); }
 die()  { echo -e "${c_red}✘ $*${c_off}" >&2; exit 1; }
+# Newest vX.Y.Z[-prerelease] tag of a git repo, in semver order (0.3.0 beats 0.3.0-beta, 0.10.0 beats
+# 0.9.0); prerelease labels compare as text. Prints nothing if there is none or the repo is unreachable.
+latest_release_tag() {
+  git ls-remote --tags --refs "$1" 'v*' 2>/dev/null | awk '{ sub("^refs/tags/", "", $2); print $2 }' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]{1,20})?$' \
+    | awk '{ v = substr($0, 2); pre = "~"; i = index(v, "-")
+             if (i) { pre = "!" substr(v, i + 1); v = substr(v, 1, i - 1) }
+             split(v, n, "."); printf "%09d.%09d.%09d.%s\t%s\n", n[1], n[2], n[3], pre, $0 }' \
+    | LC_ALL=C sort | tail -n 1 | cut -f 2 || true
+}
 trap 'die "$(L "Cài đặt thất bại ở dòng $LINENO (lệnh: $BASH_COMMAND)" "Installation failed at line $LINENO (command: $BASH_COMMAND)")"' ERR
 # `|| true`: with pipefail, tr dies of SIGPIPE once head has enough bytes
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-24}" || true; }
@@ -514,12 +524,25 @@ if [[ -n "$LARES_TARBALL" ]]; then
   [[ -f "$inner/package.json" && -d "$inner/apps/server" ]] || { rm -rf "$tmp"; die "$(L 'File tarball không chứa mã nguồn Lares' 'The tarball does not contain the Lares source code'): $LARES_TARBALL"; }
   rsync -a --delete --exclude node_modules "$inner/" "$SRC/"
   rm -rf "$tmp"
-elif [[ -d "$SRC/.git" ]]; then
-  git -C "$SRC" fetch --depth 1 origin "$LARES_BRANCH"
-  git -C "$SRC" reset --hard FETCH_HEAD
 else
-  rm -rf "$SRC"   # e.g. an earlier --tarball install: git clone needs an empty directory
-  git clone --depth 1 --branch "$LARES_BRANCH" "$LARES_REPO" "$SRC"
+  # Releases are vX.Y.Z tags: code pushed to main reaches nobody until it is tagged. The panel's
+  # update check and its "Upgrade" button look at the same tags.
+  if [[ -z "$LARES_BRANCH" ]]; then
+    repo_url="$LARES_REPO"
+    [[ -d "$SRC/.git" ]] && repo_url=$(git -C "$SRC" remote get-url origin 2>/dev/null || echo "$LARES_REPO")
+    LARES_BRANCH=$(latest_release_tag "$repo_url")
+    if [[ -z "$LARES_BRANCH" ]]; then
+      LARES_BRANCH=main
+      warn "$(L 'Không tìm thấy tag phát hành (vX.Y.Z), dùng nhánh main' 'No release tag (vX.Y.Z) found, using the main branch')"
+    fi
+  fi
+  if [[ -d "$SRC/.git" ]]; then
+    git -C "$SRC" fetch --depth 1 origin "$LARES_BRANCH"
+    git -C "$SRC" reset --hard FETCH_HEAD
+  else
+    rm -rf "$SRC"   # e.g. an earlier --tarball install: git clone needs an empty directory
+    git clone --depth 1 --branch "$LARES_BRANCH" "$LARES_REPO" "$SRC"
+  fi
 fi
 LARES_VERSION=$(/usr/bin/node -p 'require(process.argv[1]).version' "$SRC/package.json" 2>/dev/null || echo unknown)
 ok "$(L 'Mã nguồn tại' 'Source code in') $SRC (Lares $LARES_VERSION)"

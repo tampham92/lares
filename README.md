@@ -62,7 +62,7 @@ Installer **phát hiện và dùng lại** các dịch vụ đang có, không c�
 | PHP-FPM | Dùng lại, không sửa `php.ini` của các phiên bản đã có |
 | Node.js cũ hơn 20 trong `/usr/bin` | Được nâng lên Node 22 (Lares cần ≥ 20). Node cài qua nvm không bị ảnh hưởng |
 
-> Mặc định script lấy mã nguồn từ `https://github.com/tampham92/lares` (nhánh `main`). Muốn dùng fork hoặc nhánh khác: `--repo <git-url> --branch <nhánh>`, hoặc `--tarball <url .tar.gz>`.
+> Mặc định script cài tag phát hành mới nhất (`vX.Y.Z`) của `https://github.com/tampham92/lares`. Muốn dùng fork, nhánh `main` hoặc tag khác: `--repo <git-url> --branch <nhánh-hoặc-tag>`, hoặc `--tarball <url .tar.gz>`.
 
 ### Cập nhật Lares có mất dữ liệu không?
 
@@ -73,7 +73,7 @@ Không. Chạy lại đúng lệnh cài đặt; installer nhận ra `/etc/lares/
 - Trước khi khởi động lại, installer tự sao lưu `/etc/lares` + database SQLite + template riêng vào `/var/lib/lares/backups/` (giữ 5 bản gần nhất).
 - Đừng sửa trực tiếp file trong `/opt/lares/src` (bị ghi đè khi cập nhật); template riêng đặt ở `/var/lib/lares/templates/`.
 - Port, phiên bản PHP, ngôn ngữ và lựa chọn thống kê ẩn danh đã chọn lúc cài được giữ nguyên, trừ khi bạn truyền lại `--port`/`--php`/`--lang`.
-- Phiên bản đang chạy hiện ở cuối thanh bên. Mỗi ngày panel kiểm tra GitHub một lần, khi có bản mới sẽ hiện **Có bản mới x.y.z** kèm lệnh nâng cấp. Danh sách thay đổi: [CHANGELOG.md](CHANGELOG.md).
+- Phiên bản đang chạy hiện ở cuối thanh bên. Mỗi ngày panel kiểm tra các tag phát hành `vX.Y.Z` trên GitHub, khi có bản mới sẽ hiện **Có bản mới x.y.z**. Nâng cấp bằng nút trong **Cài đặt → Cập nhật** hoặc bằng lệnh trên; tắt việc kiểm tra cũng ở đó. Danh sách thay đổi: [CHANGELOG.md](CHANGELOG.md).
 
 ### Tài khoản quản trị
 

@@ -10,6 +10,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   compareVersions,
+  pickLatestTag,
+  RELEASE_REPO,
   SEMVER_RE,
   TELEMETRY_URL,
   UPGRADE_COMMAND,
@@ -46,8 +48,12 @@ function readVersion(): string {
 export const VERSION = readVersion();
 
 export const releaseSettings = {
-  updateCheck: () => !off(env('LARES_UPDATE_CHECK')),
-  updateUrl: () => env('LARES_UPDATE_URL') || 'https://raw.githubusercontent.com/tampham92/lares/main/package.json',
+  /** LARES_UPDATE_CHECK=0 in the env file turns the check off for good (the Settings toggle is locked). */
+  updateCheckLocked: () => off(env('LARES_UPDATE_CHECK')),
+  updateCheck: () => !releaseSettings.updateCheckLocked() && getSetting<boolean>('release.updateCheck', true),
+  /** owner/name of the repository releases (vX.Y.Z tags) come from; a fork can point to its own. */
+  repo: () => env('LARES_UPDATE_REPO') || RELEASE_REPO,
+  updateUrl: () => env('LARES_UPDATE_URL') || `https://api.github.com/repos/${releaseSettings.repo()}/tags?per_page=100`,
   telemetry: () => !off(env('LARES_TELEMETRY')),
   telemetryUrl: () => env('LARES_TELEMETRY_URL') || TELEMETRY_URL,
   installIdFile: () => env('LARES_INSTALL_ID_FILE') || '/etc/lares/install-id',
@@ -59,21 +65,43 @@ interface UpdateState {
 }
 
 export function versionInfo(): VersionInfo {
+  // `latest` comes from the daily check or from "Check now"; turning the check off clears it.
   const s = getSetting<UpdateState>('release.update', { latest: null, checkedAt: null });
-  const latest = releaseSettings.updateCheck() ? s.latest : null;
+  const latest = s.latest;
   return {
     version: VERSION,
     latest,
     updateAvailable: !!latest && compareVersions(latest, VERSION) > 0,
     checkedAt: latest ? s.checkedAt : null,
     upgradeCommand: UPGRADE_COMMAND,
+    updateCheck: releaseSettings.updateCheck(),
+    updateCheckLocked: releaseSettings.updateCheckLocked(),
     telemetry: releaseSettings.telemetry(),
   };
 }
 
+/** Settings toggle for the daily check. Off also drops the known release, so no notice stays behind. */
+export function setUpdateCheck(enabled: boolean): VersionInfo {
+  setSetting('release.updateCheck', enabled);
+  if (!enabled) setSetting('release.update', { latest: null, checkedAt: null });
+  return versionInfo();
+}
+
+/** "Check now" in Settings: works even with the daily check off, since the admin asked for it. */
+export async function checkForUpdate(fetchFn: Fetch = fetch): Promise<VersionInfo> {
+  const s = getSetting<UpdateState>('release.update', { latest: null, checkedAt: null });
+  const latest = await fetchLatestVersion(fetchFn);
+  setSetting('release.update', { latest: latest ?? s.latest, checkedAt: new Date().toISOString() });
+  return versionInfo();
+}
+
 type Fetch = typeof fetch;
 
-/** Reads `version` from package.json on GitHub `main`; null on any problem. */
+/**
+ * Newest release: the highest vX.Y.Z tag from the GitHub tags API (what install.sh installs too), so
+ * code pushed to main reaches nobody until it is tagged. LARES_UPDATE_URL may instead point to a
+ * package.json ({ "version": ... }). Null on any problem.
+ */
 export async function fetchLatestVersion(fetchFn: Fetch = fetch, timeoutMs = 10_000): Promise<string | null> {
   try {
     const res = await fetchFn(releaseSettings.updateUrl(), {
@@ -81,7 +109,12 @@ export async function fetchLatestVersion(fetchFn: Fetch = fetch, timeoutMs = 10_
       headers: { 'User-Agent': `lares/${VERSION}`, Accept: 'application/json' },
     });
     if (!res.ok) return null;
-    const v = ((await res.json()) as { version?: unknown }).version;
+    const body = (await res.json()) as unknown;
+    if (Array.isArray(body)) {
+      const names = body.map((tag) => (tag as { name?: unknown } | null)?.name);
+      return pickLatestTag(names.filter((n): n is string => typeof n === 'string'));
+    }
+    const v = (body as { version?: unknown } | null)?.version;
     return typeof v === 'string' && v.length <= 32 && SEMVER_RE.test(v) ? v : null;
   } catch {
     return null;

@@ -28,8 +28,8 @@ Thanh bên hiện **Có bản mới x.y.z** kèm lệnh nâng cấp. Phiên bả
 Chỉ một bộ đếm ẩn danh: mã cài đặt ngẫu nhiên, phiên bản Lares, sự kiện (install/upgrade/heartbeat), tên
 và phiên bản hệ điều hành, kiến trúc CPU, ngôn ngữ panel. Không gửi IP, tên miền hay dữ liệu site. Tắt
 bằng `--no-telemetry` hoặc `LARES_TELEMETRY=0`, xem
-[Thống kê ẩn danh](installation.md#thống-kê-ẩn-danh-telemetry). Việc kiểm tra bản mới mỗi ngày chỉ tải
-file `package.json` từ GitHub. Muốn tắt, đặt `LARES_UPDATE_CHECK=0`.
+[Thống kê ẩn danh](installation.md#thống-kê-ẩn-danh-telemetry). Việc kiểm tra bản mới mỗi ngày chỉ đọc
+danh sách tag phát hành trên GitHub. Muốn tắt, vào **Cài đặt → Cập nhật**, hoặc đặt `LARES_UPDATE_CHECK=0`.
 
 **Đổi port của panel thế nào?**
 Chạy `curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --port 9443`. Đây là một lần nâng

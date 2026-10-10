@@ -85,3 +85,9 @@ inline scripts, so a script tag or bookmarklet will not work.
 
 `CHANGELOG.md` follows Keep a Changelog: add user-facing changes under `[Unreleased]`. The version in
 the root `package.json` is what the panel reports (CI checks it).
+
+A release is a `vX.Y.Z` tag (same version as `package.json`): the installer installs the newest tag and
+the panel's update check and **Upgrade** button look at the tags, so pushing to `main` reaches no user
+until it is tagged. To release: move `[Unreleased]` to the new version in `CHANGELOG.md`, bump the
+version in every `package.json`, commit, `git tag vX.Y.Z && git push origin vX.Y.Z`, then publish a
+GitHub Release for the tag.

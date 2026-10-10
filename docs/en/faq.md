@@ -29,8 +29,8 @@ the bottom of the sidebar.
 Only an anonymous counter: a random install id, the Lares version, the event
 (install/upgrade/heartbeat), OS + version, architecture and panel language. No IPs, domains or site
 data. Turn it off with `--no-telemetry` or `LARES_TELEMETRY=0`. See
-[Telemetry](installation.md#telemetry). The daily update check only downloads `package.json`
-from GitHub. Turn it off with `LARES_UPDATE_CHECK=0`.
+[Telemetry](installation.md#telemetry). The daily update check only reads the list of release
+tags from GitHub. Turn it off in **Settings → Updates**, or with `LARES_UPDATE_CHECK=0`.
 
 **How do I change the panel port?**
 `curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --port 9443`. This is an upgrade, so

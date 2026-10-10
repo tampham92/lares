@@ -55,7 +55,7 @@ Việc cần làm ngay sau lần đăng nhập đầu tiên:
 | `--node <major>` | `NODE_MAJOR` | `22` | Phiên bản Node.js, chỉ dùng khi chưa có `/usr/bin/node` hoặc bản đang có cũ hơn 20 |
 | `--mysql-root-user <user>` | `MYSQL_ROOT_USER` | `root` | Tài khoản quản trị của MySQL/MariaDB đang có |
 | `--mysql-root-password <mk>` | `MYSQL_ROOT_PASSWORD` | | Mật khẩu của tài khoản đó, khi không đăng nhập được qua socket |
-| `--repo <url>` / `--branch <tên>` | `LARES_REPO` / `LARES_BRANCH` | GitHub `main` | Cài từ fork hoặc nhánh khác |
+| `--repo <url>` / `--branch <tên>` | `LARES_REPO` / `LARES_BRANCH` | tag `vX.Y.Z` mới nhất | Cài từ fork, một nhánh (`main`) hoặc tag khác |
 | `--tarball <url\|đường dẫn>` | `LARES_TARBALL` | | Cài từ file `.tar.gz` (https://, file:// hoặc đường dẫn trên máy) thay cho git |
 | `--fresh-data` | | | Có dữ liệu cũ nhưng thiếu `/etc/lares/lares.env`: chuyển dữ liệu cũ sang chỗ khác rồi cài mới |
 | `--no-telemetry` | `LARES_TELEMETRY=0` | bật | Tắt bộ đếm cài đặt ẩn danh, xem [Thống kê ẩn danh](#thống-kê-ẩn-danh-telemetry) |
@@ -91,10 +91,16 @@ curl -sSL https://lares.thocode.dev/install | sudo bash
   lựa chọn thống kê ẩn danh đã lưu.
 - Trước khi nâng cấp, installer sao lưu `/etc/lares`, database SQLite và template riêng vào
   `/var/lib/lares/backups/`, giữ 5 bản mới nhất. Xem [Sao lưu](backups.md#dữ-liệu-của-chính-lares).
-- Mỗi ngày panel kiểm tra GitHub một lần. Khi có phiên bản mới, thanh bên hiện **Có bản mới x.y.z**
-  kèm lệnh nâng cấp ở trên. Danh sách thay đổi nằm trong [CHANGELOG.md](../../CHANGELOG.md). Muốn
-  tắt việc kiểm tra: đặt `LARES_UPDATE_CHECK=0` trong `/etc/lares/lares.env` rồi chạy
-  `systemctl restart lares`.
+- Hoặc nâng cấp ngay trong panel: **Cài đặt → Cập nhật → Nâng cấp lên vX.Y.Z**. Panel chạy đúng
+  installer của bản phát hành đó trong một unit systemd riêng (`lares-upgrade`), nên việc panel khởi
+  động lại không làm dừng quá trình nâng cấp. Trang hiện log và tự kết nối lại khi panel chạy bản mới.
+  Nếu lỗi, bản cũ vẫn chạy và lệnh ở trên vẫn dùng được.
+- Mỗi bản phát hành là một tag `vX.Y.Z` trên GitHub. Installer cài tag mới nhất chứ không cài nhánh
+  `main`; muốn cài nhánh hay tag khác thì dùng `--branch main` (hoặc tên nhánh, tên tag).
+- Mỗi ngày panel kiểm tra các tag phát hành trên GitHub một lần. Khi có bản mới, thanh bên hiện
+  **Có bản mới x.y.z**. Danh sách thay đổi nằm trong [CHANGELOG.md](../../CHANGELOG.md). Tắt việc
+  kiểm tra hằng ngày trong **Cài đặt → Cập nhật** (nút **Kiểm tra ngay** vẫn dùng được), hoặc tắt
+  hẳn bằng `LARES_UPDATE_CHECK=0` trong `/etc/lares/lares.env` rồi chạy `systemctl restart lares`.
 
 Khi nâng cấp lên 0.2.0-beta, mọi người dùng bị đăng xuất một lần. Đây là điều bình thường, vì phiên
 đăng nhập giờ có thể bị thu hồi.
@@ -121,7 +127,7 @@ gửi một ping ẩn danh rất nhỏ. **Ping chỉ gồm các trường sau:**
 | Trường | Ví dụ | Ghi chú |
 |---|---|---|
 | `install_id` | `0b5c3f9e-2f4b-…` | UUID ngẫu nhiên, tạo một lần, lưu ở `/etc/lares/install-id`. Không suy ra từ phần cứng |
-| `version` | `0.2.0-beta` | Phiên bản Lares |
+| `version` | `0.3.0-beta` | Phiên bản Lares |
 | `event` | `install` / `upgrade` / `heartbeat` | |
 | `os`, `os_version` | `ubuntu`, `24.04` | Lấy từ `/etc/os-release` |
 | `arch` | `amd64` | Kiến trúc CPU |
