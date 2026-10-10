@@ -22,6 +22,7 @@ import * as backups from './backups.js';
 import { host, type HostLogger } from './host.js';
 import * as sites from './sites.js';
 import type { TaskInfo } from './tasks.js';
+import { reloadSitePhp, runAsOf } from './isolation.js';
 import { wpCliAsWebUser } from './wordpress.js';
 import { markLogs, takeHealth } from './wpHealth.js';
 import * as policy from './wpUpdatePolicy.js';
@@ -50,7 +51,7 @@ async function requireWpCli() {
 /** wp-cli as the web user (site code is untrusted), plugins and themes not loaded. */
 const wp = (site: Site, args: string, opts: { timeoutMs?: number; log?: HostLogger } = {}) => {
   let partial = '';
-  return host.exec(wpCliAsWebUser(site.webRoot, site.rootPath, args), {
+  return host.exec(wpCliAsWebUser(site.webRoot, runAsOf(site), args), {
     timeoutMs: opts.timeoutMs ?? WP_TIMEOUT,
     // stream wp-cli progress ("Downloading update...") into the task log, without the JSON summary
     onOutput: opts.log
@@ -406,7 +407,7 @@ interface Verdict {
 /** Health after the update, compared with the baseline; a failing check is repeated once to rule out a blip. */
 async function verify(site: Site, baseline: policy.HealthSnapshot, before: WpInventory, items: WpUpdateItem[], log: HostLogger): Promise<Verdict> {
   // fresh PHP code: drop opcache entries of the replaced files (graceful reload)
-  if (site.phpVersion) await host.mutate(`systemctl reload ${shq(`php${site.phpVersion}-fpm`)}`, { log }).catch(() => undefined);
+  if (site.phpVersion) await reloadSitePhp(site, log).catch(() => undefined);
   await pause(3000);
   let inventory: WpInventory | null = null;
   try {

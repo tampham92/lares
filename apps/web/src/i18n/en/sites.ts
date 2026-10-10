@@ -208,4 +208,27 @@ export const SITES_EN: Dict = {
   'Mỗi dòng KEY=value': 'One KEY=value per line',
   'Tạo database MySQL cho site': 'Create a MySQL database for the site',
   'Tạo website': 'Create site',
+
+  // ---- isolation card (components/IsolationCard.tsx) ----
+  'Cách ly site': 'Site isolation',
+  'Đã cách ly': 'Isolated',
+  'Dùng chung user': 'Shared user',
+  'Site chạy bằng user Linux riêng: site khác trên máy chủ không đọc hay ghi được file của site này, kể cả khi bị nhiễm mã độc.':
+    "The site runs as its own Linux user: other sites on this server cannot read or change its files, even when they are infected with malware.",
+  'User hệ thống': 'System user',
+  'đã dừng': 'stopped',
+  'Kết nối ra ngoài': 'Outgoing connections',
+  'chưa chặn (thiếu nftables)': 'not restricted (nftables missing)',
+  'Chặn gửi mail trực tiếp (cổng 25), metadata của cloud và cổng panel': 'Direct mail (port 25), the cloud metadata service and the panel ports are blocked',
+  'Cho phép PHP chạy lệnh hệ thống (exec, shell_exec, proc_open...)': 'Allow PHP to run system commands (exec, shell_exec, proc_open...)',
+  'Nên tắt: webshell cần các hàm này để chạy lệnh trên máy chủ. Chỉ bật khi plugin thật sự cần chương trình ngoài (tạo PDF, tối ưu ảnh bằng công cụ dòng lệnh). Đổi xong PHP-FPM của site khởi động lại.':
+    "Best left off: a webshell needs these functions to run commands on the server. Only turn it on when a plugin really needs an external program (PDF generation, command-line image optimisers). The site's PHP-FPM restarts after a change.",
+  'Site được tạo trước khi có tính năng cách ly nên vẫn chạy bằng user chung {user}: một site khác bị nhiễm mã độc có thể đọc và sửa file của site này.':
+    'This site was created before isolation existed and still runs as the shared user {user}: another site infected with malware can read and change its files.',
+  'Lần chuyển trước thất bại, site đã được đưa về như cũ: {error}': 'The last conversion failed and the site was put back as it was: {error}',
+  'Tính năng cách ly đang tắt trên máy chủ này (LARES_SITE_ISOLATION=0).': 'Isolation is turned off on this server (LARES_SITE_ISOLATION=0).',
+  'Thử cách ly lại': 'Retry isolation',
+  'Cách ly ngay': 'Isolate now',
+  'Tạo user riêng, PHP-FPM riêng rồi chuyển quyền file. Site vẫn chạy trong lúc chuyển; lỗi thì tự đưa về như cũ.':
+    'Creates its own user and PHP-FPM, then hands the files over. The site stays online meanwhile; on any error it is put back as it was.',
 };

@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { LOCALHOST, type AppType, type CreateSiteInput, type CreateSiteResult, type IssueSslInput, type Site, type SslState } from '@lares/shared';
 import { config } from '../config.js';
-import { db } from '../db/index.js';
+import { db, nowIso } from '../db/index.js';
 import { t, tDefault } from '../i18n/index.js';
 import { decrypt, encrypt, randomPassword } from '../lib/crypto.js';
 import { conflict, errorMessage, notFound } from '../lib/errors.js';
@@ -11,6 +11,7 @@ import { UndoStack } from '../lib/undo.js';
 import * as databases from './databases.js';
 import * as githubApp from './githubApp.js';
 import { host, type HostLogger } from './host.js';
+import * as isolation from './isolation.js';
 import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type VhostSpec } from './nginx.js';
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
@@ -37,6 +38,9 @@ interface SiteRow {
   status: 'active' | 'disabled';
   migration_id: number | null;
   created_at: string;
+  sys_user: string | null;
+  php_exec_allowed: number;
+  isolation_error: string | null;
 }
 
 const toSite = (r: SiteRow): Site => ({
@@ -54,6 +58,8 @@ const toSite = (r: SiteRow): Site => ({
   accessLog: r.access_log === 1,
   migrationId: r.migration_id,
   createdAt: r.created_at,
+  sysUser: r.sys_user,
+  phpExecAllowed: r.php_exec_allowed === 1,
 });
 
 const PHP_TYPES: AppType[] = ['wordpress', 'laravel', 'php', 'unknown'];
@@ -108,6 +114,7 @@ export function vhostSpecFor(site: Site): VhostSpec {
     appType: site.appType,
     webRoot: site.webRoot,
     phpVersion: site.phpVersion,
+    phpSocket: usesPhp(site.appType) ? isolation.phpSocketFor(site) : null,
     appPort: site.appPort,
     listenPort: site.listenPort,
     accessLog: site.accessLog,
@@ -119,17 +126,31 @@ export function vhostSpecFor(site: Site): VhostSpec {
 
 export const applySiteVhost = (site: Site, log?: HostLogger) => applyVhost(vhostSpecFor(site), log);
 
-export const fixPermissions = (rootPath: string, log?: HostLogger) =>
-  host.mutate(
-    [
-      `chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(rootPath)}`,
-      `find ${shq(rootPath)} -type d -exec chmod 755 {} +`,
-      `find ${shq(rootPath)} -type f -not -perm -u+x -exec chmod 644 {} +`,
-      // never keep setuid/setgid binaries that arrived inside a migrated archive
-      `find ${shq(rootPath)} -type f -perm /6000 -exec chmod ug-s {} +`,
-    ].join(' && '),
-    { log, timeoutMs: 30 * 60_000 },
+/** Owner and modes of a site folder: its own user (0750/0640), or the shared web user for older sites. */
+export const fixPermissions = isolation.fixPermissions;
+
+/** Isolation error recorded by the upgrade (null = none). */
+export function siteIsolationError(id: number): string | null {
+  const row = db.prepare('SELECT isolation_error FROM sites WHERE id = ?').get(id) as { isolation_error: string | null } | undefined;
+  return row?.isolation_error ?? null;
+}
+
+/** Sites the upgrade could not isolate, with when it failed (notification center). */
+export function isolationFailures(): Array<{ id: number; domain: string; error: string; at: string }> {
+  return db
+    .prepare("SELECT id, domain, isolation_error AS error, COALESCE(isolation_error_at, created_at) AS at FROM sites WHERE isolation_error IS NOT NULL AND sys_user IS NULL ORDER BY id")
+    .all() as Array<{ id: number; domain: string; error: string; at: string }>;
+}
+
+export function setSiteIsolation(id: number, v: { sysUser: string | null; phpExecAllowed?: boolean; error?: string | null }) {
+  db.prepare('UPDATE sites SET sys_user = ?, php_exec_allowed = COALESCE(?, php_exec_allowed), isolation_error = ?, isolation_error_at = ? WHERE id = ?').run(
+    v.sysUser,
+    v.phpExecAllowed === undefined ? null : v.phpExecAllowed ? 1 : 0,
+    v.error ?? null,
+    v.error ? nowIso() : null,
+    id,
   );
+}
 
 export interface ProvisionInput {
   domain: string;
@@ -143,6 +164,8 @@ export interface ProvisionInput {
   allowExistingDir?: boolean;
   /** No domain: serve on a public port instead (domain must then be the synthetic `siteNNNN.localhost`). */
   listenPort?: number | null;
+  /** exec() & co. in the site's PHP (isolated sites only). Off unless copied from a clone's source. */
+  phpExecAllowed?: boolean;
 }
 
 /** Synthetic, unique identifier for port-based sites; doubles as directory / vhost / log name. */
@@ -197,6 +220,20 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
     );
   const siteId = Number(info.lastInsertRowid);
   undo.push(t('xoá bản ghi site {domain}', { domain: input.domain }), async () => db.prepare('DELETE FROM sites WHERE id = ?').run(siteId));
+
+  if (config.siteIsolation) {
+    // Own Linux user and PHP-FPM before the vhost: the nginx reload that applies the vhost is also
+    // what gives nginx's workers the site's group.
+    const user = await isolation.ensureSiteUser(siteId, layout.rootPath, log);
+    undo.push(t('xoá user {user}', { user }), () => isolation.removeSiteUser(user, log));
+    setSiteIsolation(siteId, { sysUser: user, phpExecAllowed: input.phpExecAllowed ?? false });
+    if (usesPhp(input.appType)) {
+      undo.push(t('xoá PHP-FPM của site {domain}', { domain: input.domain }), () => isolation.removeSitePhp(siteId, log));
+      await isolation.applySitePhp(getSite(siteId), log);
+      log(t('Đã khởi động PHP-FPM riêng của site ({service}, user {user})', { service: isolation.phpPathsFor(siteId).unit, user }));
+    }
+    await isolation.syncSiteFirewall(log);
+  }
 
   const site = getSite(siteId);
   await applySiteVhost(site, log);
@@ -284,17 +321,17 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
       case 'nextjs': {
         undo.push(t('xoá service {name}', { name: nodeapp.serviceName(site.domain) }), () => nodeapp.removeService(site.domain, log));
         if (input.nextjs.gitUrl) {
-          await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, await gitRepoFor({ ...input.nextjs, gitUrl: input.nextjs.gitUrl }, log), log);
+          await nodeapp.gitCloneOrPull(site.webRoot, isolation.runAsOf(site), await gitRepoFor({ ...input.nextjs, gitUrl: input.nextjs.gitUrl }, log), log);
           await nodeapp.buildAndRestart({ ...site, appPort: site.appPort! }, input.nextjs, log);
         } else {
-          await nodeapp.writeServiceFiles(site.domain, site.webRoot, site.rootPath, site.appPort!, input.nextjs, log);
+          await nodeapp.writeServiceFiles({ ...site, appPort: site.appPort! }, input.nextjs, log);
           log(t('Chưa có mã nguồn: upload project Next.js vào {dir} rồi bấm "Build & khởi động".', { dir: site.webRoot }));
         }
         break;
       }
     }
 
-    await fixPermissions(site.rootPath, log);
+    await fixPermissions(site, log);
     undo.clear();
     log(t('Hoàn tất tạo site - truy cập: {url}', { url }));
     return { site: getSite(site.id), url, database, wordpressAdmin };
@@ -323,7 +360,7 @@ export async function deploySite(id: number, log: HostLogger, signal?: AbortSign
   const site = getSite(id);
   if (site.appType !== 'nextjs' || !site.appPort) throw conflict(t('Chỉ site Next.js mới có thể build/deploy'));
   const cfg = getNodeConfig(id);
-  if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, site.rootPath, await gitRepoFor({ ...cfg, gitUrl: cfg.gitUrl }, log), log, signal);
+  if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, isolation.runAsOf(site), await gitRepoFor({ ...cfg, gitUrl: cfg.gitUrl }, log), log, signal);
   await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, cfg, log, signal);
   return getSite(id);
 }
@@ -342,6 +379,9 @@ export async function updateSite(
     accessLog: patch.accessLog ?? site.accessLog,
     status: patch.status ?? site.status,
   };
+  const ownPhp = next.sysUser !== null && usesPhp(site.appType);
+  // A new PHP version = a new binary for the site's own master. Re-enabling starts it before nginx sends traffic.
+  if (ownPhp && (next.phpVersion !== site.phpVersion || (next.status === 'active' && site.status === 'disabled'))) await isolation.applySitePhp(next, log);
   await applySiteVhost(next, log);
   db.prepare('UPDATE sites SET aliases_json = ?, php_version = ?, access_log = ?, status = ? WHERE id = ?').run(
     JSON.stringify(next.aliases),
@@ -353,6 +393,8 @@ export async function updateSite(
   if (site.appType === 'nextjs' && patch.status && patch.status !== site.status) {
     await nodeapp.serviceAction(site.domain, patch.status === 'disabled' ? 'stop' : 'start', log);
   }
+  // nginx answers 503 by now: a disabled site needs no PHP workers
+  if (ownPhp && next.status === 'disabled' && site.status === 'active') await isolation.setSitePhpRunning(next, false, log);
   return getSite(id);
 }
 
@@ -402,7 +444,7 @@ export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger
       : t('Đã bật SSL cho {domain}', { domain: site.domain }),
   );
   // An http:// home URL on an https page makes browsers block the theme's CSS/JS (mixed content).
-  if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, site.rootPath, `https://${site.domain}`, log);
+  if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, isolation.runAsOf(site), `https://${site.domain}`, log);
   return getSite(id);
 }
 
@@ -436,7 +478,7 @@ export async function disableSsl(id: number, revoke: boolean, log?: HostLogger) 
 /** One-off repairs for sites created by older Lares versions (runs at startup, idempotent). */
 export async function repairSites(log: HostLogger) {
   for (const s of listSites()) {
-    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
+    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, isolation.siteOwner(s), log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
   }
 }
 
@@ -472,7 +514,7 @@ export async function changeDomain(id: number, input: { domain: string; aliases:
     undo.push(t('xoá vhost {domain}', { domain }), () => removeVhost(domain, log));
 
     if (site.appType === 'nextjs' && site.appPort) {
-      await nodeapp.writeServiceFiles(domain, site.webRoot, site.rootPath, site.appPort, getNodeConfig(id), log);
+      await nodeapp.writeServiceFiles({ ...site, domain, appPort: site.appPort }, getNodeConfig(id), log);
       undo.push(t('xoá service {name}', { name: nodeapp.serviceName(domain) }), () => nodeapp.removeService(domain, log));
       await nodeapp.serviceAction(domain, 'restart', log);
     }
@@ -492,7 +534,7 @@ export async function changeDomain(id: number, input: { domain: string; aliases:
   if (site.listenPort) await ports.closeFirewallPort(site.listenPort, log);
   if (site.ssl.type === 'letsencrypt') await ssl.deleteLetsEncrypt(site.domain, log);
   if (site.ssl.type === 'custom') await ssl.removeCustomCert(site.domain);
-  if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, site.rootPath, `http://${domain}`, log);
+  if (site.appType === 'wordpress') await wordpressReplaceUrl(site.webRoot, isolation.runAsOf(site), `http://${domain}`, log);
 
   log(t('Đã gán tên miền {domains}. Tiếp theo: trỏ bản ghi DNS A về IP máy chủ, rồi cài SSL ở tab SSL.', { domains: [domain, ...input.aliases].join(', ') }));
   return getSite(id);
@@ -523,6 +565,7 @@ export async function deleteSite(
   const site = getSite(id);
   if (site.appType === 'nextjs') await nodeapp.removeService(site.domain, log);
   await removeVhost(site.domain, log);
+  if (site.sysUser && usesPhp(site.appType)) await isolation.removeSitePhp(site.id, log);
   if (site.listenPort) await ports.closeFirewallPort(site.listenPort, log);
   if (site.ssl.type === 'letsencrypt' && opts.revokeSsl) await ssl.deleteLetsEncrypt(site.domain, log);
   if (site.ssl.type === 'custom') await ssl.removeCustomCert(site.domain);
@@ -542,6 +585,14 @@ export async function deleteSite(
     if (!root.startsWith(path.resolve(config.sitesRoot) + path.sep)) throw new Error(t('Từ chối xoá thư mục ngoài {root}: {path}', { root: config.sitesRoot, path: root }));
     await fs.rm(root, { recursive: true, force: true });
     log(t('Đã xoá {path}', { path: root }));
+  } else if (site.sysUser && (await host.exists(site.rootPath))) {
+    // The kept files would otherwise belong to a free uid - the next site user created could get it.
+    await host.mutate(`chown -R -h root:root ${shq(site.rootPath)}`, { log });
+    log(t('Giữ lại {path} (chủ sở hữu chuyển về root)', { path: site.rootPath }));
+  }
+  if (site.sysUser) {
+    await isolation.removeSiteUser(site.sysUser, log).catch((e) => log(t('Cảnh báo: không xoá được user {user}: {error}', { user: site.sysUser!, error: errorMessage(e) })));
+    await isolation.syncSiteFirewall(log);
   }
   if (opts.removeLogs) await fs.rm(siteLogPaths(site.domain).dir, { recursive: true, force: true });
   db.prepare('DELETE FROM sites WHERE id = ?').run(id);

@@ -15,6 +15,7 @@ import {
   SEMVER_RE,
   TELEMETRY_URL,
   UPGRADE_COMMAND,
+  CHANGELOG_URL,
   type TelemetryEvent,
   type TelemetryPayload,
   type VersionInfo,
@@ -22,6 +23,7 @@ import {
 import { config } from '../config.js';
 import { getSetting, setSetting } from '../db/index.js';
 import { defaultLang, t } from '../i18n/index.js';
+import { registerNotificationSource } from './notifications.js';
 
 const DAY = 24 * 3_600_000;
 const env = (key: string) => (process.env[key] ?? '').trim();
@@ -62,12 +64,16 @@ export const releaseSettings = {
 interface UpdateState {
   latest: string | null;
   checkedAt: string | null;
+  /** Panel version that ran the check. Another one (just upgraded) = the answer is stale: check again. */
+  checkedFor?: string;
 }
 
 export function versionInfo(): VersionInfo {
   // `latest` comes from the daily check or from "Check now"; turning the check off clears it.
   const s = getSetting<UpdateState>('release.update', { latest: null, checkedAt: null });
-  const latest = s.latest;
+  // A release published after the last check and installed since (upgrade, reinstall from git) would
+  // otherwise show "newest: 0.2.0" under "running: 0.3.0" until the next daily check.
+  const latest = s.latest && compareVersions(s.latest, VERSION) < 0 ? VERSION : s.latest;
   return {
     version: VERSION,
     latest,
@@ -80,6 +86,28 @@ export function versionInfo(): VersionInfo {
   };
 }
 
+// Bell: a newer release, as long as it is newer than what runs (gone once upgraded).
+registerNotificationSource('release', () => {
+  const v = versionInfo();
+  if (!v.updateAvailable || !v.latest) return [];
+  return [
+    {
+      id: `release:${v.latest}`,
+      kind: 'release',
+      tone: 'info',
+      title: t('Có bản mới {version}', { version: v.latest }),
+      body: t('Bạn đang dùng Lares {version}. Nâng cấp giữ nguyên website, database và tài khoản.', { version: v.version }),
+      createdAt: v.checkedAt ?? new Date().toISOString(),
+      actions: [
+        { label: t('Nâng cấp'), href: '/settings?tab=update' },
+        { label: t('Xem thay đổi'), href: CHANGELOG_URL, external: true },
+      ],
+      command: v.upgradeCommand,
+      dismissible: false,
+    },
+  ];
+});
+
 /** Settings toggle for the daily check. Off also drops the known release, so no notice stays behind. */
 export function setUpdateCheck(enabled: boolean): VersionInfo {
   setSetting('release.updateCheck', enabled);
@@ -91,7 +119,7 @@ export function setUpdateCheck(enabled: boolean): VersionInfo {
 export async function checkForUpdate(fetchFn: Fetch = fetch): Promise<VersionInfo> {
   const s = getSetting<UpdateState>('release.update', { latest: null, checkedAt: null });
   const latest = await fetchLatestVersion(fetchFn);
-  setSetting('release.update', { latest: latest ?? s.latest, checkedAt: new Date().toISOString() });
+  setSetting('release.update', { latest: latest ?? s.latest, checkedAt: new Date().toISOString(), checkedFor: VERSION });
   return versionInfo();
 }
 
@@ -181,10 +209,10 @@ const olderThanADay = (iso: string | null | undefined, now: number) => !iso || n
 export async function releaseTick(log: (m: string) => void, fetchFn: Fetch = fetch, now = Date.now()): Promise<void> {
   if (releaseSettings.updateCheck()) {
     const s = getSetting<UpdateState>('release.update', { latest: null, checkedAt: null });
-    if (olderThanADay(s.checkedAt, now)) {
+    if (olderThanADay(s.checkedAt, now) || (s.checkedAt && s.checkedFor !== VERSION)) {
       const latest = await fetchLatestVersion(fetchFn);
       // A failed check keeps the previous answer but still waits a day before trying again.
-      setSetting('release.update', { latest: latest ?? s.latest, checkedAt: new Date(now).toISOString() });
+      setSetting('release.update', { latest: latest ?? s.latest, checkedAt: new Date(now).toISOString(), checkedFor: VERSION });
       if (latest && compareVersions(latest, VERSION) > 0) log(t('Đã có Lares {latest} (đang chạy {version}). Nâng cấp: {command}', { latest, version: VERSION, command: UPGRADE_COMMAND }));
     }
   }

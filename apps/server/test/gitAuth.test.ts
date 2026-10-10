@@ -48,7 +48,7 @@ describe('asWebUser', () => {
     const prevNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     try {
-      const cmd = host.asWebUser('echo "${LARES_SECRET_TEST-unset}:${NODE_ENV-unset}:$CI"', { cwd: os.tmpdir(), home: os.tmpdir() });
+      const cmd = host.asWebUser('echo "${LARES_SECRET_TEST-unset}:${NODE_ENV-unset}:$CI"', { cwd: os.tmpdir(), home: os.tmpdir(), user: 'www-data' });
       const r = await host.exec(cmd);
       expect(r.stdout.trim()).toBe('unset:unset:1');
     } finally {
@@ -90,7 +90,7 @@ describe('asWebUser proxy', () => {
   it('passes proxy settings through to site commands', async () => {
     process.env.HTTPS_PROXY = 'http://proxy.local:3128';
     try {
-      const r = await host.exec(host.asWebUser('echo "$HTTPS_PROXY"', { cwd: os.tmpdir(), home: os.tmpdir() }));
+      const r = await host.exec(host.asWebUser('echo "$HTTPS_PROXY"', { cwd: os.tmpdir(), home: os.tmpdir(), user: 'www-data' }));
       expect(r.stdout.trim()).toBe('http://proxy.local:3128');
     } finally {
       delete process.env.HTTPS_PROXY;

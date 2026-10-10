@@ -23,11 +23,39 @@ install, port 8686 is open to every IP. Work through this checklist:
   password logs out the other sessions, and `sudo lares reset-password` logs out every session of
   that user.
 - **Site code runs with a clean environment**: npm scripts, `next build`, wp-cli and artisan run as
-  the web user without the panel's environment variables (secret key, admin and MySQL passwords).
+  the site's own user without the panel's environment variables (secret key, admin and MySQL passwords).
 - **GitHub App**: each panel registers its own App (Settings → Integrations → GitHub) with read-only
   access to code. Its private key stays on the server; git only receives a one-hour token scoped to
   the one repo being cloned, through a temporary file that is deleted afterwards.
 - `X-Forwarded-For` is **not trusted** by default (see [Reverse proxy](#running-the-panel-behind-a-reverse-proxy)).
+
+## Per-site isolation
+
+Every site has its own Linux user (`lares-s<id>`) and its own PHP-FPM, so a site infected with malware
+(usually through a vulnerable WordPress plugin) does not spread to the others:
+
+- **Files**: the site folder belongs to the site's user, mode `0750` (files `0640`, `wp-config.php` and
+  `.env` `0600`). Other sites cannot enter it. nginx reads static files through the site's group and
+  does not follow symlinks to files owned by someone else (`disable_symlinks if_not_owner`).
+- **Own PHP-FPM** (`lares-php-<id>.service`): runs as the site's user, with no root process, its own
+  OPcache and sessions. systemd keeps it in a sandbox: read-only system, private `/tmp`, the other
+  sites' folders hidden, Lares' data and secrets inaccessible, and no executing files dropped in the
+  site folder or `/tmp`. Next.js sites get the same sandbox.
+- **System commands**: `exec`, `shell_exec`, `proc_open`... are off for new sites. Turn them back on
+  in the site page → Overview → Site isolation when a plugin really needs them.
+- **Outgoing connections** (nftables, per site user): direct mail on port 25 (spam), the cloud
+  metadata service (169.254.169.254) and the panel/Adminer ports on the machine are blocked. Sending
+  mail through SMTP (587/465) still works.
+- Site users have no password, no shell and are listed in `/etc/cron.deny`: they cannot log in or
+  schedule jobs.
+
+Sites created by an older Lares are converted on upgrade, one at a time. They stay online meanwhile;
+if a step fails or the site answers 5xx after the switch, it is put back as it was and the site page
+shows why, with a retry button. `LARES_SITE_ISOLATION=0` in `/etc/lares/lares.env` turns the feature
+off (new sites then share `www-data` again).
+
+Limit: sites still share the kernel, so a privilege escalation to root bypasses every layer above.
+Let the server install security updates automatically (see [Updates](#updates)).
 
 ## Two-factor authentication (2FA)
 

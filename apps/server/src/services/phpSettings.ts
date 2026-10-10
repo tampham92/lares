@@ -160,7 +160,7 @@ export interface ServerPhp {
  * Read /etc/php/<v>/fpm: php.ini, then conf.d/*.ini (later files win, like PHP's scan order), then
  * the pool serving `socket` (php_value / php_admin_value). Missing files fall back to PHP defaults.
  */
-export async function readServerPhp(version: string, socket: string, etcPhp = '/etc/php'): Promise<ServerPhp> {
+export async function readServerPhp(version: string, socket: string, etcPhp = '/etc/php', ownPoolFiles?: string[]): Promise<ServerPhp> {
   const fpm = path.join(etcPhp, version, 'fpm');
   const read = (f: string) => fs.readFile(f, 'utf8').catch(() => '');
   const ini = parseIni(await read(path.join(fpm, 'php.ini')));
@@ -168,10 +168,11 @@ export async function readServerPhp(version: string, socket: string, etcPhp = '/
   for (const f of confd) for (const [k, v] of parseIni(await read(path.join(fpm, 'conf.d', f)))) ini.set(k, v);
 
   let pool: PoolOverrides = { admin: new Map(), value: new Map() };
-  const poolFiles = (await fs.readdir(path.join(fpm, 'pool.d')).catch(() => [] as string[])).filter((f) => f.endsWith('.conf')).sort();
+  // An isolated site has its own php-fpm.conf (services/isolation.ts); the version's pool.d does not serve it.
+  const poolFiles = ownPoolFiles ?? (await fs.readdir(path.join(fpm, 'pool.d')).catch(() => [] as string[])).filter((f) => f.endsWith('.conf')).sort().map((f) => path.join(fpm, 'pool.d', f));
   let fallback: PoolOverrides | null = null;
   for (const f of poolFiles) {
-    for (const [name, p] of parsePoolFile(await read(path.join(fpm, 'pool.d', f)))) {
+    for (const [name, p] of parsePoolFile(await read(f))) {
       if (p.listen && path.resolve(p.listen) === path.resolve(socket)) pool = p.overrides;
       if (name === 'www') fallback = p.overrides;
     }

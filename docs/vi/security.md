@@ -22,11 +22,39 @@ cài, port 8686 mở cho mọi IP. Hãy làm lần lượt danh sách sau:
 - **Thu hồi phiên đăng nhập**: nút **Cài đặt → Phiên đăng nhập → Đăng xuất mọi nơi** kết thúc mọi phiên. Đổi mật khẩu
   sẽ đăng xuất các phiên khác. `sudo lares reset-password` đăng xuất mọi phiên của tài khoản đó.
 - **Code của site chạy với môi trường sạch**: npm script, `next build`, wp-cli và artisan chạy dưới
-  web user và không thấy biến môi trường của panel (khoá bí mật, mật khẩu admin và MySQL).
+  user riêng của site và không thấy biến môi trường của panel (khoá bí mật, mật khẩu admin và MySQL).
 - **GitHub App**: mỗi panel tự đăng ký một App riêng (Cài đặt → Tích hợp → GitHub), chỉ có quyền đọc
   code. Khoá bí mật nằm trên máy chủ; git chỉ nhận token sống 1 giờ, giới hạn đúng repo đang clone,
   qua một file tạm bị xoá ngay sau đó.
 - Mặc định panel **không tin** header `X-Forwarded-For`. Xem phần [Reverse proxy](#đặt-panel-sau-reverse-proxy).
+
+## Cách ly từng site
+
+Mỗi site có user Linux riêng (`lares-s<id>`) và PHP-FPM riêng, nên một site bị nhiễm mã độc (thường
+qua plugin WordPress có lỗ hổng) không lan sang site khác:
+
+- **File**: thư mục site thuộc user của site, quyền `0750` (file `0640`, `wp-config.php` và `.env`
+  `0600`). Site khác không vào được thư mục này. nginx đọc file tĩnh qua nhóm của site và không đi theo
+  symlink trỏ sang file của người khác (`disable_symlinks if_not_owner`).
+- **PHP-FPM riêng** (`lares-php-<id>.service`): chạy bằng user của site, không có tiến trình root,
+  OPcache và session riêng. systemd khoá nó trong sandbox: hệ thống chỉ đọc, `/tmp` riêng, thư mục các
+  site khác bị ẩn, dữ liệu và bí mật của Lares không truy cập được, không chạy được file đặt trong thư
+  mục site hay `/tmp`. Site Next.js có cùng sandbox.
+- **Lệnh hệ thống**: `exec`, `shell_exec`, `proc_open`... bị tắt với site mới. Bật lại ở trang site →
+  Tổng quan → Cách ly site nếu plugin thật sự cần.
+- **Kết nối ra ngoài** (nftables, theo user của site): chặn gửi mail trực tiếp qua cổng 25 (spam), dịch
+  vụ metadata của cloud (169.254.169.254) và cổng panel/Adminer trên máy. Gửi mail qua SMTP (587/465)
+  vẫn dùng được.
+- User của site không có mật khẩu, không có shell và nằm trong `/etc/cron.deny`: không đăng nhập hay
+  đặt lịch chạy được.
+
+Site tạo bằng bản Lares cũ được tự chuyển sang khi nâng cấp, từng site một. Site vẫn chạy trong lúc
+chuyển; nếu một bước lỗi hoặc site trả về lỗi 5xx sau khi chuyển, site được đưa về như cũ và trang site
+ghi lại lý do kèm nút thử lại. `LARES_SITE_ISOLATION=0` trong `/etc/lares/lares.env` tắt tính năng này
+(site mới lại dùng chung `www-data`).
+
+Giới hạn: các site vẫn dùng chung kernel, nên lỗ hổng leo thang lên root vượt qua mọi lớp trên. Hãy để
+máy chủ tự cập nhật bản vá bảo mật (xem [Cập nhật](#cập-nhật)).
 
 ## Xác thực 2 lớp (2FA)
 

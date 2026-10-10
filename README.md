@@ -203,13 +203,13 @@ Nơi lưu trên VPS: dữ liệu `/var/lib/lares` (SQLite, secret), site `/var/w
 
 - Mật khẩu SSH/DB nguồn, mật khẩu DB và biến môi trường Next.js được mã hoá AES-256-GCM trong SQLite.
 - Mọi tham số shell đều được quote; tên miền, đường dẫn và excludes được validate bằng Zod ở cả server lẫn web.
-- Code và dump SQL từ site migrate về được coi là **không tin cậy**: import SQL bằng user riêng của site (không dùng root), wp-cli/artisan/npm chạy bằng `www-data`, gỡ bit setuid/setgid, giải nén với `--no-same-owner`.
+- Code và dump SQL từ site migrate về được coi là **không tin cậy**: import SQL bằng user riêng của site (không dùng root), wp-cli/artisan/npm chạy bằng user riêng của site, gỡ bit setuid/setgid, giải nén với `--no-same-owner`.
+- **Cách ly từng site**: mỗi site có user Linux và PHP-FPM riêng trong sandbox systemd, tường lửa chặn gửi mail trực tiếp và metadata của cloud. Một site bị nhiễm mã độc không đọc hay sửa được site khác. Chi tiết: [docs/vi/security.md](docs/vi/security.md#cách-ly-từng-site).
 - Host key SSH được ghim sau lần *Kiểm tra kết nối*; nếu key đổi thì dừng lại.
 - Trang quản trị chạy HTTPS (chứng chỉ tự ký, hoặc Let's Encrypt khi đặt tên miền cho trang quản trị), có xác thực 2 lớp, giới hạn IP, chống dò mật khẩu, thu hồi phiên đăng nhập; token SSE được che trong log. Hướng dẫn: [docs/vi/security.md](docs/vi/security.md).
 
 ## Giới hạn hiện tại
 
-- Mọi site chạy chung user `www-data` (chưa tách user/PHP-FPM pool riêng cho từng site).
 - Chuyển database chỉ hỗ trợ MySQL/MariaDB; site Next.js dùng DB ngoài (Postgres, Mongo...) cần tự chuyển DB đó.
 - Biến môi trường bí mật của Next.js không nằm trong mã nguồn (ví dụ trong process manager của panel cũ) cần được nhập lại.
 - Bản sao lưu hiện chỉ lưu trên chính VPS; hãy tự chép ra ngoài.

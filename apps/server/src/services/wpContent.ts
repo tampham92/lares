@@ -8,6 +8,7 @@ import { conflict } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import type { SiteContext } from './ai.js';
 import { host, type HostLogger } from './host.js';
+import { runAsOf, siteOwner } from './isolation.js';
 import { wpCliAsWebUser } from './wordpress.js';
 
 /*
@@ -92,8 +93,9 @@ async function wpEval<T>(site: Site, php: string, payload?: unknown): Promise<T>
   try {
     await host.writeFile(script, php, 0o640);
     if (payload !== undefined) await host.writeFile(data, JSON.stringify(payload), 0o640);
-    await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(script)}${payload !== undefined ? ` ${shq(data)}` : ''}`);
-    const out = await host.run(wpCliAsWebUser(site.webRoot, site.rootPath, `eval-file ${shq(script)}${payload !== undefined ? ` ${shq(data)}` : ''}`), { timeoutMs: 120_000 });
+    const owner = siteOwner(site);
+    await host.mutate(`chown ${shq(`${owner}:${owner}`)} ${shq(script)}${payload !== undefined ? ` ${shq(data)}` : ''}`);
+    const out = await host.run(wpCliAsWebUser(site.webRoot, runAsOf(site), `eval-file ${shq(script)}${payload !== undefined ? ` ${shq(data)}` : ''}`), { timeoutMs: 120_000 });
     return lastJson<T>(out);
   } finally {
     await Promise.all([fs.rm(script, { force: true }), fs.rm(data, { force: true })]);
@@ -240,16 +242,16 @@ async function portOwner(port: string): Promise<string | null> {
 /** WPMU_PLUGIN_DIR as WordPress itself sees it (sites with a custom wp-content location). */
 async function realMuPluginDir(site: Site): Promise<string | null> {
   if (!(await host.has('wp'))) return null;
-  const r = await host.exec(wpCliAsWebUser(site.webRoot, site.rootPath, `eval ${shq('echo "\\n" . WPMU_PLUGIN_DIR;')}`), { timeoutMs: 60_000 });
+  const r = await host.exec(wpCliAsWebUser(site.webRoot, runAsOf(site), `eval ${shq('echo "\\n" . WPMU_PLUGIN_DIR;')}`), { timeoutMs: 60_000 });
   const dir = r.stdout.trim().split('\n').pop()?.trim() ?? '';
   return r.code === 0 && dir.startsWith('/') ? dir : null;
 }
 
-async function installSsoPlugin(muDir: string, tokenFile: string, log?: HostLogger) {
+async function installSsoPlugin(muDir: string, tokenFile: string, owner: string, log?: HostLogger) {
   const existed = await host.exists(muDir);
   const plugin = path.join(muDir, SSO_PLUGIN);
-  await host.writeFile(plugin, renderSsoPlugin(tokenFile), 0o644);
-  await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(plugin)}${existed ? '' : ` ${shq(muDir)}`}`, { log });
+  await host.writeFile(plugin, renderSsoPlugin(tokenFile), 0o640);
+  await host.mutate(`chown ${shq(`${owner}:${owner}`)} ${shq(plugin)}${existed ? '' : ` ${shq(muDir)}`}`, { log });
 }
 
 /**
@@ -264,7 +266,7 @@ export async function wpLoginUrl(site: Site, baseUrl: string, target: string, lo
   if (!(await host.exists(content))) throw conflict(t('Không tìm thấy {path} - site chưa cài WordPress xong?', { path: content }));
   const tokenFile = path.join(site.rootPath, '.lares-sso.json');
   const marker = ssoMarker(tokenFile);
-  await installSsoPlugin(path.join(content, 'mu-plugins'), tokenFile, log);
+  await installSsoPlugin(path.join(content, 'mu-plugins'), tokenFile, siteOwner(site), log);
 
   if (!config.dryRun) {
     let pub = await probeSso(base, marker, false);
@@ -274,7 +276,7 @@ export async function wpLoginUrl(site: Site, baseUrl: string, target: string, lo
         // wp-content moved by wp-config (WP_CONTENT_DIR / WPMU_PLUGIN_DIR): ask WordPress where mu-plugins live
         const dir = await realMuPluginDir(site);
         if (dir && path.resolve(dir) !== path.resolve(content, 'mu-plugins')) {
-          await installSsoPlugin(dir, tokenFile, log);
+          await installSsoPlugin(dir, tokenFile, siteOwner(site), log);
           [pub, local] = await Promise.all([probeSso(base, marker, false), probeSso(base, marker, true)]);
         }
       }
@@ -302,7 +304,7 @@ export async function wpLoginUrl(site: Site, baseUrl: string, target: string, lo
   const token = crypto.randomBytes(32).toString('hex');
   const record = { hash: crypto.createHash('sha256').update(token).digest('hex'), exp: Math.floor(Date.now() / 1000) + SSO_TTL_SECONDS, to: target };
   await host.writeFile(tokenFile, JSON.stringify(record), 0o600);
-  // PHP runs as the web user: it must read (and delete) the token file
-  await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(tokenFile)}`, { log });
+  // PHP runs as the site's user: it must read (and delete) the token file
+  await host.mutate(`chown ${shq(`${siteOwner(site)}:${siteOwner(site)}`)} ${shq(tokenFile)}`, { log });
   return `${base}/?lares_sso=${token}`;
 }

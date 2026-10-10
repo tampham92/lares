@@ -3,8 +3,6 @@ import type { Dict } from '@lares/shared';
 /** Version badge / update notice. */
 export const RELEASE_EN: Dict = {
   'Có bản mới {version}': 'New version {version}',
-  'Nâng cấp trong Cài đặt': 'Upgrade in Settings',
-  'Hoặc chạy lệnh sau trên VPS (website và dữ liệu được giữ nguyên):': 'Or run this on the VPS (websites and data are kept):',
   'Đã sao chép': 'Copied',
   'Sao chép': 'Copy',
   'Xem thay đổi': 'View changes',
@@ -34,4 +32,11 @@ export const RELEASE_EN: Dict = {
   'Lần nâng cấp lên v{version} bị gián đoạn.': 'The upgrade to v{version} was interrupted.',
   'Nâng cấp lên v{version} thất bại (mã lỗi {code}).': 'The upgrade to v{version} failed (exit code {code}).',
   'Xem log bên dưới, hoặc chạy lệnh nâng cấp trên VPS:': 'See the log below, or run the upgrade command on the VPS:',
+
+  // ---- notification bell (components/NotificationBell.tsx) ----
+  'Thông báo ({n} mới)': 'Notifications ({n} new)',
+  'Không có thông báo mới': 'No new notifications',
+  'Ẩn thông báo': 'Dismiss',
+  'Chạy bằng lệnh trên VPS': 'Run it from the VPS command line',
+  'Kiểm tra bản mới đang tắt': 'Update check is off',
 };

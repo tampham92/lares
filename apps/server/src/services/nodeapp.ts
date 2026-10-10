@@ -1,15 +1,18 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { NextjsConfig, NodeAppStatus, PackageManager } from '@lares/shared';
+import type { NextjsConfig, NodeAppStatus, PackageManager, Site } from '@lares/shared';
 import { config } from '../config.js';
 import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { CommandError } from '../executors/types.js';
 import { credentialLine, isGitAuthError } from './gitAuth.js';
 import { host, type HostLogger } from './host.js';
+import { fixPermissions, nodeSandboxLines, runAsOf, type RunAs } from './isolation.js';
 
 type PM = Exclude<PackageManager, 'auto'>;
+/** What the unit and the build need to know about the site. */
+export type NodeSite = Pick<Site, 'domain' | 'webRoot' | 'rootPath' | 'sysUser'> & { appPort: number };
 export type NodeAppConfig = Omit<NextjsConfig, 'gitUrl' | 'branch'> & { gitUrl?: string; branch?: string };
 
 export const serviceName = (domain: string) => `lares-app-${domain.replace(/[^a-z0-9.-]/gi, '-')}`;
@@ -37,12 +40,12 @@ export async function defaultCommands(appDir: string, pm: PM) {
 }
 
 /**
- * Run a command inside the app dir as the unprivileged web user. `alsoInDryRun` is only for git
+ * Run a command inside the app dir as the site's unprivileged user. `alsoInDryRun` is only for git
  * clone/pull: it writes nothing outside the site's folder (under LARES_DATA_DIR in dry-run) and runs
  * no code from the repo, so a laptop can fetch the real source and test the rest of the flow.
  */
-async function runAsWebUser(appDir: string, homeDir: string, command: string, log: HostLogger, signal?: AbortSignal, alsoInDryRun = false) {
-  const full = host.asWebUser(command, { cwd: appDir, home: homeDir });
+async function runAsWebUser(appDir: string, runAs: RunAs, command: string, log: HostLogger, signal?: AbortSignal, alsoInDryRun = false) {
+  const full = host.asWebUser(command, { cwd: appDir, ...runAs });
   log(`$ ${command}`);
   let pending = '';
   await (alsoInDryRun ? host.run.bind(host) : host.mutate.bind(host))(full, {
@@ -71,17 +74,22 @@ export function renderEnvFile(env: Record<string, string>): string {
   );
 }
 
-export function renderUnit(domain: string, appDir: string, homeDir: string, port: number): string {
+/**
+ * `sandbox`: systemd lines of an isolated site (isolation.nodeSandboxLines), null for an older site
+ * still on the shared web user (unit unchanged until the upgrade converts it).
+ */
+export function renderUnit(domain: string, appDir: string, runAs: RunAs, port: number, sandbox: string[] | null): string {
+  const homeDir = runAs.home;
   return `# Managed by Lares
 [Unit]
 Description=Lares Next.js app ${domain}
-After=network.target
+After=network.target${sandbox ? ' lares-site-firewall.service\nWants=lares-site-firewall.service' : ''}
 
 [Service]
 Type=simple
-User=${config.webUser}
-Group=${config.webUser}
-WorkingDirectory=${appDir}
+User=${runAs.user}
+Group=${runAs.user}
+${sandbox ? 'UMask=0027\n' : ''}WorkingDirectory=${appDir}
 Environment=NODE_ENV=production
 Environment=PORT=${port}
 Environment=HOSTNAME=127.0.0.1
@@ -91,20 +99,24 @@ ExecStart=/bin/bash ${startScriptPath(domain)}
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
-
+${sandbox ? `${sandbox.join('\n')}\n` : ''}
 [Install]
 WantedBy=multi-user.target
 `;
 }
 
-export async function writeServiceFiles(domain: string, appDir: string, homeDir: string, port: number, cfg: NodeAppConfig, log: HostLogger) {
+export async function writeServiceFiles(site: NodeSite, cfg: NodeAppConfig, log: HostLogger) {
+  const { domain, webRoot: appDir } = site;
   const pm = await detectPackageManager(appDir, cfg.packageManager);
   const defaults = await defaultCommands(appDir, pm);
   const start = cfg.startCommand || defaults.start;
   await host.writeFile(startScriptPath(domain), `#!/bin/bash\n# Managed by Lares\ncd ${shq(appDir)} || exit 1\nexec ${start}\n`, 0o755);
-  await host.writeFile(unitPath(domain), renderUnit(domain, appDir, homeDir, port));
+  const sandbox = site.sysUser ? await nodeSandboxLines(site) : null;
+  await host.writeFile(unitPath(domain), renderUnit(domain, appDir, runAsOf(site), site.appPort, sandbox));
   if (Object.keys(cfg.env ?? {}).length) {
-    await host.writeFile(path.join(appDir, '.env.production.local'), renderEnvFile(cfg.env), 0o640);
+    const envFile = path.join(appDir, '.env.production.local');
+    await host.writeFile(envFile, renderEnvFile(cfg.env), 0o600);
+    await host.mutate(`chown ${shq(`${runAsOf(site).user}:${runAsOf(site).user}`)} ${shq(envFile)}`, { log });
   }
   await host.mutate('systemctl daemon-reload', { log });
   await host.mutate(`systemctl enable ${shq(serviceName(domain))}`, { log });
@@ -112,7 +124,7 @@ export async function writeServiceFiles(domain: string, appDir: string, homeDir:
 
 /** install -> build -> (re)start. Used on site creation, "Deploy" and after migration. */
 export async function buildAndRestart(
-  site: { domain: string; rootPath: string; webRoot: string; appPort: number },
+  site: NodeSite,
   cfg: NodeAppConfig,
   log: HostLogger,
   signal?: AbortSignal,
@@ -124,13 +136,14 @@ export async function buildAndRestart(
   const pm = await detectPackageManager(appDir, cfg.packageManager);
   const defaults = await defaultCommands(appDir, pm);
   if (pm !== 'npm') await host.mutate(`corepack enable >/dev/null 2>&1 || true`, { log });
-  await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(site.rootPath)}`, { log });
-  await writeServiceFiles(site.domain, appDir, site.rootPath, site.appPort, cfg, log);
-  await runAsWebUser(appDir, site.rootPath, cfg.installCommand || defaults.install, log, signal);
+  await fixPermissions(site, log);
+  await writeServiceFiles(site, cfg, log);
+  const runAs = runAsOf(site);
+  await runAsWebUser(appDir, runAs, cfg.installCommand || defaults.install, log, signal);
   // Turbopack caches failed module lookups across builds: a build that once ran without
   // devDependencies keeps failing ("Cannot find module '@tailwindcss/postcss'") until this is cleared.
-  await runAsWebUser(appDir, site.rootPath, 'rm -rf .next/cache/turbopack', log, signal);
-  await runAsWebUser(appDir, site.rootPath, `NODE_ENV=production ${cfg.buildCommand || defaults.build}`, log, signal);
+  await runAsWebUser(appDir, runAs, 'rm -rf .next/cache/turbopack', log, signal);
+  await runAsWebUser(appDir, runAs, `NODE_ENV=production ${cfg.buildCommand || defaults.build}`, log, signal);
   await host.mutate(`systemctl restart ${shq(serviceName(site.domain))}`, { log });
   log(t('Đã khởi động {service} trên 127.0.0.1:{port}', { service: serviceName(site.domain), port: String(site.appPort) }));
 }
@@ -142,7 +155,7 @@ export type GitRepo = { gitUrl: string; branch: string; token?: string };
  * The token goes into a credential-store file in a fresh 0700 temp dir owned by the web user,
  * removed afterwards, so it is never on a command line, in the task log or in .git/config.
  */
-async function withGitAuth<T>(repo: GitRepo, log: HostLogger, fn: (git: string) => Promise<T>): Promise<T> {
+async function withGitAuth<T>(repo: GitRepo, owner: string, log: HostLogger, fn: (git: string) => Promise<T>): Promise<T> {
   // No prompts: without a tty git cannot ask for a password anyway, so fail fast with a clear message.
   const git = 'GIT_TERMINAL_PROMPT=0 git';
   if (!repo.token) return fn(git);
@@ -152,7 +165,7 @@ async function withGitAuth<T>(repo: GitRepo, log: HostLogger, fn: (git: string) 
   const file = path.join(dir, 'credentials');
   try {
     await fs.writeFile(file, `${line}\n`, { mode: 0o600 });
-    await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(dir)}`, { log });
+    await host.mutate(`chown -R ${shq(`${owner}:${owner}`)} ${shq(dir)}`, { log });
     // The empty helper first drops any helper configured on the machine.
     return await fn(`${git} -c credential.helper= -c ${shq(`credential.helper=store --file=${file}`)}`);
   } finally {
@@ -160,20 +173,20 @@ async function withGitAuth<T>(repo: GitRepo, log: HostLogger, fn: (git: string) 
   }
 }
 
-export async function gitCloneOrPull(appDir: string, homeDir: string, repo: GitRepo, log: HostLogger, signal?: AbortSignal) {
+export async function gitCloneOrPull(appDir: string, runAs: RunAs, repo: GitRepo, log: HostLogger, signal?: AbortSignal) {
   const branch = shq(repo.branch);
   try {
     if (await host.exists(path.join(appDir, '.git'))) {
       // set-url: a Git URL changed in the build settings takes effect on the next deploy.
-      await withGitAuth(repo, log, (git) =>
-        runAsWebUser(appDir, homeDir, `git remote set-url origin ${shq(repo.gitUrl)} && ${git} fetch --depth 1 origin ${branch} && git reset --hard FETCH_HEAD`, log, signal, true),
+      await withGitAuth(repo, runAs.user, log, (git) =>
+        runAsWebUser(appDir, runAs, `git remote set-url origin ${shq(repo.gitUrl)} && ${git} fetch --depth 1 origin ${branch} && git reset --hard FETCH_HEAD`, log, signal, true),
       );
       return;
     }
     if (!(await host.isEmptyDir(appDir))) throw new Error(t('{dir} không trống, không thể git clone', { dir: appDir }));
     await fs.mkdir(appDir, { recursive: true });
-    await host.mutate(`chown -R ${shq(`${config.webUser}:${config.webUser}`)} ${shq(homeDir)}`, { log });
-    await withGitAuth(repo, log, (git) => runAsWebUser(appDir, homeDir, `${git} clone --depth 1 --branch ${branch} ${shq(repo.gitUrl)} .`, log, signal, true));
+    await host.mutate(`chown -R ${shq(`${runAs.user}:${runAs.user}`)} ${shq(runAs.home)}`, { log });
+    await withGitAuth(repo, runAs.user, log, (git) => runAsWebUser(appDir, runAs, `${git} clone --depth 1 --branch ${branch} ${shq(repo.gitUrl)} .`, log, signal, true));
   } catch (err) {
     if (err instanceof CommandError && isGitAuthError(`${err.result.stderr}\n${err.result.stdout}`)) {
       throw new Error(

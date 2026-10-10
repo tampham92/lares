@@ -70,6 +70,19 @@ export const config = {
   phpFpmSocket: env('LARES_PHP_FPM_SOCKET', '/run/php/php{version}-fpm.sock'),
   defaultPhp: env('LARES_DEFAULT_PHP', '8.2'),
   webUser: env('LARES_WEB_USER', 'www-data'),
+  /**
+   * Per-site isolation (services/isolationPolicy.ts): a Linux user and a PHP-FPM master per site.
+   * LARES_SITE_ISOLATION=0 is an escape hatch: new sites then use the shared web user again and
+   * existing sites are not converted. Sites already isolated stay isolated.
+   */
+  siteIsolation: env('LARES_SITE_ISOLATION', '1') !== '0',
+  /** php-fpm.conf of each isolated site's own master. */
+  phpPoolDir: env('LARES_PHP_POOL_DIR', dryRun ? path.join(dataDir, 'php-sites') : '/etc/lares/php'),
+  sitePhpMaxChildren: Number(env('LARES_SITE_PHP_MAX_CHILDREN', '8')),
+  /** nftables rules for the isolated sites' uids, loaded at boot by lares-site-firewall.service. */
+  siteFirewallFile: env('LARES_SITE_FIREWALL_FILE', dryRun ? path.join(dataDir, 'site-firewall.nft') : '/etc/lares/site-firewall.nft'),
+  /** The panel's own env file (secrets): hidden from the site sandboxes. */
+  envFile: env('LARES_ENV_FILE', '/etc/lares/lares.env'),
   /** Per-site logs live outside /var/log/nginx so they don't collide with the distro's nginx logrotate rule. */
   siteLogDir: env('LARES_SITE_LOG_DIR', dryRun ? path.join(dataDir, 'logs') : '/var/log/lares/sites'),
   /** Shared webroot for ACME http-01 challenges; every vhost (incl. Next.js proxies) serves it. */

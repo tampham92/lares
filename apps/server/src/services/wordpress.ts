@@ -7,6 +7,7 @@ import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { parseWpConfig } from '../migration/appDetect.js';
 import { host, type HostLogger } from './host.js';
+import type { RunAs } from './isolation.js';
 import * as mysql from './mysql.js';
 
 const phpStr = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -71,9 +72,9 @@ require_once ABSPATH . 'wp-settings.php';
 /** wp-cli as root - only for WordPress code Lares downloaded itself (fresh installs). */
 export const wpCli = (webRoot: string, args: string) => `wp --path=${shq(webRoot)} --allow-root --skip-plugins --skip-themes ${args}`;
 
-/** wp-cli as the web user - for migrated sites, whose wp-config.php/plugins are untrusted PHP. */
-export const wpCliAsWebUser = (webRoot: string, home: string, args: string) =>
-  host.asWebUser(`wp --path=${shq(webRoot)} --skip-plugins --skip-themes ${args}`, { cwd: webRoot, home });
+/** wp-cli as the site's user - for migrated sites, whose wp-config.php/plugins are untrusted PHP. */
+export const wpCliAsWebUser = (webRoot: string, runAs: RunAs, args: string) =>
+  host.asWebUser(`wp --path=${shq(webRoot)} --skip-plugins --skip-themes ${args}`, { cwd: webRoot, ...runAs });
 
 /**
  * Download WordPress, write wp-config.php and - when wp-cli is present and admin credentials are
@@ -129,10 +130,10 @@ export async function hasWpCli() {
   return host.has('wp');
 }
 
-/** Current home URL of a WordPress install (read via wp-cli as the web user), or null. */
-export async function wordpressHomeUrl(webRoot: string, home: string): Promise<string | null> {
+/** Current home URL of a WordPress install (read via wp-cli as the site's user), or null. */
+export async function wordpressHomeUrl(webRoot: string, runAs: RunAs): Promise<string | null> {
   if (config.dryRun || !(await host.has('wp'))) return null;
-  const r = await host.exec(wpCliAsWebUser(webRoot, home, 'option get home'));
+  const r = await host.exec(wpCliAsWebUser(webRoot, runAs, 'option get home'));
   const url = r.stdout.trim().split('\n').pop()?.trim() ?? '';
   return r.code === 0 && /^https?:\/\//.test(url) ? url.replace(/\/+$/, '') : null;
 }
@@ -184,7 +185,7 @@ async function replaceUrlViaSql(webRoot: string, to: string, from: string | null
  * wp-cli runs as the web user: by now the site may contain third-party plugins/themes.
  * Never throws: a failure here must not leave the caller half-way (the domain is already switched).
  */
-export async function wordpressReplaceUrl(webRoot: string, home: string, to: string, log: HostLogger, from?: string | null): Promise<boolean> {
+export async function wordpressReplaceUrl(webRoot: string, runAs: RunAs, to: string, log: HostLogger, from?: string | null): Promise<boolean> {
   if (config.dryRun) {
     log(`[dry-run] wp search-replace ${from ?? '<home>'} ${to}`);
     return true;
@@ -192,10 +193,10 @@ export async function wordpressReplaceUrl(webRoot: string, home: string, to: str
   const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).split('\n').slice(-2).join(' ');
   if (await host.has('wp')) {
     try {
-      const current = from ?? (await wordpressHomeUrl(webRoot, home));
+      const current = from ?? (await wordpressHomeUrl(webRoot, runAs));
       if (!current) throw new Error(t('không đọc được URL hiện tại (option home)'));
       if (current === to) return true;
-      const run = (args: string) => host.run(wpCliAsWebUser(webRoot, home, args), { timeoutMs: 30 * 60_000 });
+      const run = (args: string) => host.run(wpCliAsWebUser(webRoot, runAs, args), { timeoutMs: 30 * 60_000 });
       // serialized PHP data needs wp-cli's search-replace; a plain SQL REPLACE would corrupt it
       for (const [a, b] of urlReplacePairs(current, to)) {
         await run(`search-replace ${shq(a)} ${shq(b)} --all-tables-with-prefix --skip-columns=guid --precise --report-changed-only`);
@@ -216,21 +217,21 @@ export async function wordpressReplaceUrl(webRoot: string, home: string, to: str
   }
   log(
     t('CẦN LÀM TAY: WordPress vẫn giữ URL cũ. Chạy trên VPS: {command}', {
-      command: `sudo -u ${config.webUser} wp --path=${shq(webRoot)} option update home ${shq(to)} && sudo -u ${config.webUser} wp --path=${shq(webRoot)} option update siteurl ${shq(to)}`,
+      command: `sudo -u ${runAs.user} wp --path=${shq(webRoot)} option update home ${shq(to)} && sudo -u ${runAs.user} wp --path=${shq(webRoot)} option update siteurl ${shq(to)}`,
     }),
   );
   return false;
 }
 
 /** Patch wp-config.php of a port-based site that was created before PORT_HOST_FIX existed. */
-export async function ensurePortHostFix(webRoot: string, log?: HostLogger): Promise<boolean> {
+export async function ensurePortHostFix(webRoot: string, owner: string, log?: HostLogger): Promise<boolean> {
   const file = path.join(webRoot, 'wp-config.php');
   const src = await fs.readFile(file, 'utf8').catch(() => null);
   if (src === null) return false;
   const next = addPortHostFix(src);
   if (next === src) return false;
   await host.writeFile(file, next, 0o640);
-  await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(file)}`, { log });
+  await host.mutate(`chown ${shq(`${owner}:${owner}`)} ${shq(file)}`, { log });
   log?.(t('Đã vá wp-config.php (giữ port trong HTTP_HOST): {file}', { file }));
   return true;
 }

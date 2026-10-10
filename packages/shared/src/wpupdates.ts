@@ -106,7 +106,7 @@ export interface WpUpdatesResponse {
   checkError: string | null;
   pending: number;
   /** Update/backup/restore currently holding this site's lock. */
-  running: { taskId: string; kind: 'backup' | 'restore' | 'update' } | null;
+  running: { taskId: string; kind: 'backup' | 'restore' | 'update' | 'isolate' } | null;
   history: WpUpdateRun[];
 }
 

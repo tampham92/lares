@@ -94,6 +94,13 @@ function ensureColumn(table: string, column: string, definition: string) {
   if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 ensureColumn('sites', 'listen_port', 'INTEGER');
+// Per-site isolation (services/isolation.ts). sys_user NULL = still on the shared web user; the
+// upgrade converts those sites and records why when it cannot (isolation_error, the site then stays
+// as it was). php_exec_allowed: 1 for every older site (unchanged behaviour), new sites start at 0.
+ensureColumn('sites', 'sys_user', 'TEXT');
+ensureColumn('sites', 'php_exec_allowed', 'INTEGER NOT NULL DEFAULT 1');
+ensureColumn('sites', 'isolation_error', 'TEXT');
+ensureColumn('sites', 'isolation_error_at', 'TEXT');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_listen_port ON sites(listen_port) WHERE listen_port IS NOT NULL');
 
 export const nowIso = () => new Date().toISOString();
@@ -231,5 +238,23 @@ CREATE TABLE IF NOT EXISTS site_php_settings (
   settings_json TEXT NOT NULL,
   client_max_body_mb INTEGER,
   updated_at TEXT NOT NULL
+);
+`);
+
+// ---- Notification center (services/notifications.ts) ------------------------------
+// Stored events (live notices are computed on read). title/body/labels are Vietnamese msgids
+// translated when listed, so each viewer reads them in their own language. dedupe_key: a newer event
+// of the same key replaces the older one. Read state per user: settings key `notifications.read.<userId>`.
+db.exec(`
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  tone TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  params_json TEXT NOT NULL DEFAULT '{}',
+  actions_json TEXT NOT NULL DEFAULT '[]',
+  dedupe_key TEXT UNIQUE,
+  created_at TEXT NOT NULL
 );
 `);

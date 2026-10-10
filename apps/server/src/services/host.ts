@@ -26,10 +26,11 @@ export const host = {
   },
 
   /**
-   * Wrap a command so it runs as the unprivileged web user. Anything that executes site code
-   * (wp-cli, artisan, npm scripts) must go through this: migrated code is not trusted with root.
+   * Wrap a command so it runs as the site's unprivileged user (`runAsOf(site)` in isolation.ts: its
+   * own user, or the shared web user for older sites). Anything that executes site code (wp-cli,
+   * artisan, npm scripts) must go through this: migrated code is not trusted with root.
    */
-  asWebUser(command: string, opts: { cwd: string; home: string; env?: Record<string, string> }): string {
+  asWebUser(command: string, opts: { cwd: string; home: string; user: string; env?: Record<string, string> }): string {
     // `env -i`: site code must not inherit the panel's environment. It holds LARES_SECRET and the
     // admin/MySQL passwords, and its NODE_ENV=production makes `npm ci` skip the devDependencies
     // (tailwind, typescript...) that `next build` needs.
@@ -40,7 +41,7 @@ export const host = {
       .map(([k, v]) => `${k}=${shq(v)}`)
       .join(' ');
     const inner = `cd ${shq(opts.cwd)} && ${command}`;
-    const user = shq(config.webUser);
+    const user = shq(opts.user);
     return process.getuid?.() === 0
       ? `runuser -u ${user} -- env -i HOME=${shq(opts.home)} USER=${user} LOGNAME=${user} PATH="$PATH" ${env} bash -c ${shq(inner)}`
       : `env -i HOME="$HOME" PATH="$PATH" ${env} bash -c ${shq(inner)}`;

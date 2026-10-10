@@ -219,6 +219,27 @@ if [[ $PURGE == 1 ]]; then
     fi
     ok "$domain"
   done
+  # Per-site isolation: each site's own PHP-FPM, its Linux user, the outbound firewall table
+  for unit in /etc/systemd/system/lares-php-*.service; do
+    [[ -f "$unit" ]] || continue
+    systemctl disable --now "$(basename "$unit")" >/dev/null 2>&1 || true
+    rm -f "$unit"
+  done
+  rm -rf /var/lib/lares-php-*
+  if [[ -f /etc/systemd/system/lares-site-firewall.service ]]; then
+    systemctl disable --now lares-site-firewall >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/lares-site-firewall.service
+  fi
+  if command -v nft >/dev/null; then nft delete table inet lares_sites >/dev/null 2>&1 || true; fi
+  while IFS=: read -r u _; do
+    [[ "$u" =~ ^lares-s[1-9][0-9]*$ ]] || continue
+    pkill -KILL -u "$u" >/dev/null 2>&1 || true
+    userdel "$u" >/dev/null 2>&1 || true
+    if getent group "$u" >/dev/null; then groupdel "$u" >/dev/null 2>&1 || true; fi
+  done < <(getent passwd)
+  for f in /etc/cron.deny /etc/at.deny; do
+    if [[ -f "$f" ]]; then sed -i -E '/^lares-s[1-9][0-9]*$/d' "$f"; fi
+  done
   systemctl daemon-reload
 
   if [[ ${#DATABASES[@]} -gt 0 ]]; then

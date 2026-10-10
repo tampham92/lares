@@ -15,6 +15,8 @@ export interface VhostSpec {
   appType: AppType;
   webRoot: string;
   phpVersion: string | null;
+  /** FastCGI socket of the site's own PHP-FPM (isolated sites); unset = the shared pool of phpVersion. */
+  phpSocket?: string | null;
   appPort: number | null;
   /** Port-based site: listen on this public port for any hostname instead of name-based :80. */
   listenPort?: number | null;
@@ -63,6 +65,13 @@ export function acmeLocation(): string {
 }`;
 }
 
+/**
+ * nginx's user is in every isolated site's group (it serves their static files), so a symlink planted
+ * by one site pointing into another would be served with nginx's rights. Only follow symlinks whose
+ * owner is the owner of their target (services/isolationPolicy.ts).
+ */
+const DISABLE_SYMLINKS = 'disable_symlinks if_not_owner from=$document_root;';
+
 function appBody(spec: VhostSpec): string {
   const logs = siteLogPaths(spec.domain);
   const common = [
@@ -102,13 +111,14 @@ proxy_read_timeout 300s;`;
   }
 
   if (spec.appType === 'static') {
-    return [`root ${ngxPath(spec.webRoot)};`, 'index index.html index.htm;', ...common, '', 'location / {\n    try_files $uri $uri/ =404;\n}'].join('\n');
+    return [`root ${ngxPath(spec.webRoot)};`, DISABLE_SYMLINKS, 'index index.html index.htm;', ...common, '', 'location / {\n    try_files $uri $uri/ =404;\n}'].join('\n');
   }
 
   // PHP family: wordpress, laravel, generic php
   const php = spec.phpVersion ?? config.defaultPhp;
   const lines = [
     `root ${ngxPath(spec.webRoot)};`,
+    DISABLE_SYMLINKS,
     'index index.php index.html index.htm;',
     ...common,
     '',
@@ -117,7 +127,7 @@ proxy_read_timeout 300s;`;
     `location ~ \\.php$ {
     try_files $uri =404;
     fastcgi_split_path_info ^(.+\\.php)(/.+)$;
-    fastcgi_pass unix:${phpSocket(php)};
+    fastcgi_pass unix:${spec.phpSocket ?? phpSocket(php)};
     fastcgi_index index.php;
     include fastcgi_params;
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
