@@ -12,7 +12,7 @@ import { fixPermissions, nodeSandboxLines, runAsOf, type RunAs } from './isolati
 
 type PM = Exclude<PackageManager, 'auto'>;
 /** What the unit and the build need to know about the site. */
-export type NodeSite = Pick<Site, 'domain' | 'webRoot' | 'rootPath' | 'sysUser'> & { appPort: number };
+export type NodeSite = Pick<Site, 'domain' | 'webRoot' | 'rootPath' | 'sysUser' | 'limits'> & { appPort: number };
 export type NodeAppConfig = Omit<NextjsConfig, 'gitUrl' | 'branch'> & { gitUrl?: string; branch?: string };
 
 export const serviceName = (domain: string) => `lares-app-${domain.replace(/[^a-z0-9.-]/gi, '-')}`;

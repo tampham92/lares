@@ -231,4 +231,28 @@ export const SITES_EN: Dict = {
   'Cách ly ngay': 'Isolate now',
   'Tạo user riêng, PHP-FPM riêng rồi chuyển quyền file. Site vẫn chạy trong lúc chuyển; lỗi thì tự đưa về như cũ.':
     'Creates its own user and PHP-FPM, then hands the files over. The site stays online meanwhile; on any error it is put back as it was.',
+
+  // ---- resource limits card (components/LimitsCard.tsx) ----
+  'Đã áp dụng giới hạn': 'Limits applied',
+  'RAM {size}': 'RAM {size}',
+  '{n} tiến trình': '{n} processes',
+  '{n} kết nối MySQL': '{n} MySQL connections',
+  'Giới hạn tài nguyên': 'Resource limits',
+  'Giữ một site quá tải hoặc bị tấn công không chiếm hết tài nguyên của các site khác. Để trống = không giới hạn.':
+    'Keep an overloaded or attacked site from taking the resources of the other sites. Empty = no limit.',
+  'Máy chủ: {cpu} CPU, {ram} RAM': 'Server: {cpu} CPU, {ram} RAM',
+  'Đang dùng: {usage}': 'In use: {usage}',
+  'RAM tối đa (MB)': 'Max RAM (MB)',
+  'Gần mức này site bị làm chậm, vượt thì tiến trình bị dừng.': 'Near this the site is slowed down; above it its processes are killed.',
+  'Không giới hạn': 'No limit',
+  'CPU tối đa (%)': 'Max CPU (%)',
+  '100 = một nhân CPU. Máy chủ có {n} nhân = tối đa {max}%.': '100 = one CPU core. This server has {n} cores = up to {max}%.',
+  'Số worker PHP': 'PHP workers',
+  'Số request PHP xử lý cùng lúc (pm.max_children).': 'PHP requests handled at the same time (pm.max_children).',
+  'Mặc định: {n}': 'Default: {n}',
+  'Kết nối MySQL tối đa': 'Max MySQL connections',
+  'Cho mỗi user database của site (MAX_USER_CONNECTIONS).': "Per database user of the site (MAX_USER_CONNECTIONS).",
+  'Đang áp dụng...': 'Applying...',
+  'Áp dụng': 'Apply',
+  '{service} khởi động lại vài giây để nhận giới hạn mới.': '{service} restarts for a few seconds to pick up the new limits.',
 };

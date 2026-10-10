@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   EXEC_FUNCTIONS,
   editDenyList,
+  parseUnitStats,
   permissionCommands,
+  resourceLines,
   renderFirewallUnit,
   renderSiteFirewall,
   renderSitePhpUnit,
@@ -12,6 +14,7 @@ import {
   sitePhpPaths,
   unitPathArg,
 } from '../src/services/isolationPolicy.js';
+import { siteLimitsSchema } from '@lares/shared';
 import { parsePoolFile } from '../src/services/phpSettings.js';
 import { renderVhost, type VhostSpec } from '../src/services/nginx.js';
 
@@ -71,6 +74,7 @@ describe('site PHP-FPM unit', () => {
     expect(unit).toContain('User=lares-s12\nGroup=lares-s12');
     expect(unit).toContain('ExecStart=/usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /etc/lares/php/12.conf');
     expect(unit).toContain('Type=notify');
+    expect(unit).toContain('OOMPolicy=continue');
     expect(unit).toContain('RuntimeDirectory=lares-php-12\nRuntimeDirectoryMode=0750');
     expect(unit).toContain('StateDirectory=lares-php-12');
   });
@@ -185,5 +189,31 @@ describe('vhost of an isolated site', () => {
 
   it('keeps the shared pool for older sites', () => {
     expect(renderVhost({ ...spec, phpSocket: null })).toContain('fastcgi_pass unix:/run/php/php8.3-fpm.sock;');
+  });
+});
+
+describe('resource limits', () => {
+  it('turns RAM and CPU limits into cgroup settings, throttling before killing', () => {
+    expect(resourceLines({ memoryMb: 512, cpuPercent: 150 })).toEqual(['MemoryHigh=460M', 'MemoryMax=512M', 'MemorySwapMax=0', 'CPUQuota=150%']);
+    expect(resourceLines({ memoryMb: null, cpuPercent: null })).toEqual([]);
+    expect(resourceLines(undefined)).toEqual([]);
+  });
+
+  it('puts them in the PHP-FPM unit before the sandbox', () => {
+    const unit = renderSitePhpUnit({ siteId: 12, domain: 'example.com', phpVersion: '8.3', user: 'lares-s12', paths, sandbox, tasksMax: 256, limits: { memoryMb: 256, cpuPercent: 50 } });
+    expect(unit).toContain('MemoryMax=256M\nMemorySwapMax=0\nCPUQuota=50%\n# Sandbox');
+  });
+
+  it('reads systemd usage, unknown values as null', () => {
+    expect(parseUnitStats('MemoryCurrent=134217728\nTasksCurrent=4\n')).toEqual({ memoryBytes: 134217728, tasks: 4 });
+    expect(parseUnitStats('MemoryCurrent=[not set]\nTasksCurrent=18446744073709551615\n')).toEqual({ memoryBytes: null, tasks: null });
+  });
+
+  it('validates the ranges (empty = no limit)', () => {
+    expect(siteLimitsSchema.parse({})).toEqual({ memoryMb: null, cpuPercent: null, phpWorkers: null, mysqlConnections: null });
+    expect(siteLimitsSchema.safeParse({ memoryMb: 32 }).success).toBe(false);
+    expect(siteLimitsSchema.safeParse({ cpuPercent: 12.5 }).success).toBe(false);
+    expect(siteLimitsSchema.safeParse({ phpWorkers: 0 }).success).toBe(false);
+    expect(siteLimitsSchema.safeParse({ mysqlConnections: 20, phpWorkers: 4 }).success).toBe(true);
   });
 });

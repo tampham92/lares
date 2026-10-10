@@ -49,6 +49,14 @@ Every site has its own Linux user (`lares-s<id>`) and its own PHP-FPM, so a site
 - Site users have no password, no shell and are listed in `/etc/cron.deny`: they cannot log in or
   schedule jobs.
 
+**Resource limits** (site page → Overview → Resource limits), empty = no limit:
+
+- **Max RAM** and **max CPU** (100% = one core) for the site's PHP-FPM or Next.js app, through cgroups.
+  Near the RAM limit the site is slowed down; a request going over it is the only one stopped (502),
+  the site keeps running. Swap is not used to go past the limit.
+- **PHP workers**: PHP requests handled at the same time (default 8).
+- **Max MySQL connections** for the site's database users (`MAX_USER_CONNECTIONS`).
+
 Sites created by an older Lares are converted on upgrade, one at a time. They stay online meanwhile;
 if a step fails or the site answers 5xx after the switch, it is put back as it was and the site page
 shows why, with a retry button. `LARES_SITE_ISOLATION=0` in `/etc/lares/lares.env` turns the feature

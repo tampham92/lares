@@ -42,4 +42,11 @@ export const ISOLATION_EN: Dict = {
   '{domain} chưa được cách ly': '{domain} is not isolated',
   'Lần chuyển sang user riêng thất bại, site đã được đưa về như cũ: {error}': 'Moving it to its own user failed and the site was put back as it was: {error}',
   'Mở site': 'Open site',
+
+  // ---- resource limits (services/siteLimits.ts) ----
+  'Giới hạn RAM/CPU cần site có user và tiến trình riêng (site PHP hoặc Next.js đã cách ly)':
+    'RAM/CPU limits need a site with its own user and process (an isolated PHP or Next.js site)',
+  'Số worker PHP chỉ áp dụng cho site PHP đã cách ly': 'PHP workers only apply to isolated PHP sites',
+  'Site không có database do Lares tạo': 'The site has no database created by Lares',
+  'Cảnh báo: không khôi phục được giới hạn cũ: {error}': 'Warning: could not restore the previous limits: {error}',
 };

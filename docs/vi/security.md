@@ -48,6 +48,14 @@ qua plugin WordPress có lỗ hổng) không lan sang site khác:
 - User của site không có mật khẩu, không có shell và nằm trong `/etc/cron.deny`: không đăng nhập hay
   đặt lịch chạy được.
 
+**Giới hạn tài nguyên** (trang site → Tổng quan → Giới hạn tài nguyên), để trống là không giới hạn:
+
+- **RAM tối đa** và **CPU tối đa** (100% = một nhân) cho PHP-FPM hoặc ứng dụng Next.js của site, qua cgroups.
+  Gần mức RAM site bị làm chậm; request nào vượt thì chỉ request đó bị dừng (502), site vẫn chạy.
+  Không dùng swap để vượt giới hạn.
+- **Số worker PHP**: số request PHP xử lý cùng lúc (mặc định 8).
+- **Kết nối MySQL tối đa** cho user database của site (`MAX_USER_CONNECTIONS`).
+
 Site tạo bằng bản Lares cũ được tự chuyển sang khi nâng cấp, từng site một. Site vẫn chạy trong lúc
 chuyển; nếu một bước lỗi hoặc site trả về lỗi 5xx sau khi chuyển, site được đưa về như cũ và trang site
 ghi lại lý do kèm nút thử lại. `LARES_SITE_ISOLATION=0` trong `/etc/lares/lares.env` tắt tính năng này

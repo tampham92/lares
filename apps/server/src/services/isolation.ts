@@ -14,6 +14,8 @@ import {
   SITE_USER_RE,
   editDenyList,
   fpmBinary,
+  parseUnitStats,
+  resourceLines,
   permissionCommands,
   renderFirewallUnit,
   renderSiteFirewall,
@@ -139,16 +141,26 @@ export async function sandboxFor(site: Pick<Site, 'rootPath'>): Promise<Omit<San
   return { rootPath: site.rootPath, sitesRoot: config.sitesRoot, hidden: hiddenPaths(), mta: await detectMta() };
 }
 
-/** systemd lines for a Node app's unit (no NoExec on the site: `next start` runs node_modules/.bin). */
-export async function nodeSandboxLines(site: Pick<Site, 'rootPath'>): Promise<string[]> {
-  return sandboxLines({ ...(await sandboxFor(site)), noExecSite: false });
+/** systemd lines for a Node app's unit: its limits, then the sandbox (no NoExec on the site: `next start` runs node_modules/.bin). */
+export async function nodeSandboxLines(site: Pick<Site, 'rootPath' | 'limits'>): Promise<string[]> {
+  return [...resourceLines(site.limits), ...sandboxLines({ ...(await sandboxFor(site)), noExecSite: false })];
+}
+
+/** Current RAM and task count of a unit (null = unknown, dry-run, or not running). */
+export async function unitStats(unit: string): Promise<{ memoryBytes: number | null; tasks: number | null }> {
+  if (config.dryRun) return { memoryBytes: null, tasks: null };
+  const r = await host.exec(`systemctl show ${shq(unit)} -p MemoryCurrent -p TasksCurrent`);
+  return parseUnitStats(r.stdout);
 }
 
 // ---- Per-site PHP-FPM ------------------------------------------------------------------
 
-type PhpSite = Pick<Site, 'id' | 'domain' | 'rootPath' | 'phpVersion' | 'sysUser' | 'phpExecAllowed'>;
+type PhpSite = Pick<Site, 'id' | 'domain' | 'rootPath' | 'phpVersion' | 'sysUser' | 'phpExecAllowed' | 'limits'>;
 
 const daemonReload = (log?: HostLogger) => host.mutate('systemctl daemon-reload', { log });
+
+/** pm.max_children of a site that sets no limit (LARES_SITE_PHP_MAX_CHILDREN, else 8). */
+export const defaultPhpWorkers = () => config.sitePhpMaxChildren || DEFAULT_PHP_MAX_CHILDREN;
 
 /**
  * Write the site's php-fpm.conf and unit, check them with php-fpm -t (as the site user, like the
@@ -158,8 +170,8 @@ export async function applySitePhp(site: PhpSite, log?: HostLogger): Promise<voi
   if (!site.sysUser) throw new Error(`site ${site.id} has no own user`);
   const version = site.phpVersion ?? config.defaultPhp;
   const p = phpPathsFor(site.id);
-  const pool = renderSitePool({ siteId: site.id, domain: site.domain, paths: p, maxChildren: config.sitePhpMaxChildren || DEFAULT_PHP_MAX_CHILDREN, execAllowed: site.phpExecAllowed });
-  const unit = renderSitePhpUnit({ siteId: site.id, domain: site.domain, phpVersion: version, user: site.sysUser, paths: p, sandbox: await sandboxFor(site), tasksMax: 256 });
+  const pool = renderSitePool({ siteId: site.id, domain: site.domain, paths: p, maxChildren: site.limits.phpWorkers ?? defaultPhpWorkers(), execAllowed: site.phpExecAllowed });
+  const unit = renderSitePhpUnit({ siteId: site.id, domain: site.domain, phpVersion: version, user: site.sysUser, paths: p, sandbox: await sandboxFor(site), tasksMax: 256, limits: site.limits });
 
   const [prevPool, prevUnit] = await Promise.all([fs.readFile(p.conf, 'utf8').catch(() => null), fs.readFile(p.unitFile, 'utf8').catch(() => null)]);
   if (!config.dryRun && !(await host.exists(fpmBinary(version)))) throw new Error(t('Chưa cài PHP-FPM {version} ({bin})', { version, bin: fpmBinary(version) }));

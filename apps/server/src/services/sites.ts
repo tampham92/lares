@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { LOCALHOST, type AppType, type CreateSiteInput, type CreateSiteResult, type IssueSslInput, type Site, type SslState } from '@lares/shared';
+import { EMPTY_SITE_LIMITS, LOCALHOST, siteLimitsSchema, type SiteLimits, type AppType, type CreateSiteInput, type CreateSiteResult, type IssueSslInput, type Site, type SslState } from '@lares/shared';
 import { config } from '../config.js';
 import { db, nowIso } from '../db/index.js';
 import { t, tDefault } from '../i18n/index.js';
@@ -41,6 +41,7 @@ interface SiteRow {
   sys_user: string | null;
   php_exec_allowed: number;
   isolation_error: string | null;
+  limits_json: string | null;
 }
 
 const toSite = (r: SiteRow): Site => ({
@@ -60,7 +61,24 @@ const toSite = (r: SiteRow): Site => ({
   createdAt: r.created_at,
   sysUser: r.sys_user,
   phpExecAllowed: r.php_exec_allowed === 1,
+  limits: parseLimits(r.limits_json),
 });
+
+/** Stored limits, tolerant of a hand-edited or older row (anything invalid = no limit). */
+function parseLimits(json: string | null): SiteLimits {
+  if (!json) return EMPTY_SITE_LIMITS;
+  try {
+    const r = siteLimitsSchema.safeParse(JSON.parse(json));
+    return r.success ? r.data : EMPTY_SITE_LIMITS;
+  } catch {
+    return EMPTY_SITE_LIMITS;
+  }
+}
+
+export function setSiteLimits(id: number, limits: SiteLimits) {
+  const empty = Object.values(limits).every((v) => v === null);
+  db.prepare('UPDATE sites SET limits_json = ? WHERE id = ?').run(empty ? null : JSON.stringify(limits), id);
+}
 
 const PHP_TYPES: AppType[] = ['wordpress', 'laravel', 'php', 'unknown'];
 export const usesPhp = (t: AppType) => PHP_TYPES.includes(t);

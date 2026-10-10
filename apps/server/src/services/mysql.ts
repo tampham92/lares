@@ -63,6 +63,27 @@ export async function dropDatabase(name: string, user?: string, log?: HostLogger
   }
 }
 
+/**
+ * Cap a site user's simultaneous connections (0 = no cap). A hijacked or overloaded site then runs
+ * out of its own connections instead of taking all of max_connections from the other sites.
+ */
+export async function setMaxUserConnections(user: string, max: number, log?: HostLogger) {
+  assertIdent(user, t('Tên user'));
+  if (!Number.isInteger(max) || max < 0 || max > 100000) throw new Error(`invalid MAX_USER_CONNECTIONS: ${max}`);
+  if (config.dryRun) {
+    log?.(`[dry-run] ALTER USER '${user}'@'localhost' WITH MAX_USER_CONNECTIONS ${max}`);
+    return;
+  }
+  await query(`ALTER USER ?@'localhost' WITH MAX_USER_CONNECTIONS ${max}`, [user]);
+}
+
+/** Open connections of these users right now. */
+export async function userConnections(users: string[]): Promise<number | null> {
+  if (config.dryRun || !users.length) return null;
+  const rows = await query<Array<{ n: number }>>('SELECT COUNT(*) AS n FROM information_schema.PROCESSLIST WHERE USER IN (?)', [users]);
+  return Number(rows[0]?.n ?? 0);
+}
+
 /** Identify the MySQL instance so we can tell when source and Lares share the same server. */
 export async function serverIdentity(): Promise<string | null> {
   if (config.dryRun) return null;

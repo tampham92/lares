@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { SiteLimits } from '@lares/shared';
 import { shq } from '../lib/shell.js';
 
 /*
@@ -186,6 +187,34 @@ export function sandboxLines(o: SandboxOptions): string[] {
   return lines;
 }
 
+// ---- Resource limits (cgroups v2 through systemd) ---------------------------------------
+
+/**
+ * systemd lines for a site's RAM / CPU limits. MemoryHigh at 90 % makes the kernel reclaim and
+ * throttle before MemoryMax kills a process: a busy site slows down instead of dropping requests.
+ * MemorySwapMax=0: MemoryMax only counts RAM, so without it the excess just moves to swap - the
+ * site keeps growing and the swapping slows every other site down.
+ */
+export function resourceLines(limits: Pick<SiteLimits, 'memoryMb' | 'cpuPercent'> | null | undefined): string[] {
+  const lines: string[] = [];
+  const mem = limits?.memoryMb;
+  if (mem && Number.isInteger(mem) && mem > 0) lines.push(`MemoryHigh=${Math.floor(mem * 0.9)}M`, `MemoryMax=${mem}M`, 'MemorySwapMax=0');
+  const cpu = limits?.cpuPercent;
+  if (cpu && Number.isInteger(cpu) && cpu > 0) lines.push(`CPUQuota=${cpu}%`);
+  return lines;
+}
+
+/** `systemctl show -p MemoryCurrent -p TasksCurrent` → numbers (null when systemd does not know). */
+export function parseUnitStats(text: string): { memoryBytes: number | null; tasks: number | null } {
+  const get = (key: string) => {
+    const v = text.match(new RegExp(`^${key}=(\\d+)$`, 'm'))?.[1];
+    const n = v === undefined ? NaN : Number(v);
+    // [not set] and UINT64_MAX ("infinity") both mean: unknown
+    return Number.isSafeInteger(n) ? n : null;
+  };
+  return { memoryBytes: get('MemoryCurrent'), tasks: get('TasksCurrent') };
+}
+
 export interface SitePhpUnitOptions {
   siteId: number;
   domain: string;
@@ -194,6 +223,7 @@ export interface SitePhpUnitOptions {
   paths: SitePhpPaths;
   sandbox: Omit<SandboxOptions, 'noExecSite'>;
   tasksMax: number;
+  limits?: Pick<SiteLimits, 'memoryMb' | 'cpuPercent'> | null;
 }
 
 export function renderSitePhpUnit(o: SitePhpUnitOptions): string {
@@ -214,12 +244,15 @@ ExecStart=${bin} --nodaemonize --fpm-config ${unitPathArg(o.paths.conf)}
 ExecReload=/bin/kill -USR2 $MAINPID
 Restart=on-failure
 RestartSec=3
+# a worker killed for going over the RAM limit is that one request; the master respawns workers
+# (the default, stop, would take the whole site down until the restart)
+OOMPolicy=continue
 RuntimeDirectory=${o.paths.runtimeName}
 RuntimeDirectoryMode=0750
 StateDirectory=${o.paths.runtimeName}
 StateDirectoryMode=0700
 TasksMax=${Math.trunc(o.tasksMax)}
-${sandboxLines({ ...o.sandbox, noExecSite: true }).join('\n')}
+${[...resourceLines(o.limits), ...sandboxLines({ ...o.sandbox, noExecSite: true })].join('\n')}
 
 [Install]
 WantedBy=multi-user.target

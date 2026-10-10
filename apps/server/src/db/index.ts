@@ -101,6 +101,8 @@ ensureColumn('sites', 'sys_user', 'TEXT');
 ensureColumn('sites', 'php_exec_allowed', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumn('sites', 'isolation_error', 'TEXT');
 ensureColumn('sites', 'isolation_error_at', 'TEXT');
+// Per-site resource limits (services/siteLimits.ts, SiteLimits JSON). NULL = no limit at all.
+ensureColumn('sites', 'limits_json', 'TEXT');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_listen_port ON sites(listen_port) WHERE listen_port IS NOT NULL');
 
 export const nowIso = () => new Date().toISOString();

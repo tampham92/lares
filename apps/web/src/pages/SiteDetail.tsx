@@ -9,6 +9,7 @@ import { BackupsTab } from '../components/BackupsTab';
 import { CloudflareDnsOption, useCloudflareDns } from '../components/CloudflareDnsOption';
 import { GitSourceFields } from '../components/GitSourceFields';
 import { IsolationCard } from '../components/IsolationCard';
+import { LimitsCard } from '../components/LimitsCard';
 import { SiteDnsCard } from '../components/SiteDnsCard';
 import { LeadsTab } from '../components/LeadsTab';
 import { PhpSettingsTab } from '../components/PhpSettingsTab';
@@ -104,6 +105,7 @@ function Overview({ data, onOpenSsl }: { data: SiteDetailResponse; onOpenSsl: ()
       <OverviewCards data={data} />
       <DomainCard key={`${data.site.domain}-${data.site.listenPort}`} site={data.site} onOpenSsl={onOpenSsl} />
       <IsolationCard site={data.site} />
+      <LimitsCard site={data.site} />
     </>
   );
 }

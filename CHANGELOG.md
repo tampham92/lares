@@ -19,6 +19,10 @@ breaking changes; upgrading is always the install command run again
   them back on.
 - Outgoing firewall for site users (nftables): direct SMTP on port 25, the cloud metadata service and
   the panel/Adminer ports are blocked. The installer now installs `nftables` (the service stays off).
+- **Per-site resource limits** (site page → Overview): max RAM and CPU for the site's PHP-FPM or
+  Next.js app (cgroups: throttled near the limit, only the offending request is stopped above it, no
+  swap), PHP workers (`pm.max_children`) and max MySQL connections (`MAX_USER_CONNECTIONS`), with
+  current usage. Empty = no limit.
 - **Notification bell** in the top bar (also on phones): a new Lares release, sites that could not be
   isolated, and events such as the result of the upgrade's site conversion. Read state is kept per
   account on the server. Features add their own notices (`registerNotificationSource` / `notify` in
