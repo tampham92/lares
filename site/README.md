@@ -1,6 +1,6 @@
 # Landing page (lares.thocode.dev)
 
-Static HTML/CSS, no build step and no third-party requests. Deployed as a Cloudflare Worker with static assets.
+Static HTML/CSS, no build step. The only third-party request is Cloudflare Web Analytics (cookieless; allowed in the CSP in `_headers`). Deployed as a Cloudflare Worker with static assets.
 
 - `index.html` (Vietnamese) and `en/index.html` (English) are a pair: change both.
 - `assets/site.css` reuses the panel's design tokens (see `.claude/skills/lares-design/SKILL.md`).
