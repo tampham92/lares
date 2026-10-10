@@ -201,13 +201,13 @@ Locations on the VPS: data `/var/lib/lares` (SQLite, secret), sites `/var/www/<d
 
 - Source SSH/DB passwords, DB passwords and Next.js environment variables are encrypted with AES-256-GCM in SQLite.
 - Every shell argument is quoted; domains, paths and excludes are validated with Zod on both server and web.
-- Code and SQL dumps from migrated sites are treated as **untrusted**: SQL is imported with the site's own user (never root), wp-cli/artisan/npm run as `www-data`, setuid/setgid bits are stripped, and archives are extracted with `--no-same-owner`.
+- Code and SQL dumps from migrated sites are treated as **untrusted**: SQL is imported with the site's own user (never root), wp-cli/artisan/npm run as the site's own user, setuid/setgid bits are stripped, and archives are extracted with `--no-same-owner`.
+- **Per-site isolation**: each site has its own Linux user and PHP-FPM inside a systemd sandbox, and a firewall blocks direct mail and the cloud metadata service. A site infected with malware cannot read or change the others. Details: [docs/en/security.md](docs/en/security.md#per-site-isolation).
 - The SSH host key is pinned after the first *Test connection*; if the key changes, the migration stops.
 - The admin panel runs over HTTPS (self-signed, or Let's Encrypt once a panel domain is set), with two-factor auth, an IP allowlist, brute-force protection and session revocation; SSE tokens are masked in logs. Guide: [docs/en/security.md](docs/en/security.md).
 
 ## Current limitations
 
-- All sites run as the same `www-data` user (no per-site user/PHP-FPM pool yet).
 - Database migration supports MySQL/MariaDB only; Next.js sites using an external DB (Postgres, Mongo...) need that DB moved by hand.
 - Secret Next.js environment variables that are not in the source code (e.g. kept in the old panel's process manager) must be entered again.
 - Backups are stored on the server itself only; copy them elsewhere yourself.

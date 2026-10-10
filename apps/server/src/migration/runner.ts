@@ -24,6 +24,7 @@ import * as mysql from '../services/mysql.js';
 import { port80Owner } from '../services/nginx.js';
 import * as nodeapp from '../services/nodeapp.js';
 import * as sites from '../services/sites.js';
+import { runAsOf } from '../services/isolation.js';
 import { rewriteWpConfig, wpCliAsWebUser } from '../services/wordpress.js';
 import { rewriteDotEnv } from './appDetect.js';
 import * as repo from './repo.js';
@@ -562,8 +563,8 @@ export class MigrationRunner {
         }
       }
       if (ctx.appType === 'laravel' && (await host.has('php'))) {
-        await sites.fixPermissions(site.rootPath);
-        await host.mutate(host.asWebUser('php artisan config:clear && php artisan cache:clear', { cwd: appDir, home: site.rootPath }), { log: (m) => log('debug', m) }).catch((err) =>
+        await sites.fixPermissions(site);
+        await host.mutate(host.asWebUser('php artisan config:clear && php artisan cache:clear', { cwd: appDir, ...runAsOf(site) }), { log: (m) => log('debug', m) }).catch((err) =>
           log('warn', `artisan: ${errorMessage(err)}`),
         );
       }
@@ -588,9 +589,9 @@ export class MigrationRunner {
     const to = input.targetDomain;
     if (await host.has('wp')) {
       // wp-cli handles serialized PHP arrays correctly - plain SQL REPLACE would corrupt them
-      await sites.fixPermissions(ctx.site!.rootPath);
+      await sites.fixPermissions(ctx.site!);
       const args = `search-replace ${shq(`//${from}`)} ${shq(`//${to}`)} --all-tables-with-prefix --skip-columns=guid --precise --report-changed-only`;
-      await host.mutate(wpCliAsWebUser(appDir, ctx.site!.rootPath, args), {
+      await host.mutate(wpCliAsWebUser(appDir, runAsOf(ctx.site!), args), {
         log: (m) => log('debug', m),
         timeoutMs: 3_600_000,
       });
@@ -607,7 +608,7 @@ export class MigrationRunner {
 
   private async finalize(ctx: ItemContext, log: (l: MigrationLog['level'], m: string) => void) {
     const site = sites.getSite(ctx.site!.id);
-    await sites.fixPermissions(site.rootPath, (m) => log('debug', m));
+    await sites.fixPermissions(site, (m) => log('debug', m));
     await sites.applySiteVhost(site, (m) => log('debug', m));
     if (ctx.run.session.sameHost) {
       const owner = await port80Owner();

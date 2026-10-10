@@ -128,6 +128,28 @@ jobs:
           echo "panel reports $got, package.json says $want"
           test "$got" = "$want"
 
+      - name: A new site gets its own user, PHP-FPM and firewall rules
+        run: |
+          token=$(curl -skf -X POST -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"CiSmokeTest-12345"}' "$PANEL/api/auth/login" | jq -r .token)
+          task=$(curl -skf -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"type":"php","domain":"ci-isolation.test","aliases":[],"phpVersion":"8.3","createDatabase":false}' "$PANEL/api/sites" | jq -r .id)
+          for _ in $(seq 1 60); do
+            st=$(curl -skf -H "Authorization: Bearer $token" "$PANEL/api/tasks/$task" | jq -r .status)
+            [ "$st" != running ] && break; sleep 2
+          done
+          curl -skf -H "Authorization: Bearer $token" "$PANEL/api/tasks/$task" | jq -r '.logs[].msg'
+          test "$st" = completed
+          systemctl is-active lares-php-1
+          test "$(stat -c '%U %a' /var/www/ci-isolation.test)" = "lares-s1 750"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: ci-isolation.test' http://127.0.0.1/)
+          echo "site answers HTTP $code"; test "$code" = 200
+          sudo nft list table inet lares_sites | grep -q 'tcp dport 25'
+          # the site's PHP cannot reach the panel port (it is trusted on loopback)
+          echo '<?php $s = @fsockopen("127.0.0.1", 8686, $e, $m, 2); echo $s ? "open" : "blocked";' | sudo tee /var/www/ci-isolation.test/public_html/p.php >/dev/null
+          sudo chown lares-s1:lares-s1 /var/www/ci-isolation.test/public_html/p.php
+          test "$(curl -s -H 'Host: ci-isolation.test' http://127.0.0.1/p.php)" = blocked
+
       - name: Telemetry opt-out was saved
         run: |
           sudo grep -qx 'LARES_TELEMETRY=0' /etc/lares/lares.env
@@ -157,3 +179,7 @@ jobs:
           test ! -e /opt/lares
           test ! -e /etc/lares
           test ! -e /usr/local/bin/lares
+          # per-site isolation is gone too
+          if id lares-s1 >/dev/null 2>&1; then echo "user lares-s1 still exists"; exit 1; fi
+          test ! -e /etc/systemd/system/lares-php-1.service
+          if sudo nft list table inet lares_sites >/dev/null 2>&1; then echo "nft table still loaded"; exit 1; fi

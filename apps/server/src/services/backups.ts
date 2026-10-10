@@ -27,6 +27,7 @@ import { LocalBackupStorage, MANIFEST_FILE, type BackupStorage } from './backupS
 import { databasesSize, findWpConfig } from './clone.js';
 import * as databases from './databases.js';
 import { host, type HostLogger } from './host.js';
+import { restartSitePhp } from './isolation.js';
 import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
 import * as sites from './sites.js';
@@ -149,7 +150,7 @@ function recordResult(siteId: number, status: 'ok' | 'failed', error: string | n
 
 // ---- Locks ------------------------------------------------------------------------
 
-export type SiteJobKind = 'backup' | 'restore' | 'update';
+export type SiteJobKind = 'backup' | 'restore' | 'update' | 'isolate';
 
 const running = new Map<number, { taskId: string; kind: SiteJobKind }>();
 
@@ -177,6 +178,17 @@ export function startLocked<T>(site: Site, kind: SiteJobKind, label: string, fn:
   } catch (err) {
     running.delete(site.id);
     throw err;
+  }
+}
+
+/** Hold the site's lock inside a task that is already running (one site after another). Throws when busy. */
+export async function withSiteLock<T>(site: Site, kind: SiteJobKind, fn: () => Promise<T>): Promise<T> {
+  if (running.has(site.id)) throw busy(site);
+  running.set(site.id, { taskId: '', kind });
+  try {
+    return await fn();
+  } finally {
+    running.delete(site.id);
   }
 }
 
@@ -531,7 +543,7 @@ async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { sa
 
     // Files and data are back. What follows only restarts things: failures are reported, not rolled back.
     const warn = (what: string, err: unknown) => log(t('Cảnh báo: {what} thất bại: {error}', { what, error: errorMessage(err) }));
-    await sites.fixPermissions(site.rootPath, log).catch((e) => warn(t('phân quyền'), e));
+    await sites.fixPermissions(site, log).catch((e) => warn(t('phân quyền'), e));
     if (hadRoot) await fs.rm(old, { recursive: true, force: true }).catch((e) => warn(t('xoá thư mục cũ'), e));
     if (site.appType === 'nextjs' && site.appPort) {
       const ready = (await host.exists(path.join(site.webRoot, 'node_modules'))) && (await host.exists(path.join(site.webRoot, '.next')));
@@ -541,7 +553,7 @@ async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { sa
         await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, sites.getNodeConfig(site.id), log).catch((e) => warn('build', e));
       }
     }
-    if (site.phpVersion) await host.mutate(`systemctl reload ${shq(`php${site.phpVersion}-fpm`)}`, { log }).catch((e) => warn('php-fpm reload', e));
+    if (site.phpVersion) await restartSitePhp(site, log).catch((e) => warn('php-fpm', e));
     await sites.applySiteVhost(sites.getSite(site.id), log).catch((e) => warn('nginx', e));
     log(t('Đã khôi phục {domain} từ bản sao lưu {id}', { domain: site.domain, id }));
     return { safetyId };
@@ -584,6 +596,8 @@ async function rollback(s: {
       if (s.hadRoot) await fs.rename(s.old, site.rootPath);
       await fs.rm(failed, { recursive: true, force: true });
     });
+    // an isolated site's PHP-FPM still has the swapped-out folder mounted (see restartSitePhp)
+    if (site.sysUser && site.phpVersion) await step('php-fpm', () => restartSitePhp(site, log));
   }
   if (s.touched.length) {
     if (!s.safetyId) {

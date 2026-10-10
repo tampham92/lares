@@ -107,14 +107,6 @@ code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monosp
 }
 .sidebar-footer { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--sidebar-border); font-size: 12px; }
 .sidebar-footer a { color: var(--sidebar-text); }
-.sidebar-footer .update { margin-bottom: 8px; }
-.sidebar-footer .update summary { cursor: pointer; color: var(--flame); font-weight: 600; }
-.sidebar-footer .update > div { margin-top: 6px; line-height: 1.45; }
-.sidebar-footer .update code {
-  display: block; margin: 6px 0; padding: 6px 8px; border-radius: 6px; background: var(--code-bg);
-  color: var(--code-text); word-break: break-all; user-select: all;
-}
-.sidebar-footer .update a { text-decoration: underline; }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .topbar {
@@ -173,6 +165,50 @@ code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monosp
   color: var(--muted); cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .icon-btn:hover { color: var(--err); border-color: var(--err); background: var(--err-soft); }
+.icon-btn.neutral:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+
+/* ---- Notification bell (top bar, components/NotificationBell.tsx) --------------------------- */
+.bell { position: relative; }
+.bell .icon-btn { position: relative; }
+.bell-count {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--err); color: var(--panel); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  box-shadow: 0 0 0 2px var(--panel); font-variant-numeric: tabular-nums;
+}
+.bell-panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(360px, calc(100vw - 32px));
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  overflow-wrap: anywhere; display: flex; flex-direction: column; max-height: min(560px, calc(100vh - 80px));
+}
+.bell-head { padding: 12px 16px; font-weight: 650; border-bottom: 1px solid var(--border); }
+.bell-list { overflow-y: auto; }
+.bell-empty { padding: 24px 16px; text-align: center; color: var(--muted); }
+.bell-item { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--border); }
+.bell-item:last-child { border-bottom: 0; }
+.bell-item.new { background: var(--primary-soft); }
+.bell-item-head { display: flex; align-items: flex-start; gap: 8px; }
+.bell-item-head strong { flex: 1; min-width: 0; }
+.bell-tone { flex-shrink: 0; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--primary); }
+.bell-item.ok .bell-tone { background: var(--ok); }
+.bell-item.warn .bell-tone { background: var(--warn); }
+.bell-item.err .bell-tone { background: var(--err); }
+.bell-dismiss {
+  flex-shrink: 0; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.bell-dismiss:hover { background: var(--panel-2); color: var(--text); }
+.bell-item .sub { font-size: 13px; }
+.bell-item details summary { font-size: 13px; }
+.bell-time { font-size: 12px; color: var(--muted); }
+.bell-cmd {
+  display: block; margin: 8px 0; padding: 6px 8px; border-radius: 6px; background: var(--code-bg);
+  color: var(--code-text); word-break: break-all; user-select: all;
+}
+.bell-error { color: var(--err); font-size: 13px; }
+.bell-foot {
+  display: flex; justify-content: space-between; gap: 8px; padding: 10px 16px; font-size: 12px;
+  color: var(--muted); border-top: 1px solid var(--border);
+}
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row.end { justify-content: flex-end; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
@@ -304,6 +340,9 @@ details summary { cursor: pointer; color: var(--primary); }
   .sidebar nav a.active::before { display: none; }
   .sidebar-footer { display: none; }
   .topbar { padding: 0 16px; }
+  /* the bell is not at the right edge: anchor its panel to the (sticky, positioned) top bar instead */
+  .bell { position: static; }
+  .bell-panel { left: 16px; right: 16px; width: auto; top: calc(100% - 4px); }
   .content { padding: 16px; }
   .kv { grid-template-columns: 1fr; gap: 2px 12px; }
   .kv > div:nth-child(even) { margin-bottom: 6px; }

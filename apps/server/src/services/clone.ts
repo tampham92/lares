@@ -15,6 +15,7 @@ import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
 import * as sites from './sites.js';
+import { runAsOf, siteOwner } from './isolation.js';
 import { ensurePortHostFix, rewriteWpConfig, wordpressReplaceUrl } from './wordpress.js';
 
 /** Caches in the site's home dir (HOME of the web user) and Next.js build cache: rebuilt on demand. */
@@ -89,7 +90,7 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
     // the source keeps its internal port; the clone gets a free one
     const nodeConfig = src.appType === 'nextjs' ? { ...sites.getNodeConfig(src.id), port: undefined } : undefined;
     const site = await sites.provisionSite(
-      { domain, aliases: listenPort ? [] : input.aliases, appType: src.appType, phpVersion: src.phpVersion, webRootSubdir, nodeConfig, listenPort },
+      { domain, aliases: listenPort ? [] : input.aliases, appType: src.appType, phpVersion: src.phpVersion, webRootSubdir, nodeConfig, listenPort, phpExecAllowed: src.phpExecAllowed },
       log,
       undo,
     );
@@ -118,10 +119,10 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
         const cfgFile = inClone(wpConfig!);
         await host.writeFile(cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), 0o640);
         log(t('wp-config.php: trỏ sang database mới'));
-        if (listenPort) await ensurePortHostFix(site.webRoot, log);
-        // wp-cli runs as the web user and must be able to read the copied files
-        await sites.fixPermissions(site.rootPath, log);
-        await wordpressReplaceUrl(site.webRoot, site.rootPath, url, log);
+        if (listenPort) await ensurePortHostFix(site.webRoot, siteOwner(site), log);
+        // wp-cli runs as the site's user and must be able to read the copied files
+        await sites.fixPermissions(site, log);
+        await wordpressReplaceUrl(site.webRoot, runAsOf(site), url, log);
         break;
       }
       case 'laravel':
@@ -144,18 +145,18 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
           if (to !== target) log(t('CẦN KIỂM TRA: cấu hình của site vẫn có thể trỏ tới database {from} - hãy đổi sang {to} (mật khẩu xem ở mục Database)', { from, to: to.name }));
         }
         if (src.appType === 'laravel' && (await host.has('php'))) {
-          await sites.fixPermissions(site.rootPath, log);
+          await sites.fixPermissions(site, log);
           await host
-            .mutate(host.asWebUser('php artisan config:clear && php artisan cache:clear', { cwd: appDir, home: site.rootPath }), { log })
+            .mutate(host.asWebUser('php artisan config:clear && php artisan cache:clear', { cwd: appDir, ...runAsOf(site) }), { log })
             .catch((err) => log(`artisan: ${errorMessage(err)}`));
         }
         break;
       }
       case 'nextjs': {
         undo.push(t('xoá service {name}', { name: nodeapp.serviceName(domain) }), () => nodeapp.removeService(domain, log));
-        await nodeapp.writeServiceFiles(domain, site.webRoot, site.rootPath, site.appPort!, nodeConfig!, log);
+        await nodeapp.writeServiceFiles({ ...site, appPort: site.appPort! }, nodeConfig!, log);
         if (await host.exists(path.join(site.webRoot, '.next'))) {
-          await sites.fixPermissions(site.rootPath, log);
+          await sites.fixPermissions(site, log);
           await nodeapp.serviceAction(domain, 'restart', log);
           log(t('Đã khởi động {service} trên 127.0.0.1:{port} (dùng bản build của site nguồn)', { service: nodeapp.serviceName(domain), port: String(site.appPort) }));
           log(t('Lưu ý: biến NEXT_PUBLIC_* được đóng gói lúc build - nếu có giá trị chứa tên miền cũ, sửa ở tab Next.js rồi build lại.'));
@@ -168,7 +169,7 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
         break;
     }
 
-    await sites.fixPermissions(site.rootPath, log);
+    await sites.fixPermissions(site, log);
     undo.clear();
     log(t('Hoàn tất nhân bản {domain} - truy cập: {url}', { domain: src.domain, url }));
     const first = [...copies.values()][0];

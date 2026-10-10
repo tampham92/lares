@@ -56,6 +56,13 @@ describe('version', () => {
     setSetting('release.update', { latest: null, checkedAt: null });
   });
 
+  it('never reports a newest release older than the running version', () => {
+    // checked before the release was tagged, then upgraded: "running 0.3.0, newest 0.2.0" was shown
+    setSetting('release.update', { latest: '0.0.1', checkedAt: new Date().toISOString() });
+    expect(versionInfo()).toMatchObject({ latest: VERSION, updateAvailable: false });
+    setSetting('release.update', { latest: null, checkedAt: null });
+  });
+
   it('GET /api/system/version requires a login', async () => {
     const app = Fastify();
     await app.register(jwt, { secret: 'test-secret-test-secret-test-secret' });
@@ -107,6 +114,20 @@ describe('update check', () => {
     expect(logs.join()).toContain('99.1.0');
     await releaseTick(() => {}, f.fn, now + 25 * 3_600_000);
     expect(f.calls).toHaveLength(2);
+    setSetting('release.update', { latest: null, checkedAt: null });
+  });
+});
+
+describe('update check after an upgrade', () => {
+  it('checks again at the next tick when the answer came from another panel version', async () => {
+    const now = Date.now();
+    setSetting('release.update', { latest: '0.0.1', checkedAt: new Date(now).toISOString(), checkedFor: '0.0.1' });
+    const f = fakeFetch([{ name: `v${VERSION}` }]);
+    await releaseTick(() => {}, f.fn, now + 60_000);
+    expect(f.calls).toHaveLength(1);
+    await releaseTick(() => {}, f.fn, now + 3_600_000);
+    expect(f.calls).toHaveLength(1);
+    expect(versionInfo()).toMatchObject({ latest: VERSION, updateAvailable: false });
     setSetting('release.update', { latest: null, checkedAt: null });
   });
 });

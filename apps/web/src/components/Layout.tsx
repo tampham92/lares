@@ -5,6 +5,7 @@ import { t } from '../i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { LeadsNavBadge } from './LeadsInbox';
 import { Logo } from './Logo';
+import { NotificationBell } from './NotificationBell';
 import { VersionBadge } from './VersionBadge';
 
 // Icon paths: 24x24 stroke icons (lucide style), drawn with currentColor.
@@ -42,6 +43,7 @@ export function Layout() {
       </aside>
       <main className="main">
         <header className="topbar">
+          <NotificationBell />
           <LanguageSwitcher className="lang-switch" />
           <button
             className="icon-btn"

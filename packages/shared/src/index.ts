@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SiteLimits } from './limits.js';
 import { builderSpecSchema } from './builder.js';
 
 export * from './i18n.js';
@@ -13,6 +14,8 @@ export * from './leads.js';
 export * from './github.js';
 export * from './sitetools.js';
 export * from './builder.js';
+export * from './notifications.js';
+export * from './limits.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)
@@ -215,6 +218,30 @@ export interface Site {
   accessLog: boolean;
   migrationId: number | null;
   createdAt: string;
+  /**
+   * The site's own Linux user (`lares-s<id>`), which owns its files and runs its PHP-FPM / Node
+   * process. null = an older site still on the shared web user (converted on upgrade).
+   */
+  sysUser: string | null;
+  /** exec(), shell_exec()... allowed in the site's PHP. Off for new sites; kept on for converted ones. */
+  phpExecAllowed: boolean;
+  /** RAM / CPU / PHP workers / MySQL connections (limits.ts). All null = no limit. */
+  limits: SiteLimits;
+}
+
+/** Isolation state of one site (site page). */
+export interface SiteIsolationView {
+  sysUser: string | null;
+  /** Own PHP-FPM running; null = not a PHP site, not isolated, or unknown (dry-run). */
+  phpActive: boolean | null;
+  phpService: string | null;
+  phpExecAllowed: boolean;
+  /** Outbound firewall rules loaded; null = unknown (dry-run). */
+  firewall: boolean | null;
+  /** Why converting this site to its own user failed last time (it stays on the shared user). */
+  error: string | null;
+  /** Isolation turned off on this server (LARES_SITE_ISOLATION=0). */
+  disabled: boolean;
 }
 
 export interface TemplateInfo {
@@ -249,6 +276,9 @@ export const siteSettingsSchema = z.object({
   accessLog: z.boolean().optional(),
   status: z.enum(['active', 'disabled']).optional(),
 });
+
+/** Site page → Isolation: exec(), shell_exec()... in the site's own PHP-FPM. */
+export const phpExecSchema = z.object({ allowed: z.boolean() });
 
 // ---------------------------------------------------------------------------
 // SSL

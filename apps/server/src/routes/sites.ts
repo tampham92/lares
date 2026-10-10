@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { LOCALHOST, LOG_TYPES, autoDnsBodySchema, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, siteSettingsSchema } from '@lares/shared';
+import { LOCALHOST, LOG_TYPES, autoDnsBodySchema, cloneSiteSchema, createSiteSchema, domainSchema, deleteSiteSchema, issueSslSchema, nextjsConfigSchema, phpExecSchema, siteLimitsSchema, siteSettingsSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
 import { t } from '../i18n/index.js';
 import { badRequest } from '../lib/errors.js';
@@ -10,6 +10,8 @@ import { idParam, parse } from '../lib/validate.js';
 import { cloneSite } from '../services/clone.js';
 import { autoDnsForSite } from '../services/cloudflareDns.js';
 import * as databases from '../services/databases.js';
+import { isolationView, setPhpExecAllowed, startIsolateSite } from '../services/isolateSites.js';
+import { limitsView, setLimits } from '../services/siteLimits.js';
 import { tailFile, trafficStats, truncateLog } from '../services/logs.js';
 import { siteLogPaths } from '../services/nginx.js';
 import * as nodeapp from '../services/nodeapp.js';
@@ -118,6 +120,23 @@ export async function siteRoutes(app: FastifyInstance) {
     const site = sites.getSite(id);
     await nodeapp.serviceAction(site.domain, action as 'start' | 'stop' | 'restart');
     return nodeapp.serviceStatus(site.domain, site.appPort, site.webRoot);
+  });
+
+  // ---- Isolation (own Linux user + PHP-FPM, services/isolation.ts) ---------
+
+  app.get('/api/sites/:id/isolation', async (req) => isolationView(idParam(req.params)));
+
+  /** Convert an older site (shared web user) now - the retry after a failed automatic conversion. */
+  app.post('/api/sites/:id/isolation', async (req) => startIsolateSite(idParam(req.params)));
+
+  // Resource limits: RAM / CPU / PHP workers / MySQL connections (services/siteLimits.ts)
+  app.get('/api/sites/:id/limits', async (req) => limitsView(idParam(req.params)));
+
+  app.put('/api/sites/:id/limits', async (req) => setLimits(idParam(req.params), parse(siteLimitsSchema, req.body)));
+
+  app.put('/api/sites/:id/php-exec', async (req) => {
+    const { allowed } = parse(phpExecSchema, req.body);
+    return setPhpExecAllowed(idParam(req.params), allowed);
   });
 
   // ---- SSL -----------------------------------------------------------------

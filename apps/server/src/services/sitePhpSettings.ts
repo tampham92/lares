@@ -6,7 +6,7 @@ import { t } from '../i18n/index.js';
 import { badRequest, conflict, errorMessage } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
-import { phpSocket } from './php.js';
+import { phpPathsFor, phpSocketFor, reloadSitePhp, siteOwner } from './isolation.js';
 import {
   blockSettings,
   clientMaxBodyFor,
@@ -33,7 +33,9 @@ function phpSite(id: number): Site & { phpVersion: string } {
   return { ...site, phpVersion: site.phpVersion ?? config.defaultPhp };
 }
 
-const serverPhpFor = (site: { phpVersion: string }) => readServerPhp(site.phpVersion, phpSocket(site.phpVersion), process.env.LARES_PHP_ETC_DIR || '/etc/php');
+/** php.ini of the site's PHP version, plus the pool that really serves it (its own php-fpm.conf when isolated). */
+const serverPhpFor = (site: Site & { phpVersion: string }) =>
+  readServerPhp(site.phpVersion, phpSocketFor(site), process.env.LARES_PHP_ETC_DIR || '/etc/php', site.sysUser ? [phpPathsFor(site.id).conf] : undefined);
 
 const userIniPath = (site: Site, server: ServerPhp) => path.join(site.webRoot, server.userIniFilename || '.user.ini');
 
@@ -115,9 +117,9 @@ export async function savePhpSettings(siteId: number, settings: PhpSettings, log
   const writeIni = async (content: string | null) => {
     if (content === null) await fs.rm(file, { force: true });
     else {
-      await host.writeFile(file, content, 0o644);
-      // the site's own tools (Wordfence...) append their lines to this file, so it belongs to the web user like the rest
-      await host.mutate(`chown ${shq(`${config.webUser}:${config.webUser}`)} ${shq(file)}`, { log });
+      await host.writeFile(file, content, site.sysUser ? 0o640 : 0o644);
+      // the site's own tools (Wordfence...) append their lines to this file, so it belongs to the site's user like the rest
+      await host.mutate(`chown ${shq(`${siteOwner(site)}:${siteOwner(site)}`)} ${shq(file)}`, { log });
     }
   };
 
@@ -131,8 +133,7 @@ export async function savePhpSettings(siteId: number, settings: PhpSettings, log
     throw err;
   }
   // user_ini.cache_ttl (300 s by default) would delay the change: a graceful reload starts fresh workers
-  await host
-    .mutate(`systemctl reload ${shq(`php${site.phpVersion}-fpm`)}`, { log })
+  await reloadSitePhp(site, log)
     .catch((err) => log?.(t('Cảnh báo: không reload được PHP-FPM ({error}) - giá trị mới có hiệu lực sau tối đa {ttl} giây', { error: errorMessage(err), ttl: server.userIniCacheTtl })));
   return view(site, server, settings, next);
 }

@@ -8,6 +8,40 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Added
+- **Per-site isolation**: every site gets its own Linux user (`lares-s<id>`) and its own PHP-FPM
+  (`lares-php-<id>.service`) running as that user inside a systemd sandbox (read-only system, private
+  `/tmp`, other sites hidden, no exec from writable folders). Site folders are `0750`, so a site
+  infected with malware can no longer read another site's `wp-config.php` or change its files. Next.js
+  sites run as their own user with the same sandbox. The site page shows the state (Overview → Site
+  isolation).
+- `exec`, `shell_exec`, `proc_open`... are disabled for new PHP sites; a switch on the site page turns
+  them back on.
+- Outgoing firewall for site users (nftables): direct SMTP on port 25, the cloud metadata service and
+  the panel/Adminer ports are blocked. The installer now installs `nftables` (the service stays off).
+- **Per-site resource limits** (site page → Overview): max RAM and CPU for the site's PHP-FPM or
+  Next.js app (cgroups: throttled near the limit, only the offending request is stopped above it, no
+  swap), PHP workers (`pm.max_children`) and max MySQL connections (`MAX_USER_CONNECTIONS`), with
+  current usage. Empty = no limit.
+- **Notification bell** in the top bar (also on phones): a new Lares release, sites that could not be
+  isolated, and events such as the result of the upgrade's site conversion. Read state is kept per
+  account on the server. Features add their own notices (`registerNotificationSource` / `notify` in
+  `services/notifications.ts`) without UI changes.
+
+### Changed
+- On upgrade, existing sites are converted to their own user and PHP-FPM one at a time, while they stay
+  online. A failed step or a site answering 5xx afterwards rolls the site back; the reason is shown on
+  the site page with a retry button. `LARES_SITE_ISOLATION=0` turns isolation off.
+- nginx no longer follows symlinks whose owner differs from their target's
+  (`disable_symlinks if_not_owner`) in PHP and static sites.
+- `/var/www` is now `0711`: sites can no longer list each other's domains.
+- The new-release notice moved from the sidebar footer to the bell.
+
+### Fixed
+- Settings → Updates could show a "latest version" older than the running one (a check made just
+  before a release was tagged, then upgraded). The panel now checks again after its version changes
+  and never reports a latest version below its own.
+
 ## [0.3.0-beta] - 2026-10-10
 
 ### Added

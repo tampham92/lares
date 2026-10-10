@@ -18,11 +18,16 @@ the 1200x630 share images. Retake them when the panel UI changes noticeably.
 `wrangler.jsonc` serves this folder as a Worker named `lares-site` on the route `lares.thocode.dev/*`.
 `.assetsignore` keeps the config and this README out of the public files.
 
-Dashboard (Workers & Pages > the Worker > Settings > Build):
+Deployed by GitHub Actions (`.github/workflows/site.yml`), not by Cloudflare's Git integration:
 
-- Git repository `tampham92/lares`, branch `main`
-- Root directory `site`, build command empty, deploy command `npx wrangler deploy`
-- Build watch paths: include `site/*`
+- a push to `main` that changes `site/` runs `wrangler deploy`, then checks the page answers;
+- a pull request that changes `site/` only runs `wrangler deploy --dry-run` (no token, nothing uploaded);
+- **Actions → Landing page → Run workflow** deploys `main` by hand.
+
+Repository secrets: `CLOUDFLARE_API_TOKEN` (an API token with *Account → Workers Scripts → Edit* and
+*Zone → Workers Routes → Edit* on `thocode.dev`) and `CLOUDFLARE_ACCOUNT_ID`. The Worker must not also be
+connected to the repository in the dashboard (Settings > Build > Git repository: disconnected), or every
+branch would be built twice.
 
 The Worker name in the dashboard must match `name` in `wrangler.jsonc`.
 

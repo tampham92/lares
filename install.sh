@@ -295,6 +295,9 @@ step "$(L 'Cài gói hệ thống cơ bản' 'Installing base system packages')"
 $APT update || warn "$(L 'apt-get update báo lỗi (thường do repo bên thứ ba hỏng) - vẫn tiếp tục' 'apt-get update reported errors (usually a broken third-party repo) - continuing')"
 $APT install curl ca-certificates gnupg git tar gzip pigz rsync unzip openssl lsb-release cron logrotate \
   iproute2 procps sudo apt-transport-https
+# nft only: Lares loads its own table for the isolated sites' outbound rules. nftables.service is
+# left disabled - it starts with `flush ruleset`, which would also wipe ufw's rules.
+$APT install nftables || warn "$(L 'Không cài được nftables - các site vẫn chạy, chỉ chưa chặn kết nối ra ngoài' 'Could not install nftables - sites still work, only their outgoing connections are not restricted')"
 ok "$(L 'Gói cơ bản' 'Base packages')"
 
 # ---- IPv6 without a route ---------------------------------------------------
@@ -502,7 +505,9 @@ fi
 
 # ---- Directories ------------------------------------------------------------
 step "$(L 'Tạo thư mục' 'Creating directories')"
-install -d -m 755 /var/www "$CONF_DIR" "$CONF_DIR/apps" /var/log/lares /var/log/lares/sites
+install -d -m 755 "$CONF_DIR" "$CONF_DIR/apps" "$CONF_DIR/php" /var/log/lares /var/log/lares/sites
+# 711: nginx and each site's own user can traverse to their folder, nobody can list the other sites
+install -d -m 711 /var/www
 install -d -m 700 "$CONF_DIR/ssl" "$INSTALL_DIR"
 install -d -m 711 "$DATA_DIR"
 install -d -m 755 "$DATA_DIR/acme"

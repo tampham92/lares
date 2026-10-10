@@ -95,6 +95,6 @@ export interface SiteBackupsResponse {
   schedule: { globalEnabled: boolean; siteEnabled: boolean; time: string; keep: number };
   last: { date: string | null; status: 'ok' | 'failed' | null; error: string | null; at: string | null };
   /** Backup/restore currently running for this site (attach a TaskLog to follow it). */
-  running: { taskId: string; kind: 'backup' | 'restore' | 'update' } | null;
+  running: { taskId: string; kind: 'backup' | 'restore' | 'update' | 'isolate' } | null;
   root: string;
 }
