@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.0-beta] - 2026-10-11
+
 ### Added
 - **Per-site isolation**: every site gets its own Linux user (`lares-s<id>`) and its own PHP-FPM
   (`lares-php-<id>.service`) running as that user inside a systemd sandbox (read-only system, private
@@ -200,6 +202,7 @@ First public beta under the name **Lares Panel by ThoCode**.
 - Re-running the installer (upgrade) no longer resets a custom `--port` to 8686, and no longer
   installs the default PHP versions again: the saved port and PHP list are kept.
 
-[Unreleased]: https://github.com/tampham92/lares/compare/v0.3.0-beta...HEAD
+[Unreleased]: https://github.com/tampham92/lares/compare/v0.4.0-beta...HEAD
+[0.4.0-beta]: https://github.com/tampham92/lares/compare/v0.3.0-beta...v0.4.0-beta
 [0.3.0-beta]: https://github.com/tampham92/lares/compare/v0.2.0-beta...v0.3.0-beta
 [0.2.0-beta]: https://github.com/tampham92/lares/releases/tag/v0.2.0-beta
