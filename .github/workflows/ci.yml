@@ -130,6 +130,8 @@ jobs:
 
       - name: A new site gets its own user, PHP-FPM and firewall rules
         run: |
+          # some VPS images give root a 027/077 umask: the panel's folder is then closed to site users
+          sudo chmod 700 /opt/lares/src/apps/server
           token=$(curl -skf -X POST -H 'Content-Type: application/json' \
             -d '{"username":"admin","password":"CiSmokeTest-12345"}' "$PANEL/api/auth/login" | jq -r .token)
           task=$(curl -skf -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
