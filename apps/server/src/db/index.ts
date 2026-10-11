@@ -301,3 +301,5 @@ CREATE INDEX IF NOT EXISTS idx_security_events_site ON security_events(site_id, 
 `);
 // mu-plugins known as legitimate (path -> sha256), like admins_json: a new one stays flagged until acknowledged
 ensureColumn('site_security', 'mu_plugins_json', 'TEXT');
+// files the owner marked as not malware (path -> sha256): a changed file is reported again
+ensureColumn('site_security', 'ignored_json', 'TEXT');

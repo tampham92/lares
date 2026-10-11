@@ -77,7 +77,9 @@ Site page → **Security**.
 site's code, so it also works on a quarantined site:
 
 - WordPress core and plugin files are compared with the release checksums from wordpress.org:
-  modified files, unknown files in `wp-admin`/`wp-includes`, missing core files.
+  modified files, unknown files in `wp-admin`/`wp-includes`, unknown `wp-*.php` files in the root
+  (disguised as core), missing core files. `wp-config.php` is searched for malware code too.
+- Images carrying PHP code keep being reported by later scans until they are dealt with.
 - PHP files in `uploads` and images carrying PHP code; `.user.ini` files with `auto_prepend_file`
   (Wordfence's firewall excepted); unknown or modified files in `mu-plugins` (reported until you
   acknowledge them).
@@ -90,12 +92,22 @@ site's code, so it also works on a quarantined site:
 New findings are reported in the notification bell and, when enabled, to the Telegram/webhook set up
 under Leads → Notifications. No scanner catches every backdoor: a clean result is not a guarantee.
 
+A false positive (a file of a legitimate plugin) can be marked **Not malware** once you have opened and
+checked the file: Lares remembers its content (sha256), the finding becomes informational and no
+longer blocks the release. A later change to the file brings it back. The mark is recorded in the
+security history.
+
+**Automatic quarantine** (off by default, under the automatic scan schedule): when the daily scan finds
+something new and critical, a site with its own user is quarantined at once and you get a
+Telegram/webhook alert. A false positive also takes the site offline until you release it.
+
 **Quarantine** (when you suspect an infection): the site serves a 503 maintenance page, every outgoing
 connection of the site is blocked, its PHP-FPM/Next.js and any leftover process of its user are
 stopped, its cron jobs are removed, then Lares keeps a backup as evidence. That backup is hidden from
 the normal restore list and restoring it takes an explicit confirmation. While quarantined the site
 cannot be enabled, updated, cloned, have its PHP settings changed or be logged into: all of that runs
-the site's code.
+the site's code. If a quarantine step fails (nginx, firewall, stopping processes), the task fails, the
+Security tab names the step and offers **Run quarantine again**.
 
 **Clean site** (quarantined site; most complete for WordPress): replaces code with clean copies rather
 than trusting "scan and delete".
@@ -105,14 +117,22 @@ than trusting "scan and delete".
 2. Flagged files are moved to `<site folder>/.lares-quarantine/<time>/`, outside the web root and never
    deleted. Foreign `auto_prepend_file` lines are removed from `.user.ini`.
 3. New salts in `wp-config.php` (every old login session ends), a new database password, the
-   administrators you select deleted, application passwords revoked.
+   administrators you select deleted, application passwords revoked, random passwords for the remaining
+   administrators (after the release, open wp-admin with the panel's button or "Lost your password?"
+   and set a new one), `home`/`siteurl` reset to the site's domain if they were changed.
 4. Scan again. A safety backup is taken first.
+
+What is left to do by hand is listed at the end of the log ("TO DO BY HAND") and in the security
+history: premium or custom plugins/themes, suspicious code in `wp-config.php`, `<script>` in the
+database (open Adminer on the Overview tab). If the site user cannot write to its own folder (after a
+restore whose permission step failed, for example), Lares gives the folder back to it before cleaning.
 
 Lares does not run the site's code while cleaning: the panel downloads the files, then the site's user
 unpacks and moves them into place (root never writes into the site folder). Afterwards, change the
 admin passwords and related FTP/hosting accounts. **Release** needs a scan after the quarantine without
 critical findings; if you checked the site yourself you can release without one (recorded in the
-history).
+history). For a Next.js site the scanner cannot read the code, so the release always takes that
+confirmation; deploys are blocked during the quarantine, so redeploy from git right after releasing.
 
 **Code lock** (optional, per PHP site): the site's code belongs to root, PHP can read it and only write
 to the allowed folders (WordPress default: `wp-content/uploads`, `wp-content/cache`,

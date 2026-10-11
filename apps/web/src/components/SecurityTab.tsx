@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  QUARANTINE_STEP_LABELS,
   SCAN_CHECK_LABELS,
   SECURITY_EVENT_LABELS,
   msg,
@@ -49,10 +50,23 @@ const FIREWALL_KIND: Record<string, string> = {
 };
 const DB_PLACE: Record<string, string> = { posts: msg('bài viết / trang'), options: msg('tuỳ chọn (wp_options)') };
 
-function FindingRow({ f }: { f: ScanFinding }) {
+/** Findings about one file's content: the owner may mark it as not malware (same rule as malwarePolicy.ignorable). */
+const IGNORABLE = new Set<ScanFinding['check']>(['core-checksum', 'plugin-checksum', 'uploads-php', 'uploads-code', 'pattern', 'user-ini']);
+const ignorable = (f: ScanFinding) => IGNORABLE.has(f.check) && !!f.path && !f.count && !f.path.endsWith('/') && f.severity !== 'info';
+
+/** What to do about findings the cleaning cannot fix by itself. */
+const FIX_HINT: Partial<Record<ScanFinding['check'], string>> = {
+  'db-script': msg('Mở Adminer ở tab Tổng quan để xem và xoá đoạn lạ (có thể là mã hợp lệ như analytics).'),
+  'site-url': msg('Dọn site đặt lại địa chỉ này về tên miền của site.'),
+};
+
+type OnIgnore = (path: string, ignore: boolean) => void;
+
+function FindingRow({ f, busy, onIgnore }: { f: ScanFinding; busy: boolean; onIgnore?: OnIgnore }) {
   const known = (table: Record<string, string>, key: string | undefined) => (key && table[key] ? t(table[key]) : key);
   const where = f.check === 'firewall' ? known(FIREWALL_KIND, f.path) : f.check === 'db-script' ? known(DB_PLACE, f.path) : f.path;
   const detail = known(DETAIL, f.detail);
+  const hint = FIX_HINT[f.check];
   return (
     <div className="finding">
       <Badge tone={SEVERITY[f.severity].tone}>{t(SEVERITY[f.severity].label)}</Badge>
@@ -60,15 +74,27 @@ function FindingRow({ f }: { f: ScanFinding }) {
         <div>
           {t(SCAN_CHECK_LABELS[f.check])}
           {f.count ? <span className="sub"> · {t('{n} lần/file', { n: f.count })}</span> : null}
+          {f.ignored && <span className="sub"> · {t('đã đánh dấu không phải mã độc (vốn là: {severity})', { severity: t(SEVERITY[f.ignored].label) })}</span>}
         </div>
         {where && <div className={f.check === 'firewall' || f.check === 'db-script' ? 'sub' : 'mono'}>{where}</div>}
         {detail && <div className="hint mono">{detail}</div>}
+        {hint && !f.ignored && <div className="hint">{t(hint)}</div>}
+        {onIgnore && f.path && ignorable(f) && (
+          <button className="btn sm" disabled={busy} onClick={() => onIgnore(f.path!, true)}>
+            {t('Không phải mã độc')}
+          </button>
+        )}
+        {onIgnore && f.path && f.ignored && (
+          <button className="btn sm" disabled={busy} onClick={() => onIgnore(f.path!, false)}>
+            {t('Bỏ đánh dấu')}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function Findings({ scan }: { scan: MalwareScan }) {
+function Findings({ scan, busy, onIgnore }: { scan: MalwareScan; busy: boolean; onIgnore?: OnIgnore }) {
   const main = scan.findings.filter((f) => f.severity !== 'info');
   const info = scan.findings.filter((f) => f.severity === 'info');
   return (
@@ -76,16 +102,19 @@ function Findings({ scan }: { scan: MalwareScan }) {
       {main.length > 0 && (
         <div>
           {main.map((f, i) => (
-            <FindingRow key={i} f={f} />
+            <FindingRow key={i} f={f} busy={busy} onIgnore={onIgnore} />
           ))}
         </div>
+      )}
+      {main.some(ignorable) && onIgnore && (
+        <div className="hint">{t('"Không phải mã độc" chỉ dùng khi bạn đã mở file và chắc chắn nó hợp lệ. File bị sửa sau đó sẽ bị báo lại.')}</div>
       )}
       {info.length > 0 && (
         <details>
           <summary>{t('{n} mục thông tin (file mới/sửa, plugin chưa đối chiếu được...)', { n: info.length })}</summary>
           <div>
             {info.map((f, i) => (
-              <FindingRow key={i} f={f} />
+              <FindingRow key={i} f={f} busy={busy} onIgnore={onIgnore} />
             ))}
           </div>
         </details>
@@ -124,6 +153,10 @@ function ScheduleForm({ settings, onSaved }: { settings: SecuritySettings; onSav
         <Check checked={form.externalAlerts} onChange={(v) => setForm({ ...form, externalAlerts: v })}>
           {t('Gửi cảnh báo qua Telegram / webhook đã cài ở Khách liên hệ → Thông báo')}
         </Check>
+        <Check checked={form.autoQuarantine} disabled={!form.scanEnabled} onChange={(v) => setForm({ ...form, autoQuarantine: v })}>
+          {t('Tự động cách ly khẩn site khi lần quét hằng ngày có phát hiện nghiêm trọng mới')}
+        </Check>
+        <div className="hint">{t('Chỉ áp dụng cho site có user riêng. Một lần báo nhầm cũng làm site ngừng phục vụ cho đến khi bạn gỡ cách ly.')}</div>
         {error && <Alert tone="err">{error}</Alert>}
         <div className="row end">
           <button className="btn" disabled={busy} onClick={() => void save()}>
@@ -164,6 +197,19 @@ function History({ scans }: { scans: MalwareScanSummary[] }) {
 function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecurityView; busy: boolean; start: (path: string, body?: unknown) => void; refresh: () => void }) {
   const scan = v.lastScan;
   const [ackBusy, setAckBusy] = useState(false);
+  const [ignoreError, setIgnoreError] = useState<string | null>(null);
+  const ignore = async (path: string, on: boolean) => {
+    setAckBusy(true);
+    setIgnoreError(null);
+    try {
+      await post(`/api/sites/${site.id}/security/ignore`, { path, ignore: on });
+      refresh();
+    } catch (e) {
+      setIgnoreError(errMsg(e));
+    } finally {
+      setAckBusy(false);
+    }
+  };
   const toAcknowledge = scan?.findings.some((f) => (f.check === 'new-admin' || f.check === 'mu-plugin') && f.severity !== 'info');
   const acknowledge = async () => {
     setAckBusy(true);
@@ -200,6 +246,20 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
         </div>
       )}
       {scan?.status === 'failed' && scan.error && <Alert tone="err">{scan.error}</Alert>}
+      {scan?.status === 'infected' && !v.quarantine.active && (
+        <Alert tone="err">
+          <div className="stack" style={{ gap: 8 }}>
+            <div>{t('Nên xử lý ngay: 1) Cách ly khẩn (chặn site chạy code và gửi dữ liệu ra ngoài), 2) Dọn site, 3) xem kết quả quét lại, 4) gỡ cách ly. Nếu chắc một mục là báo nhầm, bấm "Không phải mã độc" ở mục đó.')}</div>
+            {v.supported.quarantine && (
+              <div>
+                <button className="btn sm danger" onClick={() => document.getElementById('quarantine-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                  {t('Đến phần Cách ly khẩn')}
+                </button>
+              </div>
+            )}
+          </div>
+        </Alert>
+      )}
       <div className="row">
         <button className="btn primary" disabled={busy || !v.supported.scan} onClick={() => start(`/api/sites/${site.id}/security/scan`)}>
           {t('Quét ngay')}
@@ -207,7 +267,8 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
         {!v.settings.scanEnabled && <span className="hint">{t('Quét tự động đang tắt.')}</span>}
         {v.settings.scanEnabled && <span className="hint">{t('Tự quét mỗi ngày lúc {time}.', { time: v.settings.scanTime })}</span>}
       </div>
-      {scan && scan.status !== 'running' && scan.status !== 'failed' && <Findings scan={scan} />}
+      {scan && scan.status !== 'running' && scan.status !== 'failed' && <Findings scan={scan} busy={busy || ackBusy} onIgnore={(p, on) => void ignore(p, on)} />}
+      {ignoreError && <Alert tone="err">{ignoreError}</Alert>}
       {toAcknowledge && site.appType === 'wordpress' && (
         <div className="row">
           <button className="btn sm" disabled={ackBusy} onClick={() => void acknowledge()}>
@@ -239,6 +300,8 @@ const CLEAN_DEFAULTS: CleanSiteInput = {
   shuffleSalts: true,
   rotateDbPassword: true,
   revokeAppPasswords: true,
+  resetSiteUrl: true,
+  resetAdminPasswords: true,
 };
 
 function CleanForm({ site, v, busy, start }: { site: Site; v: SiteSecurityView; busy: boolean; start: (path: string, body?: unknown) => void }) {
@@ -287,6 +350,12 @@ function CleanForm({ site, v, busy, start }: { site: Site; v: SiteSecurityView; 
             <Check checked={form.revokeAppPasswords} onChange={set('revokeAppPasswords')}>
               {t('Thu hồi application password và phiên đăng nhập')}
             </Check>
+            <Check checked={form.resetAdminPasswords} onChange={set('resetAdminPasswords')}>
+              {t('Đặt mật khẩu ngẫu nhiên cho mọi tài khoản quản trị (sau đó vào wp-admin bằng nút của panel hoặc "Quên mật khẩu")')}
+            </Check>
+            <Check checked={form.resetSiteUrl} onChange={set('resetSiteUrl')}>
+              {t('Đặt lại địa chỉ site (home/siteurl) nếu bị đổi sang tên miền khác')}
+            </Check>
           </>
         )}
       </div>
@@ -317,11 +386,13 @@ function QuarantineCard({ site, v, busy, start }: { site: Site; v: SiteSecurityV
   const [confirming, setConfirming] = useState(false);
   const [force, setForce] = useState(false);
   const scan = v.lastScan;
-  const scannedSince = !!scan && !!q.since && scan.startedAt >= q.since && (scan.status === 'clean' || scan.status === 'warning');
+  // the scan reads PHP code only (supported.clean = an isolated PHP site): for other sites the owner confirms
+  const verifiable = v.supported.clean;
+  const scannedSince = verifiable && !!scan && !!q.since && scan.startedAt >= q.since && (scan.status === 'clean' || scan.status === 'warning');
 
   if (!q.active) {
     return (
-      <div className="card stack">
+      <div className="card stack" id="quarantine-card">
         <h2 style={{ margin: 0 }}>{t('Cách ly khẩn')}</h2>
         <div className="sub">
           {t('Dùng khi nghi site bị nhiễm: site trả trang bảo trì, mọi kết nối ra ngoài của site bị chặn, PHP/Node và mọi tiến trình còn sót bị dừng, cron của site bị xoá, rồi chụp một bản sao lưu làm bằng chứng. Trong lúc cách ly không bật lại, cập nhật, nhân bản hay đăng nhập wp-admin được.')}
@@ -361,11 +432,23 @@ function QuarantineCard({ site, v, busy, start }: { site: Site; v: SiteSecurityV
   }
 
   return (
-    <div className="card stack">
+    <div className="card stack" id="quarantine-card">
       <div className="row">
         <h2 style={{ margin: 0, flex: 1 }}>{t('Cách ly khẩn')}</h2>
         <Badge tone="err">{t('Đang cách ly')}</Badge>
       </div>
+      {q.problems.length > 0 && (
+        <Alert tone="err">
+          <div className="stack" style={{ gap: 8 }}>
+            <div>{t('Cách ly chưa trọn vẹn, lỗi ở bước: {steps}. Xem log, xử lý lỗi rồi chạy lại.', { steps: q.problems.map((p) => t(QUARANTINE_STEP_LABELS[p])).join(', ') })}</div>
+            <div>
+              <button className="btn sm danger" disabled={busy} onClick={() => start(`/api/sites/${site.id}/security/quarantine`, { reason: q.reason ?? '' })}>
+                {t('Chạy lại cách ly')}
+              </button>
+            </div>
+          </div>
+        </Alert>
+      )}
       <div className="kv">
         <div>{t('Từ lúc')}</div>
         <div>{fmtDate(q.since)}</div>
@@ -384,14 +467,16 @@ function QuarantineCard({ site, v, busy, start }: { site: Site; v: SiteSecurityV
       {v.supported.clean ? (
         <CleanForm site={site} v={v} busy={busy} start={start} />
       ) : (
-        <div className="sub">{t('Site này không có bước dọn tự động: deploy lại code từ nguồn gốc (git) rồi quét lại trước khi gỡ cách ly.')}</div>
+        <div className="sub">
+          {t('Site này không có bước dọn tự động và bộ quét không kiểm tra được code của nó. Deploy bị chặn trong lúc cách ly: kiểm tra hoặc thay code bằng tay (SFTP), gỡ cách ly, rồi deploy lại ngay từ nguồn gốc (git).')}
+        </div>
       )}
       <h3 style={{ margin: 0 }}>{t('Gỡ cách ly')}</h3>
       {scannedSince ? (
         <div className="sub">{t('Lần quét sau khi cách ly không còn dấu hiệu nghiêm trọng.')}</div>
       ) : (
         <>
-          <Alert tone="warn">{t('Chưa có lần quét nào sau khi cách ly cho kết quả không còn dấu hiệu nghiêm trọng.')}</Alert>
+          {verifiable && <Alert tone="warn">{t('Chưa có lần quét nào sau khi cách ly cho kết quả không còn dấu hiệu nghiêm trọng.')}</Alert>}
           <Check checked={force} onChange={setForce}>
             {t('Tôi đã tự kiểm tra site, vẫn gỡ cách ly (ghi vào lịch sử)')}
           </Check>

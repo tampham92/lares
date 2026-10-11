@@ -53,6 +53,8 @@ export interface ScanFinding {
   detail?: string;
   /** Grouped findings (e.g. 57 changed files of one plugin). */
   count?: number;
+  /** The owner marked this file (this exact content) as not malware: shown as info, with its original severity. */
+  ignored?: ScanSeverity;
 }
 
 export const SCAN_STATUSES = ['running', 'clean', 'warning', 'infected', 'failed'] as const;
@@ -85,12 +87,26 @@ export const securitySettingsSchema = z.object({
   scanTime: z.string().regex(HHMM_RE, msg('Giờ phải có dạng HH:MM')).default('04:30'),
   /** Also send alerts to the Telegram / webhook set up under Leads → Notifications. */
   externalAlerts: z.boolean().default(true),
+  /** Quarantine a site by itself when the daily scan finds something new and critical (off: a false positive takes the site down). */
+  autoQuarantine: z.boolean().default(false),
 });
 export type SecuritySettings = z.infer<typeof securitySettingsSchema>;
 
 // ---- Quarantine and cleaning -----------------------------------------------
 
 export const quarantineSchema = z.object({ reason: z.string().trim().max(500).default('') });
+
+/** "Not malware" on one finding of the latest scan (a file path from that scan), or undoing it. */
+export const ignoreFindingSchema = z.object({ path: z.string().min(1).max(1000), ignore: z.boolean() });
+
+/** Containment steps of a quarantine; a failed one is kept in QuarantineState.problems until a retry succeeds. */
+export const QUARANTINE_STEPS = ['nginx', 'firewall', 'processes'] as const;
+export type QuarantineStep = (typeof QUARANTINE_STEPS)[number];
+export const QUARANTINE_STEP_LABELS: Record<QuarantineStep, string> = {
+  nginx: msg('trang bảo trì (nginx)'),
+  firewall: msg('chặn kết nối ra ngoài (tường lửa)'),
+  processes: msg('dừng PHP/Node, tiến trình và cron'),
+};
 
 /** Lifting the quarantine needs a clean scan, unless `force` (the owner checked the site by hand). */
 export const releaseQuarantineSchema = z.object({ force: z.boolean().default(false) });
@@ -109,6 +125,10 @@ export const cleanSiteSchema = z.object({
   shuffleSalts: z.boolean().default(true),
   rotateDbPassword: z.boolean().default(true),
   revokeAppPasswords: z.boolean().default(true),
+  /** home / siteurl pointing at another host go back to the site's own address. */
+  resetSiteUrl: z.boolean().default(true),
+  /** Random passwords for the remaining administrators (a stolen password must not work any more). */
+  resetAdminPasswords: z.boolean().default(true),
 });
 export type CleanSiteInput = z.infer<typeof cleanSiteSchema>;
 
@@ -119,9 +139,11 @@ export interface QuarantineState {
   reason: string | null;
   /** Backup taken when the quarantine started (trigger "quarantine": not offered for a normal restore). */
   backupId: string | null;
+  /** Containment steps that failed: the quarantine is incomplete until a retry succeeds. */
+  problems: QuarantineStep[];
 }
 
-export const SECURITY_EVENT_ACTIONS = ['quarantine', 'release', 'clean', 'code-lock', 'code-unlock', 'acknowledge'] as const;
+export const SECURITY_EVENT_ACTIONS = ['quarantine', 'release', 'clean', 'code-lock', 'code-unlock', 'acknowledge', 'ignore', 'unignore'] as const;
 export type SecurityEventAction = (typeof SECURITY_EVENT_ACTIONS)[number];
 
 export const SECURITY_EVENT_LABELS: Record<SecurityEventAction, string> = {
@@ -131,6 +153,8 @@ export const SECURITY_EVENT_LABELS: Record<SecurityEventAction, string> = {
   'code-lock': msg('Khoá code'),
   'code-unlock': msg('Mở khoá code'),
   acknowledge: msg('Đánh dấu đã kiểm tra'),
+  ignore: msg('Đánh dấu không phải mã độc'),
+  unignore: msg('Bỏ đánh dấu không phải mã độc'),
 };
 
 export interface SecurityEvent {

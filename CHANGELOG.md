@@ -8,6 +8,34 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Added
+- Security tab: **Not malware** on a finding (a false positive) after checking the file. Lares
+  remembers the file's sha256; the finding no longer counts or blocks the release, and comes back if
+  the file changes. Recorded in the security history.
+- Optional **automatic quarantine** when the daily scan finds something new and critical (off by
+  default), with a Telegram/webhook alert.
+- Cleaning also resets `home`/`siteurl` pointing at another domain and sets random passwords for the
+  remaining WordPress administrators (both on by default). `<script>` found in the database is listed
+  in the to-do-by-hand list with a pointer to Adminer.
+- An infected scan result now says what to do next and links to the quarantine.
+
+### Fixed
+- The scan never reported unknown `wp-*.php` files in the WordPress root (a common disguise for a
+  backdoor) and never searched `wp-config.php` for malware code: both were treated as verified core
+  files. Unknown root `wp-*.php` files are now reported (and moved out by cleaning); `wp-config.php` is
+  checked but never moved.
+- An image carrying PHP code was reported once and then disappeared from the next daily scan; cleaning
+  could leave it in place. It is now reported until dealt with, and cleaning reads every media file.
+- A quarantine whose nginx, firewall or process step failed still reported success, and could not be
+  run again. Every step is now attempted, a failed one fails the task and shows on the Security tab
+  with **Run quarantine again**. Cron jobs are removed before the site's processes are killed, and the
+  kill is checked.
+- Cleaning failed with "mkdir: cannot create directory '/var/www/<domain>': Permission denied" when
+  the site folder was not the site user's any more: cleaning now gives it back first, and names the
+  owners and modes along the path when that is not enough.
+- A quarantined Next.js site could be released on a "clean" scan, which does not read its code: the
+  release now always takes an explicit confirmation.
+
 ## [0.4.1-beta] - 2026-10-11
 
 ### Fixed

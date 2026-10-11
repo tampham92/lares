@@ -76,7 +76,9 @@ Trang site → **Bảo mật**.
 của site, nên quét được cả site đang cách ly:
 
 - File lõi WordPress và plugin được so với checksum của bản gốc trên wordpress.org: file bị sửa, file
-  lạ trong `wp-admin`/`wp-includes`, file lõi bị thiếu.
+  lạ trong `wp-admin`/`wp-includes`, file `wp-*.php` lạ ở thư mục gốc (tên giả file lõi), file lõi bị
+  thiếu. `wp-config.php` cũng được dò các đoạn mã độc.
+- File ảnh có chứa mã PHP tiếp tục bị báo ở các lần quét sau cho tới khi được xử lý.
 - File PHP trong `uploads` và file ảnh có chứa mã PHP; `.user.ini` có `auto_prepend_file` (trừ
   firewall của Wordfence); file lạ hoặc bị sửa trong `mu-plugins` (báo cho tới khi bạn xác nhận).
 - Các đoạn mã thường gặp trong webshell và mã độc (`eval(base64_decode(...))`, `system($_GET[...])`...);
@@ -88,11 +90,20 @@ của site, nên quét được cả site đang cách ly:
 Phát hiện mới được báo ở chuông thông báo và, nếu bật, qua Telegram/webhook đã cài ở Khách liên hệ →
 Thông báo. Máy quét không bắt được mọi backdoor: kết quả sạch không có nghĩa là chắc chắn sạch.
 
+Một mục báo nhầm (file của plugin hợp lệ) có thể đánh dấu **Không phải mã độc** sau khi bạn đã mở file
+và kiểm tra: Lares nhớ nội dung file (sha256), mục đó chuyển thành thông tin và không chặn gỡ cách ly
+nữa. File bị sửa sau đó sẽ bị báo lại. Việc đánh dấu được ghi vào lịch sử bảo mật.
+
+**Tự động cách ly** (tắt mặc định, trong Lịch quét tự động): khi lần quét hằng ngày có phát hiện nghiêm
+trọng mới, site có user riêng được cách ly khẩn ngay và bạn nhận cảnh báo qua Telegram/webhook. Một lần
+báo nhầm cũng làm site ngừng phục vụ cho đến khi bạn gỡ cách ly.
+
 **Cách ly khẩn** (khi nghi site bị nhiễm): site trả trang bảo trì 503, mọi kết nối ra ngoài của site bị
 chặn, PHP-FPM/Next.js và mọi tiến trình còn sót của user site bị dừng, cron của site bị xoá, rồi Lares
 chụp một bản sao lưu làm bằng chứng. Bản này không hiện trong danh sách khôi phục mặc định và cần xác
 nhận riêng nếu muốn khôi phục. Trong lúc cách ly không bật lại, cập nhật, nhân bản, đổi cài đặt PHP hay
-đăng nhập wp-admin được: những việc đó đều chạy code của site.
+đăng nhập wp-admin được: những việc đó đều chạy code của site. Nếu một bước cách ly lỗi (nginx, tường
+lửa, dừng tiến trình), tác vụ báo thất bại, tab Bảo mật ghi rõ bước nào và có nút **Chạy lại cách ly**.
 
 **Dọn site** (site đang cách ly; WordPress được dọn đầy đủ nhất): thay code bằng bản sạch thay vì tin
 vào việc quét rồi xoá.
@@ -102,13 +113,22 @@ vào việc quét rồi xoá.
 2. File bị đánh dấu được chuyển vào `<thư mục site>/.lares-quarantine/<thời điểm>/`, nằm ngoài thư mục
    web và không bị xoá. Dòng `auto_prepend_file` lạ bị xoá khỏi `.user.ini`.
 3. Đổi salt trong `wp-config.php` (mọi phiên đăng nhập cũ hết hiệu lực), đổi mật khẩu database, xoá các
-   tài khoản quản trị bạn chọn, thu hồi application password.
+   tài khoản quản trị bạn chọn, thu hồi application password, đặt mật khẩu ngẫu nhiên cho các tài khoản
+   quản trị còn lại (sau khi gỡ cách ly, vào wp-admin bằng nút của panel hoặc "Quên mật khẩu" rồi đặt
+   mật khẩu mới), đặt lại `home`/`siteurl` về tên miền của site nếu bị đổi.
 4. Quét lại. Có bản sao lưu an toàn trước khi dọn.
+
+Những việc còn phải làm tay được liệt kê ở cuối log (mục "CẦN LÀM TAY") và trong lịch sử bảo mật:
+plugin/theme trả phí hoặc tự viết, đoạn mã lạ trong `wp-config.php`, `<script>` trong database (mở
+Adminer ở tab Tổng quan). Nếu user của site không ghi được vào thư mục site (ví dụ sau một lần khôi
+phục lỗi phân quyền), Lares trả lại quyền thư mục cho user đó trước khi dọn.
 
 Lares không chạy code của site trong lúc dọn: file được panel tải về, rồi user của site giải nén và
 chuyển vào chỗ (root không ghi vào thư mục site). Sau đó hãy đổi mật khẩu quản trị và các tài khoản
 FTP/hosting liên quan. **Gỡ cách ly** cần một lần quét sau khi cách ly không còn dấu hiệu nghiêm trọng;
-nếu bạn đã tự kiểm tra, có thể gỡ mà không cần (được ghi vào lịch sử).
+nếu bạn đã tự kiểm tra, có thể gỡ mà không cần (được ghi vào lịch sử). Với site Next.js, bộ quét không
+đọc được code nên luôn phải xác nhận tự kiểm tra; deploy bị chặn trong lúc cách ly, nên hãy deploy lại
+từ git ngay sau khi gỡ.
 
 **Khoá code** (tuỳ chọn theo site PHP): code của site thuộc về root, PHP chỉ đọc được và chỉ ghi được
 vào các thư mục cho phép (mặc định với WordPress: `wp-content/uploads`, `wp-content/cache`,
