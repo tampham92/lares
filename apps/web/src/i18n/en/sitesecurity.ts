@@ -122,4 +122,30 @@ export const SITESECURITY_EN: Dict = {
   'Lưu thư mục': 'Save folders',
   'Dọn site và gỡ cách ly trước khi khoá code.': 'Clean and release the site before locking its code.',
   'Lịch sử bảo mật': 'Security history',
+
+  // ---- not malware, incomplete quarantine (packages/shared/src/sitesecurity.ts) ----
+  'Đánh dấu không phải mã độc': 'Marked as not malware',
+  'Bỏ đánh dấu không phải mã độc': 'Unmarked as not malware',
+  'trang bảo trì (nginx)': 'maintenance page (nginx)',
+  'chặn kết nối ra ngoài (tường lửa)': 'outbound block (firewall)',
+  'dừng PHP/Node, tiến trình và cron': 'stopping PHP/Node, processes and cron',
+
+  // ---- not malware, next steps, incomplete quarantine ----
+  'Mở Adminer ở tab Tổng quan để xem và xoá đoạn lạ (có thể là mã hợp lệ như analytics).': 'Open Adminer on the Overview tab to review and remove it (it may be legitimate, like analytics).',
+  'Dọn site đặt lại địa chỉ này về tên miền của site.': 'Cleaning resets this address to the site\'s domain.',
+  'đã đánh dấu không phải mã độc (vốn là: {severity})': 'marked as not malware (was: {severity})',
+  'Không phải mã độc': 'Not malware',
+  'Bỏ đánh dấu': 'Unmark',
+  '"Không phải mã độc" chỉ dùng khi bạn đã mở file và chắc chắn nó hợp lệ. File bị sửa sau đó sẽ bị báo lại.': 'Use "Not malware" only after opening the file and making sure it is legitimate. The file is reported again if it changes later.',
+  'Tự động cách ly khẩn site khi lần quét hằng ngày có phát hiện nghiêm trọng mới': 'Quarantine a site automatically when the daily scan finds something new and critical',
+  'Chỉ áp dụng cho site có user riêng. Một lần báo nhầm cũng làm site ngừng phục vụ cho đến khi bạn gỡ cách ly.': 'Only for sites with their own user. A false positive also takes the site offline until you release it.',
+  'Nên xử lý ngay: 1) Cách ly khẩn (chặn site chạy code và gửi dữ liệu ra ngoài), 2) Dọn site, 3) xem kết quả quét lại, 4) gỡ cách ly. Nếu chắc một mục là báo nhầm, bấm "Không phải mã độc" ở mục đó.':
+    'Act now: 1) Quarantine (stops the site\'s code and anything it sends out), 2) Clean the site, 3) check the new scan, 4) release. If you are sure a finding is a false positive, click "Not malware" on it.',
+  'Đến phần Cách ly khẩn': 'Go to Quarantine',
+  'Đặt mật khẩu ngẫu nhiên cho mọi tài khoản quản trị (sau đó vào wp-admin bằng nút của panel hoặc "Quên mật khẩu")': 'Set random passwords for every administrator (then open wp-admin with the panel\'s button or "Lost your password?")',
+  'Đặt lại địa chỉ site (home/siteurl) nếu bị đổi sang tên miền khác': 'Reset the site address (home/siteurl) if it points at another domain',
+  'Cách ly chưa trọn vẹn, lỗi ở bước: {steps}. Xem log, xử lý lỗi rồi chạy lại.': 'Quarantine incomplete, failed step(s): {steps}. Check the log, fix the error and run it again.',
+  'Chạy lại cách ly': 'Run quarantine again',
+  'Site này không có bước dọn tự động và bộ quét không kiểm tra được code của nó. Deploy bị chặn trong lúc cách ly: kiểm tra hoặc thay code bằng tay (SFTP), gỡ cách ly, rồi deploy lại ngay từ nguồn gốc (git).':
+    'This site has no automatic cleaning and the scanner cannot check its code. Deploys are blocked during the quarantine: check or replace the code by hand (SFTP), release, then redeploy from the source (git) right away.',
 };

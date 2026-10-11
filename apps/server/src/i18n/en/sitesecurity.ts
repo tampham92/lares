@@ -123,4 +123,33 @@ export const SITESECURITY_EN: Dict = {
   'Tạm mở khoá code trong lúc chạy tác vụ': 'Code unlocked for this job',
   'Khoá code lại': 'Locking the code again',
   'Cảnh báo: không khoá lại được code: {error}': 'Warning: could not lock the code again: {error}',
+
+  // ---- not malware, incomplete quarantine (packages/shared/src/sitesecurity.ts) ----
+  'Đánh dấu không phải mã độc': 'Marked as not malware',
+  'Bỏ đánh dấu không phải mã độc': 'Unmarked as not malware',
+  'trang bảo trì (nginx)': 'maintenance page (nginx)',
+  'chặn kết nối ra ngoài (tường lửa)': 'outbound block (firewall)',
+  'dừng PHP/Node, tiến trình và cron': 'stopping PHP/Node, processes and cron',
+
+  // ---- quarantine retry, auto-quarantine, cleaning checks ----
+  'Lần quét gần nhất không có phát hiện này': 'The latest scan has no such finding',
+  'Không đọc được file {path}': 'Could not read the file {path}',
+  'Vẫn còn tiến trình chạy dưới user {user} sau khi dừng': 'Processes are still running as user {user} after stopping them',
+  'Chạy lại các bước cách ly': 'Quarantine steps run again',
+  '{domain}: cách ly khẩn chưa trọn vẹn': '{domain}: quarantine incomplete',
+  'Lỗi ở bước: {steps}. Mở tab Bảo mật để chạy lại, hoặc xử lý tay trên máy chủ.': 'Failed step(s): {steps}. Open the Security tab to run it again, or fix it by hand on the server.',
+  'Cách ly chưa trọn vẹn, lỗi ở bước: {steps}. Bấm "Chạy lại cách ly" sau khi xử lý lỗi.': 'Quarantine incomplete, failed step(s): {steps}. Click "Run quarantine again" once the error is fixed.',
+  'Tự động cách ly khẩn: {n} phát hiện nghiêm trọng mới': 'Automatic quarantine: {n} new critical finding(s)',
+  'Tự động: lần quét hằng ngày có {n} phát hiện nghiêm trọng mới': 'Automatic: the daily scan found {n} new critical finding(s)',
+  'Lares (tự động)': 'Lares (automatic)',
+  '{domain} đã được tự động cách ly khẩn': '{domain} was quarantined automatically',
+  'Bộ quét không kiểm tra được code của site này: xác nhận đã tự kiểm tra trước khi gỡ cách ly': 'The scanner cannot check this site\'s code: confirm you checked it yourself before releasing the quarantine',
+  'Thư mục site {dir} không tồn tại': 'The site folder {dir} does not exist',
+  'Thư mục site {dir} là symlink: dọn tự động cần thư mục thật': 'The site folder {dir} is a symlink: automatic cleaning needs a real folder',
+  'User {user} không ghi được vào {dir}: trả lại quyền thư mục cho user của site': 'User {user} cannot write to {dir}: giving the folder back to the site user',
+  'User {user} vẫn không ghi được vào {dir} (quyền trên đường dẫn ở log phía trên)': 'User {user} still cannot write to {dir} (permissions along the path in the log above)',
+  'Đã đặt mật khẩu ngẫu nhiên cho {n} tài khoản quản trị: sau khi gỡ cách ly, vào wp-admin bằng nút của panel (hoặc "Quên mật khẩu") và đặt mật khẩu mới':
+    'Set random passwords for {n} administrator account(s): after releasing the quarantine, open wp-admin with the panel\'s button (or "Lost your password?") and set a new one',
+  'Đã đặt lại {name}: {from} → {to}': 'Reset {name}: {from} → {to}',
+  '<script> trong database ({place}: {ids}): mở Adminer ở tab Tổng quan, xem và xoá đoạn lạ': '<script> in the database ({place}: {ids}): open Adminer on the Overview tab, review and remove what does not belong',
 };

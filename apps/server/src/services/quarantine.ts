@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { msg, type CleanSiteInput, type MalwareScan, type Site } from '@lares/shared';
+import crypto from 'node:crypto';
+import { msg, QUARANTINE_STEP_LABELS, type CleanSiteInput, type MalwareScan, type QuarantineState, type QuarantineStep, type Site } from '@lares/shared';
 import { config } from '../config.js';
 import { t, tDefault } from '../i18n/index.js';
 import { randomPassword } from '../lib/crypto.js';
@@ -13,7 +14,7 @@ import * as databases from './databases.js';
 import { host, type HostLogger } from './host.js';
 import * as isolation from './isolation.js';
 import { broken, probe } from './isolateSites.js';
-import { currentMuPlugins, lastResult, readSafe, runScan, wpAdminsOf, wpDbOf } from './malware.js';
+import { currentMuPlugins, externalAlert, lastResult, readSafe, runScan, wpAdminsOf, wpDbOf } from './malware.js';
 import * as policy from './malwarePolicy.js';
 import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
@@ -50,54 +51,118 @@ const ownProcessUnit = (site: Site) => site.sysUser !== null && sites.usesPhp(si
 async function stopSiteProcesses(site: Site, log: HostLogger) {
   if (ownProcessUnit(site)) await isolation.setSitePhpRunning(site, false, log);
   // disabled too, not only stopped: a reboot during the quarantine must not start the app again
-  if (site.appType === 'nextjs') await host.mutate(`systemctl disable --now ${shq(nodeapp.serviceName(site.domain))}`, { log }).catch(() => undefined);
+  if (site.appType === 'nextjs') {
+    const unit = shq(nodeapp.serviceName(site.domain));
+    // an app never deployed has no unit: nothing to stop
+    await host.mutate(`if systemctl cat ${unit} >/dev/null 2>&1; then systemctl disable --now ${unit}; fi`, { log });
+  }
   if (config.dryRun || !site.sysUser) return;
-  await host.exec(`pkill -KILL -u ${shq(site.sysUser)}`);
-  await host.exec(`crontab -r -u ${shq(site.sysUser)} 2>/dev/null`);
+  const user = shq(site.sysUser);
+  // cron and at first: a job firing between the kill and the cleanup would start the malware again
+  await host.exec(`crontab -r -u ${user} 2>/dev/null`);
   // at jobs: `atq` as root lists every user's jobs, the owner in the last column
-  await host.exec(`command -v atq >/dev/null && atq | awk -v u=${shq(site.sysUser)} '$NF == u { print $1 }' | xargs -r atrm`);
+  await host.exec(`command -v atq >/dev/null && atq | awk -v u=${user} '$NF == u { print $1 }' | xargs -r atrm`);
+  // a process that forks fast can outlive one pkill: try a few times, then say so
+  for (let i = 0; i < 3; i++) {
+    await host.exec(`pkill -KILL -u ${user}`);
+    await new Promise((r) => setTimeout(r, 500));
+    if ((await host.exec(`pgrep -u ${user}`)).code !== 0) return;
+  }
+  throw new Error(t('Vẫn còn tiến trình chạy dưới user {user} sau khi dừng', { user: site.sysUser }));
 }
 
+/** The containment steps, each attempted even when an earlier one failed. Returns the ones that failed. */
+async function contain(site: Site, log: HostLogger): Promise<QuarantineStep[]> {
+  const steps: Array<[QuarantineStep, string, () => Promise<unknown>]> = [
+    ['nginx', t('Bước 1/4: nginx trả trang bảo trì (503)'), () => sites.applySiteVhost(site, log)],
+    ['firewall', t('Bước 2/4: chặn mọi kết nối ra ngoài của user {user}', { user: site.sysUser! }), () => isolation.syncSiteFirewall(log)],
+    ['processes', t('Bước 3/4: dừng PHP/Node, dừng mọi tiến trình còn sót và xoá cron của site'), () => stopSiteProcesses(site, log)],
+  ];
+  const failed: QuarantineStep[] = [];
+  for (const [id, label, run] of steps) {
+    log(label);
+    try {
+      await run();
+    } catch (err) {
+      failed.push(id);
+      log(t('LỖI: {error}', { error: errorMessage(err) }));
+    }
+  }
+  return failed;
+}
+
+/**
+ * Quarantine a site, or retry an incomplete quarantine (same start time and reason; the evidence
+ * backup is only taken once). The site counts as quarantined from the first step on - everything that
+ * runs its code is refused - but a failed step fails the task and stays visible until a retry works:
+ * half a quarantine must never look like a whole one.
+ */
 async function quarantine(site: Site, reason: string, by: string, log: HostLogger) {
-  const since = new Date().toISOString();
-  store.setQuarantineState(site.id, { active: true, since, by, reason: reason || null, backupId: null });
-  try {
-    log(t('Bước 1/4: nginx trả trang bảo trì (503)'));
-    await sites.applySiteVhost(site, log);
-    log(t('Bước 2/4: chặn mọi kết nối ra ngoài của user {user}', { user: site.sysUser! }));
-    await isolation.syncSiteFirewall(log);
-    log(t('Bước 3/4: dừng PHP/Node, dừng mọi tiến trình còn sót và xoá cron của site'));
-    await stopSiteProcesses(site, log);
-  } catch (err) {
-    // half a quarantine is worse than a clear failure: the owner retries or acts by hand
-    log(t('LỖI: {error}', { error: errorMessage(err) }));
+  const prev = store.quarantineState(site.id);
+  const retry = prev.active;
+  const base: QuarantineState = retry ? prev : { active: true, since: new Date().toISOString(), by, reason: reason || null, backupId: null, problems: [] };
+  store.setQuarantineState(site.id, base);
+  const problems = await contain(site, log);
+  let backupId = base.backupId;
+  if (!backupId) {
+    log(t('Bước 4/4: chụp bản sao lưu làm bằng chứng (không hiện trong khôi phục thông thường)'));
+    try {
+      backupId = (await takeBackup(site, 'quarantine', log)).id;
+    } catch (err) {
+      log(t('Cảnh báo: không chụp được bản sao lưu: {error}', { error: errorMessage(err) }));
+    }
   }
-  log(t('Bước 4/4: chụp bản sao lưu làm bằng chứng (không hiện trong khôi phục thông thường)'));
-  let backupId: string | null = null;
-  try {
-    backupId = (await takeBackup(site, 'quarantine', log)).id;
-  } catch (err) {
-    log(t('Cảnh báo: không chụp được bản sao lưu: {error}', { error: errorMessage(err) }));
-  }
-  store.setQuarantineState(site.id, { active: true, since, by, reason: reason || null, backupId });
-  store.addEvent(site.id, 'quarantine', by, reason || null);
-  notify({
-    kind: 'security',
-    tone: 'err',
-    title: msg('{domain} đã bị cách ly khẩn'),
-    body: msg('Site trả trang bảo trì, không kết nối ra ngoài được và không còn tiến trình nào chạy. Dọn site rồi quét lại trước khi gỡ cách ly.'),
-    params: { domain: site.domain },
-    actions: [{ label: msg('Mở site'), href: `/sites/${site.id}?tab=security` }],
-    dedupeKey: `quarantine:${site.id}`,
-  });
+  store.setQuarantineState(site.id, { ...base, backupId, problems });
+  store.addEvent(site.id, 'quarantine', by, retry ? tDefault('Chạy lại các bước cách ly') : reason || null);
+  const failedLabels = problems.map((p) => tDefault(QUARANTINE_STEP_LABELS[p])).join(', ');
+  notify(
+    problems.length
+      ? {
+          kind: 'security',
+          tone: 'err',
+          title: msg('{domain}: cách ly khẩn chưa trọn vẹn'),
+          body: msg('Lỗi ở bước: {steps}. Mở tab Bảo mật để chạy lại, hoặc xử lý tay trên máy chủ.'),
+          params: { domain: site.domain, steps: failedLabels },
+          actions: [{ label: msg('Mở site'), href: `/sites/${site.id}?tab=security` }],
+          dedupeKey: `quarantine:${site.id}`,
+        }
+      : {
+          kind: 'security',
+          tone: 'err',
+          title: msg('{domain} đã bị cách ly khẩn'),
+          body: msg('Site trả trang bảo trì, không kết nối ra ngoài được và không còn tiến trình nào chạy. Dọn site rồi quét lại trước khi gỡ cách ly.'),
+          params: { domain: site.domain },
+          actions: [{ label: msg('Mở site'), href: `/sites/${site.id}?tab=security` }],
+          dedupeKey: `quarantine:${site.id}`,
+        },
+  );
+  if (problems.length) throw new Error(t('Cách ly chưa trọn vẹn, lỗi ở bước: {steps}. Bấm "Chạy lại cách ly" sau khi xử lý lỗi.', { steps: problems.map((p) => t(QUARANTINE_STEP_LABELS[p])).join(', ') }));
   log(t('Đã cách ly {domain}', { domain: site.domain }));
 }
 
 export function startQuarantine(siteId: number, reason: string, by: string): TaskInfo {
   const site = sites.getSite(siteId);
   if (!site.sysUser) throw conflict(t('Cách ly khẩn cần site có user riêng: bấm "Cách ly ngay" ở tab Tổng quan trước'));
-  store.assertNotQuarantined(site);
+  // an incomplete quarantine may be run again; a complete one has nothing left to do
+  if (!store.quarantineState(site.id).problems.length) store.assertNotQuarantined(site);
   return startLocked(site, 'quarantine', t('Cách ly khẩn {domain}', { domain: site.domain }), (log) => quarantine(site, reason, by, log));
+}
+
+/**
+ * After a scheduled scan (malware.ts scheduler hook): quarantine the site when the setting is on and
+ * the scan found something critical that the previous one did not. Same task, same site lock.
+ */
+export async function autoQuarantine(site: Site, scan: MalwareScan, previous: MalwareScan | null, log: HostLogger) {
+  if (!store.getSecuritySettings().autoQuarantine || !site.sysUser || store.isQuarantined(site.id)) return;
+  const fresh = policy.alertWorthy(previous?.findings ?? null, scan.findings).filter((f) => f.severity === 'critical');
+  if (!fresh.length) return;
+  log(t('Tự động cách ly khẩn: {n} phát hiện nghiêm trọng mới', { n: fresh.length }));
+  try {
+    await quarantine(site, tDefault('Tự động: lần quét hằng ngày có {n} phát hiện nghiêm trọng mới', { n: fresh.length }), tDefault('Lares (tự động)'), log);
+  } finally {
+    const title = tDefault('{domain} đã được tự động cách ly khẩn', { domain: site.domain });
+    await externalAlert(title, fresh, { event: 'security.quarantine', site: { id: site.id, domain: site.domain }, scan: { id: scan.id, status: scan.status, counts: scan.counts }, quarantine: store.quarantineState(site.id) });
+  }
 }
 
 /**
@@ -107,7 +172,7 @@ export function startQuarantine(siteId: number, reason: string, by: string): Tas
 async function release(site: Site, force: boolean, by: string, log: HostLogger) {
   const q = store.quarantineState(site.id);
   if (!q.active) throw conflict(t('Site không bị cách ly'));
-  store.setQuarantineState(site.id, { ...q, active: false });
+  store.setQuarantineState(site.id, { ...q, active: false, problems: [] });
   await isolation.syncSiteFirewall(log);
   const running = site.status === 'active';
   if (ownProcessUnit(site) && running) await isolation.applySitePhp(site, log);
@@ -131,6 +196,8 @@ export function startRelease(siteId: number, force: boolean, by: string): TaskIn
   const site = sites.getSite(siteId);
   const q = store.quarantineState(site.id);
   if (!q.active) throw conflict(t('Site không bị cách ly'));
+  // the scan reads PHP code only: for a Next.js app a "clean" result after the quarantine proves nothing
+  if (!force && !sites.usesPhp(site.appType)) throw conflict(t('Bộ quét không kiểm tra được code của site này: xác nhận đã tự kiểm tra trước khi gỡ cách ly'));
   if (!force) {
     const scan = lastResult(site.id);
     if (!scan || !q.since || scan.startedAt < q.since) throw conflict(t('Chưa có lần quét nào sau khi cách ly: dọn site và quét lại trước'));
@@ -187,6 +254,27 @@ async function apiJson(url: string): Promise<Record<string, unknown> | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Cleaning writes as the site user: its folder must be its own. A restore whose permission step failed,
+ * or a change made by hand as root, leaves it root's - give it back (the site's code is not running,
+ * the site is quarantined), and stop with the path's owners and modes if that is not enough.
+ */
+async function ensureSiteWritable(c: CleanCtx) {
+  if (config.dryRun) return;
+  const root = c.site.rootPath;
+  const st = await fs.lstat(root).catch(() => null);
+  if (!st) throw conflict(t('Thư mục site {dir} không tồn tại', { dir: root }));
+  if (st.isSymbolicLink()) throw conflict(t('Thư mục site {dir} là symlink: dọn tự động cần thư mục thật', { dir: root }));
+  const writable = async () => (await host.exec(isolation.asUser(c.user, `test -d ${shq(root)} && test -w ${shq(root)} && test -x ${shq(root)}`))).code === 0;
+  if (await writable()) return;
+  c.log(t('User {user} không ghi được vào {dir}: trả lại quyền thư mục cho user của site', { user: c.user, dir: root }));
+  await sites.fixPermissions(c.site, c.log);
+  if (await writable()) return;
+  // owner and mode of every folder on the way: what the owner needs to fix it by hand
+  c.log((await host.exec(`namei -l ${shq(root)}`)).stdout.trim());
+  throw new Error(t('User {user} vẫn không ghi được vào {dir} (quyền trên đường dẫn ở log phía trên)', { user: c.user, dir: root }));
 }
 
 /** Unpack `zip` into staging/<name> and return the folder holding `top`. */
@@ -336,6 +424,23 @@ async function cleanDatabase(c: CleanCtx, input: CleanSiteInput) {
     await mysql.query(`DELETE FROM ${tbl('usermeta')} WHERE meta_key IN ('_application_passwords', 'session_tokens')`);
     c.log(t('Đã thu hồi mọi application password và phiên đăng nhập'));
   }
+  if (input.resetAdminPasswords && keep.length) {
+    for (const a of keep) {
+      // nobody gets this password: WordPress accepts an MD5 hash and rehashes it at the next login;
+      // the owner sets a new one through the panel's wp-admin login or "Lost your password?"
+      const hashed = crypto.createHash('md5').update(randomPassword(32)).digest('hex');
+      await mysql.query(`UPDATE ${tbl('users')} SET user_pass = ?, user_activation_key = '' WHERE ID = ?`, [hashed, a.id]);
+    }
+    c.log(t('Đã đặt mật khẩu ngẫu nhiên cho {n} tài khoản quản trị: sau khi gỡ cách ly, vào wp-admin bằng nút của panel (hoặc "Quên mật khẩu") và đặt mật khẩu mới', { n: keep.length }));
+  }
+  if (input.resetSiteUrl && !c.site.listenPort) {
+    const own = sites.siteUrl(c.site);
+    const urls = await mysql.query<Array<{ option_name: string; option_value: string }>>(`SELECT option_name, option_value FROM ${tbl('options')} WHERE option_name IN ('home', 'siteurl')`);
+    for (const u of urls.filter((x) => policy.foreignSiteUrl(x.option_value, [c.site.domain, ...c.site.aliases]))) {
+      await mysql.query(`UPDATE ${tbl('options')} SET option_value = ? WHERE option_name = ?`, [own, u.option_name]);
+      c.log(t('Đã đặt lại {name}: {from} → {to}', { name: u.option_name, from: u.option_value.slice(0, 200), to: own }));
+    }
+  }
 
   const configFile = await findWpConfig(c.site);
   if (!configFile || (!input.shuffleSalts && !input.rotateDbPassword)) return;
@@ -386,6 +491,7 @@ async function clean(site: Site, input: CleanSiteInput, by: string, log: HostLog
   await fs.chmod(c.downloads, 0o755);
   try {
     await withCodeUnlocked(site, log, async () => {
+      await ensureSiteWritable(c);
       await asSite(c, `mkdir -p ${shq(c.qdir)} ${shq(c.staging)} && chmod 700 ${shq(path.join(site.rootPath, policy.QUARANTINE_DIR))} ${shq(path.join(site.rootPath, policy.STAGING_DIR))}`);
       if (site.appType === 'wordpress') {
         if (input.reinstallCore) {
@@ -408,6 +514,10 @@ async function clean(site: Site, input: CleanSiteInput, by: string, log: HostLog
       if (site.appType === 'wordpress') {
         log(t('Bước 7: database và wp-config.php'));
         await cleanDatabase(c, input);
+        // injected <script> may be legitimate (analytics, embeds): only a person can tell
+        for (const f of before.findings.filter((x) => x.check === 'db-script')) {
+          c.manual.push(tDefault('<script> trong database ({place}: {ids}): mở Adminer ở tab Tổng quan, xem và xoá đoạn lạ', { place: f.path ?? '', ids: f.detail ?? '' }));
+        }
       }
       await asSite(c, `rm -rf ${shq(path.join(site.rootPath, policy.STAGING_DIR))}`).catch(() => undefined);
       await sites.fixPermissions(site, log);

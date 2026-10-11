@@ -1,16 +1,16 @@
 import type { FastifyInstance } from 'fastify';
-import { cleanSiteSchema, codeLockSchema, quarantineSchema, releaseQuarantineSchema, securitySettingsSchema } from '@lares/shared';
+import { cleanSiteSchema, codeLockSchema, ignoreFindingSchema, quarantineSchema, releaseQuarantineSchema, securitySettingsSchema } from '@lares/shared';
 import { currentUser, requireAuth } from '../auth/index.js';
 import { idParam, parse } from '../lib/validate.js';
 import { startCodeLock } from '../services/codeLock.js';
-import { acknowledgeAdmins, getScan, siteAdmins, startMalwareScheduler, startScan } from '../services/malware.js';
-import { startClean, startQuarantine, startRelease } from '../services/quarantine.js';
+import { acknowledgeAdmins, getScan, setIgnored, siteAdmins, startMalwareScheduler, startScan } from '../services/malware.js';
+import { autoQuarantine, startClean, startQuarantine, startRelease } from '../services/quarantine.js';
 import { saveSecuritySettings, securitySettings, securityView } from '../services/siteSecurity.js';
 import * as sites from '../services/sites.js';
 
 /** Site → Security tab: malware scan (C5), quarantine + cleaning (C6), code lock (C7). */
 export async function siteSecurityRoutes(app: FastifyInstance) {
-  app.addHook('onReady', async () => startMalwareScheduler((m) => app.log.warn(m)));
+  app.addHook('onReady', async () => startMalwareScheduler((m) => app.log.warn(m), autoQuarantine));
   app.addHook('preHandler', requireAuth);
   const by = (req: Parameters<typeof currentUser>[0]) => currentUser(req).username;
 
@@ -29,6 +29,14 @@ export async function siteSecurityRoutes(app: FastifyInstance) {
   app.post('/api/sites/:id/security/acknowledge', async (req) => {
     const id = idParam(req.params);
     await acknowledgeAdmins(id, by(req));
+    return securityView(id);
+  });
+
+  /** "Not malware" on a file of the latest scan (or undo): the file's sha256 is remembered. */
+  app.post('/api/sites/:id/security/ignore', async (req) => {
+    const id = idParam(req.params);
+    const body = parse(ignoreFindingSchema, req.body);
+    await setIgnored(id, body.path, body.ignore, by(req));
     return securityView(id);
   });
 

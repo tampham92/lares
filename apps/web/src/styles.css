@@ -334,6 +334,7 @@ details summary { cursor: pointer; color: var(--primary); }
 .finding:first-child { border-top: 0; }
 .finding > .badge { flex: none; margin-top: 1px; }
 .finding-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.finding-body > .btn { align-self: flex-start; margin-top: 4px; }
 
 @media (max-width: 760px) {
   .layout { flex-direction: column; }
