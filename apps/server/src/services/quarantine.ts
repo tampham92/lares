@@ -49,7 +49,8 @@ const ownProcessUnit = (site: Site) => site.sysUser !== null && sites.usesPhp(si
 
 async function stopSiteProcesses(site: Site, log: HostLogger) {
   if (ownProcessUnit(site)) await isolation.setSitePhpRunning(site, false, log);
-  if (site.appType === 'nextjs') await nodeapp.serviceAction(site.domain, 'stop', log).catch(() => undefined);
+  // disabled too, not only stopped: a reboot during the quarantine must not start the app again
+  if (site.appType === 'nextjs') await host.mutate(`systemctl disable --now ${shq(nodeapp.serviceName(site.domain))}`, { log }).catch(() => undefined);
   if (config.dryRun || !site.sysUser) return;
   await host.exec(`pkill -KILL -u ${shq(site.sysUser)}`);
   await host.exec(`crontab -r -u ${shq(site.sysUser)} 2>/dev/null`);
@@ -110,7 +111,10 @@ async function release(site: Site, force: boolean, by: string, log: HostLogger) 
   await isolation.syncSiteFirewall(log);
   const running = site.status === 'active';
   if (ownProcessUnit(site) && running) await isolation.applySitePhp(site, log);
-  if (site.appType === 'nextjs' && running) await nodeapp.serviceAction(site.domain, 'start', log).catch((e) => log(t('Cảnh báo: {error}', { error: errorMessage(e) })));
+  if (site.appType === 'nextjs') {
+    const unit = shq(nodeapp.serviceName(site.domain));
+    await host.mutate(running ? `systemctl enable --now ${unit}` : `systemctl enable ${unit}`, { log }).catch((e) => log(t('Cảnh báo: {error}', { error: errorMessage(e) })));
+  }
   await sites.applySiteVhost(site, log);
   if (running && !config.dryRun) {
     // nginx reload returns before the old workers are gone (see isolateSites.ts)
