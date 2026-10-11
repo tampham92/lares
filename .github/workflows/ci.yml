@@ -184,13 +184,13 @@ jobs:
           test ! -e /var/www/ci-isolation.test/public_html/uploads/x.php
           run POST /api/sites/1/security/release '{}'
           test "$(site)" = 200
-          # code lock: root owns the code, uploads stay the site's
+          # code lock: root owns the code, uploads stay the site's (sudo: the runner user cannot enter the 0750 site folder)
           run PUT /api/sites/1/security/code-lock '{"locked":true,"writableDirs":["public_html/uploads"]}'
-          test "$(stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = root
-          test "$(stat -c '%U' /var/www/ci-isolation.test/public_html/uploads)" = lares-s1
+          test "$(sudo stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = root
+          test "$(sudo stat -c '%U' /var/www/ci-isolation.test/public_html/uploads)" = lares-s1
           test "$(site)" = 200
           run PUT /api/sites/1/security/code-lock '{"locked":false}'
-          test "$(stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = lares-s1
+          test "$(sudo stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = lares-s1
 
       - name: Telemetry opt-out was saved
         run: |
