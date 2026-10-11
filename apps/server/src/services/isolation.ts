@@ -61,8 +61,12 @@ export function phpServiceFor(site: Pick<Site, 'id' | 'sysUser' | 'phpVersion'>)
   return site.sysUser ? phpPathsFor(site.id).unit : `php${site.phpVersion ?? config.defaultPhp}-fpm`;
 }
 
-/** `runuser` wrapper for short root-started commands that must run with the site's rights. */
-export const asUser = (user: string, command: string) => `runuser -u ${shq(user)} -- sh -c ${shq(command)}`;
+/**
+ * `runuser` wrapper for short root-started commands that must run with the site's rights. `cd /`
+ * first: runuser keeps the panel's working directory (/opt/lares/src/apps/server), which the site user
+ * may not be allowed to enter (a root umask of 027/077 on some VPS images) - `find` then refuses to run.
+ */
+export const asUser = (user: string, command: string) => `runuser -u ${shq(user)} -- sh -c ${shq(`cd / && ${command}`)}`;
 
 /**
  * Write a file inside a site folder with the site user's rights, never root's: a path the site's code
