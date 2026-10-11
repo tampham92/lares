@@ -153,6 +153,40 @@ jobs:
           sudo chown lares-s1:lares-s1 /var/www/ci-isolation.test/public_html/p.php
           test "$(curl -s -H 'Host: ci-isolation.test' http://127.0.0.1/p.php)" = blocked
 
+      - name: Malware scan, quarantine and code lock on that site
+        run: |
+          token=$(curl -skf -X POST -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"CiSmokeTest-12345"}' "$PANEL/api/auth/login" | jq -r .token)
+          api() { curl -sk -X "$1" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' ${3:+-d "$3"} "$PANEL$2"; }
+          run() {
+            task=$(api "$1" "$2" "${3:-}" | jq -r .id)
+            for _ in $(seq 1 120); do st=$(api GET "/api/tasks/$task" | jq -r .status); [ "$st" != running ] && break; sleep 2; done
+            api GET "/api/tasks/$task" | jq -r '.logs[].msg'; test "$st" = completed
+          }
+          site() { curl -s -o /dev/null -w '%{http_code}' -H 'Host: ci-isolation.test' http://127.0.0.1/; }
+          # a webshell in uploads is found
+          sudo -u lares-s1 mkdir -p /var/www/ci-isolation.test/public_html/uploads
+          echo '<?php eval(base64_decode($_POST["x"]));' | sudo -u lares-s1 tee /var/www/ci-isolation.test/public_html/uploads/x.php >/dev/null
+          run POST /api/sites/1/security/scan
+          test "$(api GET /api/sites/1/security | jq -r .lastScan.status)" = infected
+          # quarantine: 503, PHP stopped, outbound cut
+          run POST /api/sites/1/security/quarantine '{"reason":"ci"}'
+          test "$(site)" = 503
+          if systemctl is-active --quiet lares-php-1; then echo "PHP still running"; exit 1; fi
+          sudo nft list table inet lares_sites | grep -q block_quarantine
+          # cleaning parks the webshell outside the web root, the new scan is clean, release brings the site back
+          run POST /api/sites/1/security/clean '{}'
+          test ! -e /var/www/ci-isolation.test/public_html/uploads/x.php
+          run POST /api/sites/1/security/release '{}'
+          test "$(site)" = 200
+          # code lock: root owns the code, uploads stay the site's
+          run PUT /api/sites/1/security/code-lock '{"locked":true,"writableDirs":["public_html/uploads"]}'
+          test "$(stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = root
+          test "$(stat -c '%U' /var/www/ci-isolation.test/public_html/uploads)" = lares-s1
+          test "$(site)" = 200
+          run PUT /api/sites/1/security/code-lock '{"locked":false}'
+          test "$(stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = lares-s1
+
       - name: Telemetry opt-out was saved
         run: |
           sudo grep -qx 'LARES_TELEMETRY=0' /etc/lares/lares.env

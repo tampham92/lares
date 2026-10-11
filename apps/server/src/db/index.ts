@@ -299,3 +299,5 @@ CREATE TABLE IF NOT EXISTS security_events (
 );
 CREATE INDEX IF NOT EXISTS idx_security_events_site ON security_events(site_id, id);
 `);
+// mu-plugins known as legitimate (path -> sha256), like admins_json: a new one stays flagged until acknowledged
+ensureColumn('site_security', 'mu_plugins_json', 'TEXT');

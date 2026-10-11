@@ -46,6 +46,7 @@ export const SITESECURITY_EN: Dict = {
   'khác bản gốc': 'differs from the release',
   'file không có trong bản gốc': 'not part of the release',
   'không có trên wordpress.org, chưa đối chiếu được': 'not on wordpress.org, could not be compared',
+  'thiếu file so với bản gốc (site có thể bị lỗi)': 'missing compared to the release (the site may be broken)',
   'gửi mail thẳng ra cổng 25 (spam)': 'direct mail to port 25 (spam)',
   'gọi dịch vụ metadata của cloud (lấy khoá của máy chủ)': "the cloud metadata service (the server's credentials)",
   'gọi cổng panel / Adminer': 'the panel / Adminer port',
@@ -72,8 +73,8 @@ export const SITESECURITY_EN: Dict = {
   'Quét ngay': 'Scan now',
   'Quét tự động đang tắt.': 'Scheduled scans are off.',
   'Tự quét mỗi ngày lúc {time}.': 'Scanned daily at {time}.',
-  'Các tài khoản quản trị hiện tại là của tôi': 'The current administrators are mine',
-  'Lần quét sau sẽ không báo các tài khoản này nữa.': 'The next scans will not report these accounts again.',
+  'Tài khoản quản trị và mu-plugin hiện tại là của tôi': 'The current administrators and mu-plugins are mine',
+  'Lần quét sau sẽ không báo chúng nữa (một mu-plugin bị sửa sau đó vẫn bị báo).': 'The next scans will not report them again (a mu-plugin modified later is still reported).',
 
   // ---- quarantine and cleaning ----
   'Thay code bằng bản sạch thay vì tin vào việc quét rồi xoá: WordPress, plugin và theme được tải lại từ wordpress.org đúng phiên bản đang dùng. Chỉ giữ dữ liệu (database, uploads).':
@@ -94,6 +95,7 @@ export const SITESECURITY_EN: Dict = {
   'Dùng khi nghi site bị nhiễm: site trả trang bảo trì, mọi kết nối ra ngoài của site bị chặn, PHP/Node và mọi tiến trình còn sót bị dừng, cron của site bị xoá, rồi chụp một bản sao lưu làm bằng chứng. Trong lúc cách ly không bật lại, cập nhật, nhân bản hay đăng nhập wp-admin được.':
     'For a site you suspect is infected: it serves a maintenance page, every outbound connection of the site is blocked, PHP/Node and any leftover process are stopped, its cron jobs are removed, then a backup is kept as evidence. While quarantined it cannot be enabled, updated, cloned or logged into.',
   'Cần site có user riêng: bấm "Cách ly ngay" ở tab Tổng quan trước.': 'The site needs its own user: click "Isolate now" on the Overview tab first.',
+  'Site này không có bước dọn tự động: deploy lại code từ nguồn gốc (git) rồi quét lại trước khi gỡ cách ly.': 'This site has no automatic cleaning: deploy the code again from its source (git), then scan again before releasing it.',
   'Lý do (ghi vào lịch sử)': 'Reason (kept in the history)',
   'Ví dụ: site chuyển hướng sang trang lạ': 'E.g. the site redirects to a strange page',
   '{domain} sẽ ngừng phục vụ khách ngay lập tức. Tiếp tục?': '{domain} stops serving visitors right away. Continue?',

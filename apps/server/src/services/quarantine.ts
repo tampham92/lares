@@ -12,7 +12,8 @@ import { findWpConfig } from './clone.js';
 import * as databases from './databases.js';
 import { host, type HostLogger } from './host.js';
 import * as isolation from './isolation.js';
-import { lastResult, readSafe, runScan, wpAdminsOf, wpDbOf } from './malware.js';
+import { broken, probe } from './isolateSites.js';
+import { currentMuPlugins, lastResult, readSafe, runScan, wpAdminsOf, wpDbOf } from './malware.js';
 import * as policy from './malwarePolicy.js';
 import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
@@ -111,6 +112,13 @@ async function release(site: Site, force: boolean, by: string, log: HostLogger) 
   if (ownProcessUnit(site) && running) await isolation.applySitePhp(site, log);
   if (site.appType === 'nextjs' && running) await nodeapp.serviceAction(site.domain, 'start', log).catch((e) => log(t('Cảnh báo: {error}', { error: errorMessage(e) })));
   await sites.applySiteVhost(site, log);
+  if (running && !config.dryRun) {
+    // nginx reload returns before the old workers are gone (see isolateSites.ts)
+    await new Promise((r) => setTimeout(r, site.appType === 'nextjs' ? 6_000 : 3_000));
+    const code = await probe(site);
+    if (broken(code)) log(t('Cảnh báo: site trả HTTP {code} sau khi gỡ cách ly - xem log lỗi của site (file bị thiếu sau khi dọn?)', { code }));
+    else log(t('Site trả HTTP {code}', { code }));
+  }
   store.addEvent(site.id, 'release', by, force ? tDefault('Gỡ khi chưa có lần quét sạch (người quản trị xác nhận đã tự kiểm tra)') : null);
   log(t('Đã gỡ cách ly {domain}', { domain: site.domain }));
 }
@@ -143,6 +151,8 @@ interface CleanCtx {
   /** Root-owned folder of the downloaded zip files (readable by the site user). */
   downloads: string;
   manual: string[];
+  /** Paths (relative to the site folder) the reinstall replaced: files, or folders ending in '/'. */
+  replaced: string[];
   log: HostLogger;
 }
 
@@ -187,6 +197,7 @@ async function unpack(c: CleanCtx, zip: string, name: string, top: string): Prom
 const swapIn = (c: CleanCtx, fresh: string, rel: string) => {
   const target = path.join(c.webRoot, rel);
   const parked = path.join(c.qdir, path.relative(c.site.rootPath, target));
+  c.replaced.push(path.relative(c.site.rootPath, target).split(path.sep).join('/'));
   return asSite(c, `if [ -e ${shq(target)} ] || [ -L ${shq(target)} ]; then mkdir -p ${shq(path.dirname(parked))} && mv -- ${shq(target)} ${shq(parked)}; fi && mv -- ${shq(fresh)} ${shq(target)}`);
 };
 
@@ -283,7 +294,8 @@ async function reinstallExtensions(c: CleanCtx, kind: 'plugins' | 'themes', late
 /** Move the flagged files that are still there (reinstalled code replaced the others). */
 async function parkFlagged(c: CleanCtx, scan: MalwareScan) {
   const moved: string[] = [];
-  for (const rel of policy.filesToQuarantine(scan.findings)) {
+  const replaced = (rel: string) => c.replaced.some((r) => rel === r || rel.startsWith(`${r}/`));
+  for (const rel of policy.filesToQuarantine(scan.findings, replaced)) {
     const abs = path.join(c.site.rootPath, rel);
     if (!isInside(c.site.rootPath, abs) || !(await host.exists(abs))) continue;
     const parked = path.join(c.qdir, rel);
@@ -357,6 +369,7 @@ async function clean(site: Site, input: CleanSiteInput, by: string, log: HostLog
     staging: path.join(site.rootPath, policy.STAGING_DIR, stamp),
     downloads: '',
     manual: [],
+    replaced: [],
     log,
   };
   log(t('Bước 1: quét để biết file nào cần xử lý'));
@@ -404,6 +417,8 @@ async function clean(site: Site, input: CleanSiteInput, by: string, log: HostLog
   if (site.appType === 'wordpress') {
     const d = await wpDbOf(site);
     if (d) store.setKnownAdmins(site.id, (await wpAdminsOf(d)).map((a) => a.id));
+    // what is left in mu-plugins after cleaning is what the owner keeps
+    store.setKnownMuPlugins(site.id, await currentMuPlugins(site));
   }
   if (c.manual.length) {
     log(t('CẦN LÀM TAY:'));

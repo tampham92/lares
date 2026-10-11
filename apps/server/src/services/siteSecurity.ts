@@ -13,6 +13,7 @@ export function securityView(siteId: number): SiteSecurityView {
   return {
     supported: {
       scan: scanSupported(site),
+      quarantine: site.sysUser !== null,
       clean: site.sysUser !== null && sites.usesPhp(site.appType),
       codeLock: codeLockSupported(site),
     },

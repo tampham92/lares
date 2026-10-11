@@ -89,12 +89,10 @@ export async function installWordpress(
 ): Promise<boolean> {
   const hasCli = config.dryRun || (await host.has('wp'));
   log(t('Đang tải WordPress...'));
-  if (hasCli) {
-    await host.mutate(wpCli(webRoot, `core download --locale=${shq(wp.locale)} --force`), { log, timeoutMs: 10 * 60_000 });
-  } else {
-    const url = wp.locale === 'en_US' ? 'https://wordpress.org/latest.tar.gz' : `https://${wp.locale.split('_')[0]}.wordpress.org/latest-${wp.locale}.tar.gz`;
-    await host.mutate(`curl -fsSL ${shq(url)} | tar -xz --strip-components=1 -C ${shq(webRoot)}`, { log, timeoutMs: 10 * 60_000 });
-  }
+  // Always the system tar, never `wp core download`: wp-cli unpacks the .tar.gz with PHP's PharData,
+  // which cuts file names longer than 100 characters - WordPress 7 has such files in wp-includes.
+  const url = wp.locale === 'en_US' ? 'https://wordpress.org/latest.tar.gz' : `https://${wp.locale.split('_')[0]}.wordpress.org/latest-${wp.locale}.tar.gz`;
+  await host.mutate(`curl -fsSL ${shq(url)} | tar -xz --strip-components=1 -C ${shq(webRoot)}`, { log, timeoutMs: 10 * 60_000 });
   await host.writeFile(path.join(webRoot, 'wp-config.php'), renderWpConfig({ ...db, host: 'localhost' }), 0o640);
 
   if (hasCli && wp.adminUser && wp.adminPassword && wp.adminEmail) {

@@ -28,6 +28,7 @@ export const SITESECURITY_EN: Dict = {
   '{domain} đang có tác vụ khác chạy (cách ly, quét mã độc hoặc dọn site) - hãy đợi nó xong': '{domain} already has another job running (isolation, malware scan or cleaning) - wait for it to finish',
   'Bản sao lưu {id} được chụp lúc site bị cách ly khẩn và có thể chứa mã độc. Chỉ khôi phục khi bạn chắc chắn (đánh dấu xác nhận trong hộp thoại khôi phục).':
     'Backup {id} was taken when the site was quarantined and may contain the malware. Only restore it if you are sure (tick the confirmation in the restore dialog).',
+  'Đã cập nhật mật khẩu database trong wp-config.php theo mật khẩu hiện tại': 'Database password in wp-config.php updated to the current one',
   'Site đang bảo trì, vui lòng quay lại sau': 'Site under maintenance, please come back later',
   '{domain} đang bị cách ly khẩn: gỡ cách ly trước (sau khi dọn và quét lại sạch)': '{domain} is quarantined: release it first (after cleaning and a clean scan)',
 
@@ -71,6 +72,8 @@ export const SITESECURITY_EN: Dict = {
   'Chưa có lần quét nào sau khi cách ly: dọn site và quét lại trước': 'No scan since the quarantine started: clean the site and scan again first',
   'Lần quét gần nhất vẫn còn dấu hiệu nhiễm mã độc': 'The latest scan still shows signs of malware',
   'Gỡ cách ly {domain}': 'Release {domain}',
+  'Cảnh báo: site trả HTTP {code} sau khi gỡ cách ly - xem log lỗi của site (file bị thiếu sau khi dọn?)': "Warning: the site answers HTTP {code} after the release - check the site's error log (a file missing after cleaning?)",
+  'Site trả HTTP {code}': 'The site answers HTTP {code}',
 
   // ---- cleaning ----
   'WordPress core (không xác định được phiên bản)': 'WordPress core (version unknown)',

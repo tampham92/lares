@@ -28,7 +28,8 @@ import { LocalBackupStorage, MANIFEST_FILE, type BackupStorage } from './backupS
 import { databasesSize, findWpConfig } from './clone.js';
 import * as databases from './databases.js';
 import { host, type HostLogger } from './host.js';
-import { restartSitePhp } from './isolation.js';
+import { restartSitePhp, writeSiteFile } from './isolation.js';
+import { setWpConfigDefine } from './wordpress.js';
 import { isQuarantined } from './securityStore.js';
 import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
@@ -423,6 +424,17 @@ async function resolveDbTargets(site: Site, m: BackupManifest, restoredRoot: str
   return out;
 }
 
+async function syncWpConfigPassword(site: Site, targets: DbTarget[], log: HostLogger) {
+  if (site.appType !== 'wordpress') return;
+  const file = await findWpConfig(site);
+  const src = file ? await fs.readFile(file, 'utf8').catch(() => null) : null;
+  const wp = src ? parseWpConfig(src) : null;
+  const tg = wp ? targets.find((x) => x.managed && x.name === wp.name && x.user === wp.user) : undefined;
+  if (!file || !src || !wp || !tg || wp.password === tg.password) return;
+  await writeSiteFile(site, file, setWpConfigDefine(src, 'DB_PASSWORD', tg.password), log);
+  log(t('Đã cập nhật mật khẩu database trong wp-config.php theo mật khẩu hiện tại'));
+}
+
 async function importDb(tg: DbTarget, dumpFile: string, log: HostLogger) {
   if (tg.managed) await mysql.recreateDatabase(tg.name, tg.user, tg.password, log);
   await mysql.importGzipDump(tg.name, dumpFile, { user: tg.user, password: tg.password }, { log });
@@ -547,6 +559,9 @@ async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { sa
 
     // Files and data are back. What follows only restarts things: failures are reported, not rolled back.
     const warn = (what: string, err: unknown) => log(t('Cảnh báo: {what} thất bại: {error}', { what, error: errorMessage(err) }));
+    // a backup from before a password change (cleaning rotates it) brings back the old DB_PASSWORD, while the
+    // managed database user was just recreated with the current one: point wp-config.php at the current one
+    await syncWpConfigPassword(site, touched, log).catch((e) => warn('wp-config.php', e));
     await sites.fixPermissions(site, log).catch((e) => warn(t('phân quyền'), e));
     if (hadRoot) await fs.rm(old, { recursive: true, force: true }).catch((e) => warn(t('xoá thư mục cũ'), e));
     // a disabled or quarantined site stays stopped: its processes start again when it is enabled / released

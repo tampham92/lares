@@ -26,7 +26,7 @@ import { assertNotQuarantined } from './securityStore.js';
  */
 
 /** HTTP status of the site's home page as nginx serves it on this machine ('000' = no answer). */
-async function probe(site: Site): Promise<string> {
+export async function probe(site: Site): Promise<string> {
   const port = site.listenPort ?? (site.ssl.enabled ? 443 : 80);
   const scheme = site.ssl.enabled && !site.listenPort ? 'https' : 'http';
   const r = await host.exec(
@@ -35,7 +35,7 @@ async function probe(site: Site): Promise<string> {
   return r.stdout.trim() || '000';
 }
 
-const broken = (code: string) => code === '000' || code.startsWith('5');
+export const broken = (code: string) => code === '000' || code.startsWith('5');
 
 export async function isolateSite(site: Site, log: HostLogger): Promise<Site> {
   if (site.sysUser) return site;

@@ -235,6 +235,9 @@ async function doEnsureSshDeny(log?: HostLogger): Promise<boolean | null> {
   }
   if ((await fs.readFile(config.sshDenyFile, 'utf8').catch(() => null)) === content) return true;
   await host.writeFile(config.sshDenyFile, content, 0o644);
+  // `sshd -t` wants its privilege separation dir, which only exists once ssh.service ran (socket-activated
+  // sshd on Ubuntu 24.04 starts with the first connection); systemd creates it the same way (0755)
+  await host.exec('mkdir -p -m 0755 /run/sshd');
   const test = await host.exec(`${shq(sshd)} -t`);
   if (test.code !== 0) {
     // never leave sshd with a config it rejects: the next restart would lock everyone out

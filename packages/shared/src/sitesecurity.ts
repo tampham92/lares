@@ -169,7 +169,9 @@ export interface SiteSecurityView {
   supported: {
     /** File checks (PHP sites); the firewall check runs for every isolated site. */
     scan: boolean;
-    /** Automatic cleaning (WordPress). */
+    /** Emergency quarantine: any site with its own Linux user (PHP, Next.js). */
+    quarantine: boolean;
+    /** Automatic cleaning (isolated PHP sites; full reinstall for WordPress). */
     clean: boolean;
     /** Code lock (isolated PHP sites). */
     codeLock: boolean;

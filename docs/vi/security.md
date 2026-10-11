@@ -44,11 +44,15 @@ qua plugin WordPress có lỗ hổng) không lan sang site khác:
   Tổng quan → Cách ly site nếu plugin thật sự cần.
 - **Kết nối ra ngoài** (nftables, theo user của site): chặn gửi mail trực tiếp qua cổng 25 (spam), dịch
   vụ metadata của cloud (169.254.169.254) và cổng panel/Adminer trên máy. Gửi mail qua SMTP (587/465)
-  vẫn dùng được.
-- User của site không có mật khẩu, không có shell và nằm trong `/etc/cron.deny`: không đăng nhập hay
-  đặt lịch chạy được.
+  vẫn dùng được. Mỗi site mở tối đa khoảng 20 kết nối mới mỗi giây (botnet, quét cổng, DDoS ra ngoài
+  bị chặn lại). Mỗi lần chặn được ghi vào log kernel kèm user của site (`journalctl -k -g lares-block`)
+  và bộ quét mã độc đọc lại log này.
+- User của site không có mật khẩu, không có shell, nằm trong `/etc/cron.deny` và trong nhóm
+  `lares-sites` mà sshd từ chối (`/etc/ssh/sshd_config.d/lares-sites.conf`): không đăng nhập, không mở
+  tunnel SSH, không đặt lịch chạy được.
+- Khi ổ đĩa bận, MySQL và panel được ưu tiên hơn site (`IOWeight`).
 
-**Giới hạn tài nguyên** (trang site → Tổng quan → Giới hạn tài nguyên), để trống là không giới hạn:
+**Giới hạn tài nguyên** (khi tạo site, hoặc trang site → Tổng quan → Giới hạn tài nguyên), để trống là không giới hạn:
 
 - **RAM tối đa** và **CPU tối đa** (100% = một nhân) cho PHP-FPM hoặc ứng dụng Next.js của site, qua cgroups.
   Gần mức RAM site bị làm chậm; request nào vượt thì chỉ request đó bị dừng (502), site vẫn chạy.
@@ -63,6 +67,54 @@ ghi lại lý do kèm nút thử lại. `LARES_SITE_ISOLATION=0` trong `/etc/lar
 
 Giới hạn: các site vẫn dùng chung kernel, nên lỗ hổng leo thang lên root vượt qua mọi lớp trên. Hãy để
 máy chủ tự cập nhật bản vá bảo mật (xem [Cập nhật](#cập-nhật)).
+
+## Quét mã độc, cách ly khẩn và dọn site
+
+Trang site → **Bảo mật**.
+
+**Quét mã độc** (tự chạy mỗi ngày lúc 04:30, đổi được trong tab này). Bộ quét chỉ đọc, không chạy code
+của site, nên quét được cả site đang cách ly:
+
+- File lõi WordPress và plugin được so với checksum của bản gốc trên wordpress.org: file bị sửa, file
+  lạ trong `wp-admin`/`wp-includes`, file lõi bị thiếu.
+- File PHP trong `uploads` và file ảnh có chứa mã PHP; `.user.ini` có `auto_prepend_file` (trừ
+  firewall của Wordfence); file lạ hoặc bị sửa trong `mu-plugins` (báo cho tới khi bạn xác nhận).
+- Các đoạn mã thường gặp trong webshell và mã độc (`eval(base64_decode(...))`, `system($_GET[...])`...);
+  file PHP mới hoặc bị sửa từ lần quét trước.
+- Trong database: tài khoản quản trị mới, `siteurl`/`home` trỏ sang tên miền khác, `<script>` chèn vào
+  bài viết hay tuỳ chọn.
+- Các lần tường lửa chặn site trong 24 giờ qua (gửi spam, gọi metadata của cloud...).
+
+Phát hiện mới được báo ở chuông thông báo và, nếu bật, qua Telegram/webhook đã cài ở Khách liên hệ →
+Thông báo. Máy quét không bắt được mọi backdoor: kết quả sạch không có nghĩa là chắc chắn sạch.
+
+**Cách ly khẩn** (khi nghi site bị nhiễm): site trả trang bảo trì 503, mọi kết nối ra ngoài của site bị
+chặn, PHP-FPM/Next.js và mọi tiến trình còn sót của user site bị dừng, cron của site bị xoá, rồi Lares
+chụp một bản sao lưu làm bằng chứng. Bản này không hiện trong danh sách khôi phục mặc định và cần xác
+nhận riêng nếu muốn khôi phục. Trong lúc cách ly không bật lại, cập nhật, nhân bản, đổi cài đặt PHP hay
+đăng nhập wp-admin được: những việc đó đều chạy code của site.
+
+**Dọn site** (site đang cách ly; WordPress được dọn đầy đủ nhất): thay code bằng bản sạch thay vì tin
+vào việc quét rồi xoá.
+
+1. WordPress core, plugin và theme được tải lại từ wordpress.org đúng phiên bản đang dùng (hoặc bản mới
+   nhất). Plugin/theme trả phí hoặc tự viết được liệt kê để bạn tải lại bằng tay.
+2. File bị đánh dấu được chuyển vào `<thư mục site>/.lares-quarantine/<thời điểm>/`, nằm ngoài thư mục
+   web và không bị xoá. Dòng `auto_prepend_file` lạ bị xoá khỏi `.user.ini`.
+3. Đổi salt trong `wp-config.php` (mọi phiên đăng nhập cũ hết hiệu lực), đổi mật khẩu database, xoá các
+   tài khoản quản trị bạn chọn, thu hồi application password.
+4. Quét lại. Có bản sao lưu an toàn trước khi dọn.
+
+Lares không chạy code của site trong lúc dọn: file được panel tải về, rồi user của site giải nén và
+chuyển vào chỗ (root không ghi vào thư mục site). Sau đó hãy đổi mật khẩu quản trị và các tài khoản
+FTP/hosting liên quan. **Gỡ cách ly** cần một lần quét sau khi cách ly không còn dấu hiệu nghiêm trọng;
+nếu bạn đã tự kiểm tra, có thể gỡ mà không cần (được ghi vào lịch sử).
+
+**Khoá code** (tuỳ chọn theo site PHP): code của site thuộc về root, PHP chỉ đọc được và chỉ ghi được
+vào các thư mục cho phép (mặc định với WordPress: `wp-content/uploads`, `wp-content/cache`,
+`wp-content/upgrade`). Plugin bị khai thác không sửa được code của chính site. Cài hay cập nhật
+plugin/theme trong wp-admin sẽ không chạy nữa: cập nhật qua tab Cập nhật của panel, panel tự mở khoá
+trong lúc cập nhật rồi khoá lại.
 
 ## Xác thực 2 lớp (2FA)
 

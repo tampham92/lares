@@ -39,6 +39,7 @@ const DETAIL: Record<string, string> = {
   modified: msg('khác bản gốc'),
   added: msg('file không có trong bản gốc'),
   unverified: msg('không có trên wordpress.org, chưa đối chiếu được'),
+  missing: msg('thiếu file so với bản gốc (site có thể bị lỗi)'),
 };
 const FIREWALL_KIND: Record<string, string> = {
   smtp: msg('gửi mail thẳng ra cổng 25 (spam)'),
@@ -163,7 +164,7 @@ function History({ scans }: { scans: MalwareScanSummary[] }) {
 function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecurityView; busy: boolean; start: (path: string, body?: unknown) => void; refresh: () => void }) {
   const scan = v.lastScan;
   const [ackBusy, setAckBusy] = useState(false);
-  const newAdmins = scan?.findings.some((f) => f.check === 'new-admin');
+  const toAcknowledge = scan?.findings.some((f) => (f.check === 'new-admin' || f.check === 'mu-plugin') && f.severity !== 'info');
   const acknowledge = async () => {
     setAckBusy(true);
     try {
@@ -188,7 +189,7 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
           <div>{t('Lần quét gần nhất')}</div>
           <div>
             {fmtDate(scan.startedAt)}
-            {scan.status !== 'running' && scan.status !== 'failed' && <span className="sub"> · {t('{files} file', { files: scan.filesScanned })}</span>}
+            {scan.status !== 'running' && scan.status !== 'failed' && scan.filesScanned > 0 && <span className="sub"> · {t('{files} file', { files: scan.filesScanned })}</span>}
           </div>
           {scan.status !== 'running' && scan.status !== 'failed' && (
             <>
@@ -207,12 +208,12 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
         {v.settings.scanEnabled && <span className="hint">{t('Tự quét mỗi ngày lúc {time}.', { time: v.settings.scanTime })}</span>}
       </div>
       {scan && scan.status !== 'running' && scan.status !== 'failed' && <Findings scan={scan} />}
-      {newAdmins && site.appType === 'wordpress' && (
+      {toAcknowledge && site.appType === 'wordpress' && (
         <div className="row">
           <button className="btn sm" disabled={ackBusy} onClick={() => void acknowledge()}>
-            {t('Các tài khoản quản trị hiện tại là của tôi')}
+            {t('Tài khoản quản trị và mu-plugin hiện tại là của tôi')}
           </button>
-          <span className="hint">{t('Lần quét sau sẽ không báo các tài khoản này nữa.')}</span>
+          <span className="hint">{t('Lần quét sau sẽ không báo chúng nữa (một mu-plugin bị sửa sau đó vẫn bị báo).')}</span>
         </div>
       )}
       <History scans={v.history} />
@@ -325,7 +326,7 @@ function QuarantineCard({ site, v, busy, start }: { site: Site; v: SiteSecurityV
         <div className="sub">
           {t('Dùng khi nghi site bị nhiễm: site trả trang bảo trì, mọi kết nối ra ngoài của site bị chặn, PHP/Node và mọi tiến trình còn sót bị dừng, cron của site bị xoá, rồi chụp một bản sao lưu làm bằng chứng. Trong lúc cách ly không bật lại, cập nhật, nhân bản hay đăng nhập wp-admin được.')}
         </div>
-        {!v.supported.clean && <Alert tone="info">{t('Cần site có user riêng: bấm "Cách ly ngay" ở tab Tổng quan trước.')}</Alert>}
+        {!v.supported.quarantine && <Alert tone="info">{t('Cần site có user riêng: bấm "Cách ly ngay" ở tab Tổng quan trước.')}</Alert>}
         <Field label={t('Lý do (ghi vào lịch sử)')}>
           <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} placeholder={t('Ví dụ: site chuyển hướng sang trang lạ')} />
         </Field>
@@ -350,7 +351,7 @@ function QuarantineCard({ site, v, busy, start }: { site: Site; v: SiteSecurityV
           </>
         ) : (
           <div className="row">
-            <button className="btn danger" disabled={busy || !v.supported.clean} onClick={() => setConfirming(true)}>
+            <button className="btn danger" disabled={busy || !v.supported.quarantine} onClick={() => setConfirming(true)}>
               {t('Cách ly khẩn')}
             </button>
           </div>
@@ -380,7 +381,11 @@ function QuarantineCard({ site, v, busy, start }: { site: Site; v: SiteSecurityV
         <div className="mono">{q.backupId ?? t('không có')}</div>
       </div>
       <Alert tone="info">{t('Thứ tự nên làm: 1) Dọn site, 2) xem kết quả quét lại, 3) đổi mật khẩu quản trị và tài khoản FTP/hosting liên quan, 4) gỡ cách ly.')}</Alert>
-      {v.supported.clean && <CleanForm site={site} v={v} busy={busy} start={start} />}
+      {v.supported.clean ? (
+        <CleanForm site={site} v={v} busy={busy} start={start} />
+      ) : (
+        <div className="sub">{t('Site này không có bước dọn tự động: deploy lại code từ nguồn gốc (git) rồi quét lại trước khi gỡ cách ly.')}</div>
+      )}
       <h3 style={{ margin: 0 }}>{t('Gỡ cách ly')}</h3>
       {scannedSince ? (
         <div className="sub">{t('Lần quét sau khi cách ly không còn dấu hiệu nghiêm trọng.')}</div>

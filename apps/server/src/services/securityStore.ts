@@ -30,6 +30,7 @@ interface Row {
   quarantine_json: string | null;
   code_locked: number;
   writable_dirs_json: string | null;
+  mu_plugins_json: string | null;
 }
 
 const EMPTY_QUARANTINE: QuarantineState = { active: false, since: null, by: null, reason: null, backupId: null };
@@ -43,6 +44,7 @@ function row(siteId: number): Row {
       quarantine_json: null,
       code_locked: 0,
       writable_dirs_json: null,
+      mu_plugins_json: null,
     }
   );
 }
@@ -50,10 +52,11 @@ function row(siteId: number): Row {
 function update(siteId: number, patch: Partial<Omit<Row, 'site_id'>>) {
   const next = { ...row(siteId), ...patch };
   db.prepare(
-    `INSERT INTO site_security (site_id, admins_json, admins_ack_at, quarantine_json, code_locked, writable_dirs_json) VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO site_security (site_id, admins_json, admins_ack_at, quarantine_json, code_locked, writable_dirs_json, mu_plugins_json) VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(site_id) DO UPDATE SET admins_json = excluded.admins_json, admins_ack_at = excluded.admins_ack_at,
-       quarantine_json = excluded.quarantine_json, code_locked = excluded.code_locked, writable_dirs_json = excluded.writable_dirs_json`,
-  ).run(siteId, next.admins_json, next.admins_ack_at, next.quarantine_json, next.code_locked, next.writable_dirs_json);
+       quarantine_json = excluded.quarantine_json, code_locked = excluded.code_locked, writable_dirs_json = excluded.writable_dirs_json,
+       mu_plugins_json = excluded.mu_plugins_json`,
+  ).run(siteId, next.admins_json, next.admins_ack_at, next.quarantine_json, next.code_locked, next.writable_dirs_json, next.mu_plugins_json);
 }
 
 const parse = <T>(json: string | null, fallback: T): T => {
@@ -69,6 +72,10 @@ const parse = <T>(json: string | null, fallback: T): T => {
 export const knownAdmins = (siteId: number): number[] | null => parse<number[] | null>(row(siteId).admins_json, null);
 export const adminsAcknowledgedAt = (siteId: number) => row(siteId).admins_ack_at;
 export const setKnownAdmins = (siteId: number, ids: number[]) => update(siteId, { admins_json: JSON.stringify([...new Set(ids)].sort((a, b) => a - b)), admins_ack_at: nowIso() });
+
+/** mu-plugins known as legitimate: relative path -> sha256 (null = never recorded: the next scan records them). */
+export const knownMuPlugins = (siteId: number): Record<string, string> | null => parse<Record<string, string> | null>(row(siteId).mu_plugins_json, null);
+export const setKnownMuPlugins = (siteId: number, files: Record<string, string>) => update(siteId, { mu_plugins_json: JSON.stringify(files) });
 
 export const quarantineState = (siteId: number): QuarantineState => ({ ...EMPTY_QUARANTINE, ...parse<Partial<QuarantineState>>(row(siteId).quarantine_json, {}) });
 export const setQuarantineState = (siteId: number, q: QuarantineState) => update(siteId, { quarantine_json: q.active ? JSON.stringify(q) : null });
