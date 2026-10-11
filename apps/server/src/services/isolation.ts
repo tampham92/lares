@@ -124,7 +124,9 @@ export async function fixPermissions(site: LockableSite, log?: HostLogger) {
  */
 export async function writeSiteFile(site: LockableSite, target: string, content: string, log?: HostLogger) {
   const isolated = site.sysUser !== null;
-  if (!lockedNow(site)) return writeAsUser(site, target, content, log, isolated ? 0o640 : 0o644);
+  // an existing file keeps its mode (wp-config.php stays 0600); a new one gets the layout's file mode
+  const fresh = !(await host.exists(target));
+  if (!lockedNow(site)) return writeAsUser(site, target, content, log, fresh ? (isolated ? 0o640 : 0o644) : undefined);
   const rootReal = await fs.realpath(site.rootPath);
   const dirReal = await fs.realpath(path.dirname(target));
   if (dirReal !== rootReal && !dirReal.startsWith(rootReal + path.sep)) throw new Error(`refusing to write outside the site: ${target}`);

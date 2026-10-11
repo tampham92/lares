@@ -559,10 +559,11 @@ async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { sa
 
     // Files and data are back. What follows only restarts things: failures are reported, not rolled back.
     const warn = (what: string, err: unknown) => log(t('Cảnh báo: {what} thất bại: {error}', { what, error: errorMessage(err) }));
+    await sites.fixPermissions(site, log).catch((e) => warn(t('phân quyền'), e));
     // a backup from before a password change (cleaning rotates it) brings back the old DB_PASSWORD, while the
     // managed database user was just recreated with the current one: point wp-config.php at the current one
+    // (after fixPermissions: the extracted tree is root's until then, and this writes as the site user)
     await syncWpConfigPassword(site, touched, log).catch((e) => warn('wp-config.php', e));
-    await sites.fixPermissions(site, log).catch((e) => warn(t('phân quyền'), e));
     if (hadRoot) await fs.rm(old, { recursive: true, force: true }).catch((e) => warn(t('xoá thư mục cũ'), e));
     // a disabled or quarantined site stays stopped: its processes start again when it is enabled / released
     const halted = site.status === 'disabled' || isQuarantined(site.id);
