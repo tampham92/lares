@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EXEC_FUNCTIONS,
   editDenyList,
+  parseFirewallLog,
   parseUnitStats,
   permissionCommands,
   resourceLines,
@@ -9,7 +10,9 @@ import {
   renderSiteFirewall,
   renderSitePhpUnit,
   renderSitePool,
+  renderSshDeny,
   sandboxLines,
+  sshdIncludesDropIns,
   siteUserName,
   sitePhpPaths,
   unitPathArg,
@@ -119,11 +122,41 @@ describe('outbound firewall', () => {
   it('drops SMTP, cloud metadata and the panel/Adminer ports for the site uids only', () => {
     const rules = renderSiteFirewall({ uids: [1002, 1001, 1001], localPorts: [8686, 18686] });
     expect(rules).toContain('table inet lares_sites\ndelete table inet lares_sites\n');
-    expect(rules).toContain('meta skuid { 1001, 1002 } tcp dport 25 counter drop');
-    expect(rules).toContain('meta skuid { 1001, 1002 } ip daddr 169.254.169.254 counter drop');
-    expect(rules).toContain('meta skuid { 1001, 1002 } ip daddr 127.0.0.0/8 tcp dport { 8686, 18686 } counter drop');
+    expect(rules).toContain('meta skuid { 1001, 1002 } jump site');
+    expect(rules).toContain('tcp dport 25 jump block_smtp');
+    expect(rules).toContain('ip daddr 169.254.169.254 jump block_metadata');
+    expect(rules).toContain('ip daddr 127.0.0.0/8 tcp dport { 8686, 18686 } jump block_panel');
     expect(rules).toContain('policy accept;');
     expect(rules).not.toMatch(/dport (587|465)/);
+    expect(rules).not.toContain('block_quarantine\n        ');
+  });
+
+  it('logs every kind of block with the uid, rate-limited', () => {
+    const rules = renderSiteFirewall({ uids: [1001], localPorts: [8686] });
+    for (const kind of ['smtp', 'metadata', 'panel', 'rate', 'quarantine']) {
+      expect(rules).toMatch(new RegExp(`chain block_${kind} \\{\\s+limit rate 6/minute burst 5 packets log prefix "lares-block ${kind}: " flags skuid\\s+counter drop`));
+    }
+    expect(rules).toContain('ct state new update @out_rate { meta skuid limit rate over 20/second burst 100 packets } jump block_rate');
+    // loopback (MySQL over TCP) is accepted before the rate limit and the quarantine, after the panel ports
+    expect(rules.indexOf('oifname "lo" accept')).toBeGreaterThan(rules.indexOf('jump block_panel'));
+    expect(rules.indexOf('oifname "lo" accept')).toBeLessThan(rules.indexOf('@out_rate {'));
+  });
+
+  it('cuts every outbound connection of a quarantined site, and only of an isolated one', () => {
+    const rules = renderSiteFirewall({ uids: [1001, 1002], localPorts: [], quarantined: [1002, 1003] });
+    expect(rules).toContain('meta skuid { 1002 } jump block_quarantine');
+  });
+
+  it('reads its own log lines back', () => {
+    const log = [
+      'lares-block smtp: IN= OUT=eth0 SRC=10.0.0.5 DST=203.0.113.9 LEN=60 PROTO=TCP SPT=40000 DPT=25 WINDOW=64240 SYN UID=1001 GID=1001',
+      'lares-block metadata: IN= OUT=eth0 SRC=10.0.0.5 DST=169.254.169.254 PROTO=TCP DPT=80 UID=1002 GID=1002',
+      'some other kernel line UID=5',
+    ].join('\n');
+    expect(parseFirewallLog(log)).toEqual([
+      { kind: 'smtp', uid: 1001, dst: '203.0.113.9', dport: 25 },
+      { kind: 'metadata', uid: 1002, dst: '169.254.169.254', dport: 80 },
+    ]);
   });
 
   it('only removes the table when no site is isolated', () => {
@@ -145,6 +178,19 @@ describe('deny lists', () => {
     expect(editDenyList('bob\nlares-s3\n', 'lares-s3', false)).toBe('bob\n');
     expect(editDenyList('bob\n', 'lares-s3', false)).toBeNull();
     expect(() => editDenyList('', 'root', true)).toThrow();
+  });
+});
+
+describe('ssh', () => {
+  it('denies the shared group of the site users', () => {
+    expect(renderSshDeny()).toMatch(/^DenyGroups lares-sites$/m);
+  });
+  it('only writes the drop-in when sshd_config reads that folder', () => {
+    const dir = '/etc/ssh/sshd_config.d';
+    expect(sshdIncludesDropIns('Include /etc/ssh/sshd_config.d/*.conf\nPort 22\n', dir)).toBe(true);
+    expect(sshdIncludesDropIns('  include "/etc/ssh/sshd_config.d/*.conf"\n', dir)).toBe(true);
+    expect(sshdIncludesDropIns('#Include /etc/ssh/sshd_config.d/*.conf\n', dir)).toBe(false);
+    expect(sshdIncludesDropIns('Port 22\n', dir)).toBe(false);
   });
 });
 
@@ -194,9 +240,10 @@ describe('vhost of an isolated site', () => {
 
 describe('resource limits', () => {
   it('turns RAM and CPU limits into cgroup settings, throttling before killing', () => {
-    expect(resourceLines({ memoryMb: 512, cpuPercent: 150 })).toEqual(['MemoryHigh=460M', 'MemoryMax=512M', 'MemorySwapMax=0', 'CPUQuota=150%']);
-    expect(resourceLines({ memoryMb: null, cpuPercent: null })).toEqual([]);
-    expect(resourceLines(undefined)).toEqual([]);
+    expect(resourceLines({ memoryMb: 512, cpuPercent: 150 })).toEqual(['IOWeight=50', 'MemoryHigh=460M', 'MemoryMax=512M', 'MemorySwapMax=0', 'CPUQuota=150%']);
+    // disk I/O always yields to MySQL and the panel, limit or not
+    expect(resourceLines({ memoryMb: null, cpuPercent: null })).toEqual(['IOWeight=50']);
+    expect(resourceLines(undefined)).toEqual(['IOWeight=50']);
   });
 
   it('puts them in the PHP-FPM unit before the sandbox', () => {

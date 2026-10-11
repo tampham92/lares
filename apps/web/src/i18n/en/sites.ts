@@ -220,6 +220,8 @@ export const SITES_EN: Dict = {
   'Kết nối ra ngoài': 'Outgoing connections',
   'chưa chặn (thiếu nftables)': 'not restricted (nftables missing)',
   'Chặn gửi mail trực tiếp (cổng 25), metadata của cloud và cổng panel': 'Direct mail (port 25), the cloud metadata service and the panel ports are blocked',
+  'chưa chặn (xem log của panel)': 'not blocked (see the panel log)',
+  'User của site không đăng nhập SSH được, kể cả mở tunnel': 'The site user cannot log in over SSH, not even for a tunnel',
   'Cho phép PHP chạy lệnh hệ thống (exec, shell_exec, proc_open...)': 'Allow PHP to run system commands (exec, shell_exec, proc_open...)',
   'Nên tắt: webshell cần các hàm này để chạy lệnh trên máy chủ. Chỉ bật khi plugin thật sự cần chương trình ngoài (tạo PDF, tối ưu ảnh bằng công cụ dòng lệnh). Đổi xong PHP-FPM của site khởi động lại.':
     "Best left off: a webshell needs these functions to run commands on the server. Only turn it on when a plugin really needs an external program (PDF generation, command-line image optimisers). The site's PHP-FPM restarts after a change.",
@@ -245,6 +247,10 @@ export const SITES_EN: Dict = {
   'RAM tối đa (MB)': 'Max RAM (MB)',
   'Gần mức này site bị làm chậm, vượt thì tiến trình bị dừng.': 'Near this the site is slowed down; above it its processes are killed.',
   'Không giới hạn': 'No limit',
+  'Giới hạn tài nguyên (tuỳ chọn)': 'Resource limits (optional)',
+  'Giữ một site quá tải hoặc bị tấn công không chiếm hết tài nguyên của các site khác. Để trống = không giới hạn; đổi được sau trong trang site.':
+    'Keeps one overloaded or attacked site from taking the resources of the others. Empty = no limit; you can change them later on the site page.',
+  '100 = một nhân CPU.': '100 = one CPU core.',
   'CPU tối đa (%)': 'Max CPU (%)',
   '100 = một nhân CPU. Máy chủ có {n} nhân = tối đa {max}%.': '100 = one CPU core. This server has {n} cores = up to {max}%.',
   'Số worker PHP': 'PHP workers',

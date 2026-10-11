@@ -74,6 +74,8 @@ export function IsolationCard({ site }: { site: Site }) {
                 t('Chặn gửi mail trực tiếp (cổng 25), metadata của cloud và cổng panel')
               )}
             </div>
+            <div>SSH</div>
+            <div>{v.ssh === false ? <Badge tone="warn">{t('chưa chặn (xem log của panel)')}</Badge> : t('User của site không đăng nhập SSH được, kể cả mở tunnel')}</div>
           </div>
           {isPhp && (
             <>

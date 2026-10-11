@@ -145,6 +145,9 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: ci-isolation.test' http://127.0.0.1/)
           echo "site answers HTTP $code"; test "$code" = 200
           sudo nft list table inet lares_sites | grep -q 'tcp dport 25'
+          # sshd refuses the site users (nologin alone still allows `ssh -N` tunnels)
+          id -nG lares-s1 | grep -qw lares-sites
+          if command -v sshd >/dev/null; then sudo sshd -T | grep -qix 'denygroups lares-sites'; fi
           # the site's PHP cannot reach the panel port (it is trusted on loopback)
           echo '<?php $s = @fsockopen("127.0.0.1", 8686, $e, $m, 2); echo $s ? "open" : "blocked";' | sudo tee /var/www/ci-isolation.test/public_html/p.php >/dev/null
           sudo chown lares-s1:lares-s1 /var/www/ci-isolation.test/public_html/p.php
@@ -183,3 +186,5 @@ jobs:
           if id lares-s1 >/dev/null 2>&1; then echo "user lares-s1 still exists"; exit 1; fi
           test ! -e /etc/systemd/system/lares-php-1.service
           if sudo nft list table inet lares_sites >/dev/null 2>&1; then echo "nft table still loaded"; exit 1; fi
+          test ! -e /etc/ssh/sshd_config.d/lares-sites.conf
+          if getent group lares-sites >/dev/null; then echo "group lares-sites still exists"; exit 1; fi

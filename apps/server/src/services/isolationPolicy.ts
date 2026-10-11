@@ -19,6 +19,9 @@ import { shq } from '../lib/shell.js';
  *  - nftables rules on the site uids: no direct SMTP (spam), no cloud metadata service (instance
  *    credentials), no panel/Adminer port on loopback (the panel's IP allowlist trusts loopback).
  *  - Site users in cron.deny / at.deny, shell nologin, no password: no way to schedule a comeback.
+ *  - Site users in the group `lares-sites`, which sshd refuses (DenyGroups). nologin alone stops a
+ *    shell, not `ssh -N` tunnels - and HOME is the site folder, so a hijacked site can write its own
+ *    ~/.ssh/authorized_keys.
  *
  * Not covered here: a kernel exploit (root) - that is what OS security updates are for.
  */
@@ -31,6 +34,20 @@ export const siteUserName = (siteId: number): string => {
 
 /** The only names Lares ever creates, deletes or writes into deny lists. */
 export const SITE_USER_RE = /^lares-s[1-9]\d{0,9}$/;
+
+/** Every site user is also in this group: one name for sshd's DenyGroups. */
+export const SITES_GROUP = 'lares-sites';
+
+/** sshd drop-in (Ubuntu/Debian include /etc/ssh/sshd_config.d/*.conf; DenyGroups lines add up, never override). */
+export const renderSshDeny = (): string =>
+  `# Managed by Lares Panel - site users (group ${SITES_GROUP}) never log in over SSH, not even for a tunnel.\nDenyGroups ${SITES_GROUP}\n`;
+
+/** Does sshd_config read the drop-in folder? (Older or hand-edited configs may not.) */
+export const sshdIncludesDropIns = (sshdConfig: string, dropInDir: string): boolean =>
+  sshdConfig.split('\n').some((l) => {
+    const m = /^\s*Include\s+(.+?)\s*$/i.exec(l);
+    return !!m && m[1]!.split(/\s+/).some((p) => p.replace(/^"|"$/g, '').startsWith(`${dropInDir}/`));
+  });
 
 /** PHP's functions that start another program. Off by default for new sites (php_admin_value, cannot be undone by the site). */
 export const EXEC_FUNCTIONS = ['exec', 'passthru', 'shell_exec', 'system', 'proc_open', 'popen', 'pcntl_exec'] as const;
@@ -190,13 +207,15 @@ export function sandboxLines(o: SandboxOptions): string[] {
 // ---- Resource limits (cgroups v2 through systemd) ---------------------------------------
 
 /**
- * systemd lines for a site's RAM / CPU limits. MemoryHigh at 90 % makes the kernel reclaim and
+ * systemd lines for a site's RAM / CPU / disk I/O limits. MemoryHigh at 90 % makes the kernel reclaim and
  * throttle before MemoryMax kills a process: a busy site slows down instead of dropping requests.
  * MemorySwapMax=0: MemoryMax only counts RAM, so without it the excess just moves to swap - the
  * site keeps growing and the swapping slows every other site down.
  */
 export function resourceLines(limits: Pick<SiteLimits, 'memoryMb' | 'cpuPercent'> | null | undefined): string[] {
-  const lines: string[] = [];
+  // Under disk contention MySQL, nginx and the panel (weight 100) come before one site's own I/O;
+  // with no contention the weight changes nothing.
+  const lines: string[] = ['IOWeight=50'];
   const mem = limits?.memoryMb;
   if (mem && Number.isInteger(mem) && mem > 0) lines.push(`MemoryHigh=${Math.floor(mem * 0.9)}M`, `MemoryMax=${mem}M`, 'MemorySwapMax=0');
   const cpu = limits?.cpuPercent;
@@ -264,38 +283,99 @@ WantedBy=multi-user.target
 export const FIREWALL_TABLE = 'lares_sites';
 export const FIREWALL_UNIT = 'lares-site-firewall';
 
+/** Prefix of every log line the rules write (kernel log); the kind follows it. */
+export const FIREWALL_LOG_PREFIX = 'lares-block';
+export const FIREWALL_BLOCK_KINDS = ['smtp', 'metadata', 'panel', 'rate', 'quarantine'] as const;
+export type FirewallBlockKind = (typeof FIREWALL_BLOCK_KINDS)[number];
+
+/** New outbound connections per second one site may open (burst: a page that calls a few APIs at once). */
+export const OUTBOUND_RATE = { perSecond: 20, burst: 100 };
+
+export interface SiteFirewallOptions {
+  uids: number[];
+  /** Panel and Adminer ports, closed to the sites on loopback. */
+  localPorts: number[];
+  /** Sites in quarantine (C6): nothing leaves the machine; loopback (MySQL over TCP) still works. */
+  quarantined?: number[];
+}
+
 /**
  * Rules for the isolated sites' uids. The file replaces the whole table in one transaction (the
  * `table` line first makes the `delete` valid when the table does not exist yet); with no uid it
  * only removes the table. Rules match outgoing traffic of the site processes only: nginx, the panel
  * and everything else on the machine are untouched.
+ *
+ * Every block is logged to the kernel log with the uid (flags skuid), at most a few lines a minute
+ * per kind: a site that keeps trying to send mail or reach the metadata service is a hijacked site,
+ * and the malware scan (malware.ts) reads these lines back.
  */
-export function renderSiteFirewall(o: { uids: number[]; localPorts: number[] }): string {
-  const uids = [...new Set(o.uids)].filter((u) => Number.isSafeInteger(u) && u > 0).sort((a, b) => a - b);
-  const ports = [...new Set(o.localPorts)].filter((p) => Number.isInteger(p) && p > 0 && p < 65536).sort((a, b) => a - b);
+export function renderSiteFirewall(o: SiteFirewallOptions): string {
+  const clean = (list: number[] | undefined, ok: (n: number) => boolean) => [...new Set(list ?? [])].filter(ok).sort((a, b) => a - b);
+  const uids = clean(o.uids, (u) => Number.isSafeInteger(u) && u > 0);
+  const ports = clean(o.localPorts, (p) => Number.isInteger(p) && p > 0 && p < 65536);
+  const quarantined = clean(o.quarantined, (u) => uids.includes(u));
   const head = `# Managed by Lares Panel - outbound rules for isolated sites. Rewritten by the panel, do not edit.\ntable inet ${FIREWALL_TABLE}\ndelete table inet ${FIREWALL_TABLE}\n`;
   if (!uids.length) return head;
-  const who = `meta skuid { ${uids.join(', ')} }`;
-  const rules = [
+  const set = (list: number[]) => `{ ${list.join(', ')} }`;
+  const site = [
     // Direct-to-MX mail from a hijacked site is spam sent under this server's IP. Sites that send
     // mail authenticate on a submission port (587/465) of their mail provider, which stays open.
-    `${who} tcp dport 25 counter drop`,
+    'tcp dport 25 jump block_smtp',
     // The cloud metadata service hands out the instance's credentials to any local process.
-    `${who} ip daddr 169.254.169.254 counter drop`,
-    `${who} ip6 daddr fd00:ec2::254 counter drop`,
+    'ip daddr 169.254.169.254 jump block_metadata',
+    'ip6 daddr fd00:ec2::254 jump block_metadata',
   ];
   // The panel trusts loopback in its IP allowlist (SSH tunnel escape hatch); Adminer listens on loopback.
-  if (ports.length) {
-    const set = `{ ${ports.join(', ')} }`;
-    rules.push(`${who} ip daddr 127.0.0.0/8 tcp dport ${set} counter drop`, `${who} ip6 daddr ::1 tcp dport ${set} counter drop`);
-  }
+  if (ports.length) site.push(`ip daddr 127.0.0.0/8 tcp dport ${set(ports)} jump block_panel`, `ip6 daddr ::1 tcp dport ${set(ports)} jump block_panel`);
+  site.push('oifname "lo" accept');
+  if (quarantined.length) site.push(`meta skuid ${set(quarantined)} jump block_quarantine`);
+  // A bot (DDoS, scanner, spam over 587) opens connections by the thousand; a site calls a few APIs.
+  site.push(`ct state new update @out_rate { meta skuid limit rate over ${OUTBOUND_RATE.perSecond}/second burst ${OUTBOUND_RATE.burst} packets } jump block_rate`);
+  const block = (kind: FirewallBlockKind) => `    chain block_${kind} {
+        limit rate 6/minute burst 5 packets log prefix "${FIREWALL_LOG_PREFIX} ${kind}: " flags skuid
+        counter drop
+    }`;
   return `${head}table inet ${FIREWALL_TABLE} {
+    set out_rate {
+        typeof meta skuid
+        flags dynamic
+        timeout 1m
+    }
     chain output {
         type filter hook output priority 0; policy accept;
-${rules.map((r) => `        ${r}`).join('\n')}
+        meta skuid ${set(uids)} jump site
     }
+    chain site {
+${site.map((r) => `        ${r}`).join('\n')}
+    }
+${FIREWALL_BLOCK_KINDS.map(block).join('\n')}
 }
 `;
+}
+
+export interface FirewallBlock {
+  kind: FirewallBlockKind;
+  uid: number;
+  dst: string | null;
+  dport: number | null;
+}
+
+/** Lines written by the rules above (journalctl -k -o cat), with their uid. Other lines are skipped. */
+export function parseFirewallLog(text: string): FirewallBlock[] {
+  const out: FirewallBlock[] = [];
+  const kinds = FIREWALL_BLOCK_KINDS.join('|');
+  const re = new RegExp(`${FIREWALL_LOG_PREFIX} (${kinds}): .*?\\bUID=(\\d+)`);
+  for (const line of text.split('\n')) {
+    const m = re.exec(line);
+    if (!m) continue;
+    out.push({
+      kind: m[1] as FirewallBlockKind,
+      uid: Number(m[2]),
+      dst: /\bDST=([0-9a-fA-F.:]+)/.exec(line)?.[1] ?? null,
+      dport: Number(/\bDPT=(\d+)/.exec(line)?.[1]) || null,
+    });
+  }
+  return out;
 }
 
 /** Loads the rules at boot, before the sites' PHP-FPM (ordered after nftables.service, which flushes the ruleset). */

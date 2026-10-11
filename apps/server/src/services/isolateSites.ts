@@ -157,6 +157,7 @@ export async function isolationView(siteId: number): Promise<SiteIsolationView> 
     phpService: ownPhp ? isolation.phpPathsFor(site.id).unit : null,
     phpExecAllowed: site.phpExecAllowed,
     firewall: site.sysUser ? await isolation.siteFirewallLoaded() : null,
+    ssh: site.sysUser ? await isolation.sshDenyActive() : null,
     error: sites.siteIsolationError(site.id),
     disabled: !config.siteIsolation,
   };

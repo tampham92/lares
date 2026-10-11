@@ -12,6 +12,7 @@ import {
   FIREWALL_TABLE,
   FIREWALL_UNIT,
   SITE_USER_RE,
+  SITES_GROUP,
   editDenyList,
   fpmBinary,
   parseUnitStats,
@@ -21,7 +22,9 @@ import {
   renderSiteFirewall,
   renderSitePhpUnit,
   renderSitePool,
+  renderSshDeny,
   sandboxLines,
+  sshdIncludesDropIns,
   siteUserName,
   sitePhpPaths,
   type SandboxOptions,
@@ -86,11 +89,12 @@ export async function ensureSiteUser(siteId: number, rootPath: string, log?: Hos
     log?.(`[dry-run] useradd ${user} (home ${rootPath}); usermod -aG ${user} ${config.webUser}`);
     return user;
   }
+  await ensureSitesGroup();
   if ((await host.exec(`id -u ${shq(user)}`)).code !== 0) {
-    await host.run(`useradd --system --user-group --no-create-home --home-dir ${shq(rootPath)} --shell /usr/sbin/nologin ${shq(user)}`);
+    await host.run(`useradd --system --user-group --groups ${SITES_GROUP} --no-create-home --home-dir ${shq(rootPath)} --shell /usr/sbin/nologin ${shq(user)}`);
     log?.(t('Đã tạo user hệ thống {user} cho site', { user }));
   } else {
-    await host.run(`usermod --home ${shq(rootPath)} ${shq(user)}`);
+    await host.run(`usermod --home ${shq(rootPath)} -a -G ${SITES_GROUP} ${shq(user)}`);
   }
   await host.run(`usermod -a -G ${shq(user)} ${shq(config.webUser)}`);
   await setDenied(user, true);
@@ -114,6 +118,65 @@ export async function removeSiteUser(user: string, log?: HostLogger) {
   // userdel keeps the group when another user (nginx's) is still listed in it
   if ((await host.exec(`getent group ${shq(user)}`)).code === 0) await host.exec(`groupdel ${shq(user)}`);
   await setDenied(user, false);
+}
+
+const ensureSitesGroup = async () => {
+  if ((await host.exec(`getent group ${SITES_GROUP}`)).code !== 0) await host.run(`groupadd --system ${SITES_GROUP}`);
+};
+
+let sshQueue: Promise<boolean | null> = Promise.resolve(null);
+
+/**
+ * Make sshd refuse every site user (runs at startup; idempotent): the group, every existing site user
+ * in it, the drop-in, `sshd -t`, reload. Never throws - a server without OpenSSH (or with a config
+ * that does not read the drop-in folder) keeps working and the log says why. Returns whether the
+ * rule is active (null = no sshd / dry-run).
+ */
+export function ensureSshDeny(log?: HostLogger): Promise<boolean | null> {
+  sshQueue = sshQueue.then(() => doEnsureSshDeny(log)).catch((err) => {
+    log?.(t('Cảnh báo: chưa chặn được SSH cho user của site: {error}', { error: errorMessage(err) }));
+    return false;
+  });
+  return sshQueue;
+}
+
+async function doEnsureSshDeny(log?: HostLogger): Promise<boolean | null> {
+  const content = renderSshDeny();
+  if (config.dryRun) {
+    await host.writeFile(config.sshDenyFile, content, 0o644);
+    return null;
+  }
+  await ensureSitesGroup();
+  for (const user of await siteUsers()) {
+    const groups = (await host.exec(`id -nG ${shq(user)}`)).stdout.split(/\s+/);
+    if (!groups.includes(SITES_GROUP)) await host.run(`usermod -a -G ${SITES_GROUP} ${shq(user)}`);
+  }
+  const sshd = (await host.exec('command -v sshd || ls /usr/sbin/sshd 2>/dev/null')).stdout.trim().split('\n')[0];
+  if (!sshd) return null;
+  const dir = path.dirname(config.sshDenyFile);
+  const main = await fs.readFile('/etc/ssh/sshd_config', 'utf8').catch(() => '');
+  if (!sshdIncludesDropIns(main, dir)) {
+    log?.(t('Cảnh báo: /etc/ssh/sshd_config không đọc thư mục {dir} nên chưa chặn được SSH cho user của site. Thêm dòng "Include {dir}/*.conf" vào đầu file rồi khởi động lại panel.', { dir }));
+    return false;
+  }
+  if ((await fs.readFile(config.sshDenyFile, 'utf8').catch(() => null)) === content) return true;
+  await host.writeFile(config.sshDenyFile, content, 0o644);
+  const test = await host.exec(`${shq(sshd)} -t`);
+  if (test.code !== 0) {
+    // never leave sshd with a config it rejects: the next restart would lock everyone out
+    await fs.rm(config.sshDenyFile, { force: true });
+    throw new Error((test.stderr || test.stdout).trim().split('\n').slice(-2).join(' '));
+  }
+  // socket-activated sshd (Ubuntu 24.04) may not be running: then the next connection reads the file
+  await host.exec('systemctl try-reload-or-restart ssh.service 2>/dev/null || systemctl try-reload-or-restart sshd.service 2>/dev/null');
+  log?.(t('Đã chặn đăng nhập SSH cho user của các site ({file})', { file: config.sshDenyFile }));
+  return true;
+}
+
+/** For the site page: is the SSH block in place? null = unknown (dry-run / no sshd). */
+export async function sshDenyActive(): Promise<boolean | null> {
+  if (config.dryRun || !(await host.exists(path.dirname(config.sshDenyFile)))) return null;
+  return (await fs.readFile(config.sshDenyFile, 'utf8').catch(() => null)) === renderSshDeny();
 }
 
 // ---- Sandbox inputs --------------------------------------------------------------------
@@ -234,17 +297,19 @@ export async function sitePhpActive(site: Pick<Site, 'id' | 'sysUser'>): Promise
 
 // ---- Outbound firewall ----------------------------------------------------------------
 
-/** uid of every site user on the machine (getent: also users of sites Lares no longer lists). */
-async function siteUids(): Promise<number[]> {
+/** Site users on the machine (getent: also users of sites Lares no longer lists), with their uid. */
+async function siteAccounts(): Promise<Array<{ user: string; uid: number }>> {
   const r = await host.exec('getent passwd');
   if (r.code !== 0) return [];
   return r.stdout
     .split('\n')
     .map((l) => l.split(':'))
     .filter((f) => SITE_USER_RE.test(f[0] ?? ''))
-    .map((f) => Number(f[2]))
-    .filter((n) => Number.isSafeInteger(n) && n > 0);
+    .map((f) => ({ user: f[0]!, uid: Number(f[2]) }))
+    .filter((a) => Number.isSafeInteger(a.uid) && a.uid > 0);
 }
+const siteUids = async () => (await siteAccounts()).map((a) => a.uid);
+const siteUsers = async () => (await siteAccounts()).map((a) => a.user);
 
 let firewallQueue: Promise<void> = Promise.resolve();
 

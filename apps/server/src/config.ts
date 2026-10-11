@@ -81,6 +81,8 @@ export const config = {
   sitePhpMaxChildren: Number(env('LARES_SITE_PHP_MAX_CHILDREN', '8')),
   /** nftables rules for the isolated sites' uids, loaded at boot by lares-site-firewall.service. */
   siteFirewallFile: env('LARES_SITE_FIREWALL_FILE', dryRun ? path.join(dataDir, 'site-firewall.nft') : '/etc/lares/site-firewall.nft'),
+  /** sshd drop-in that refuses SSH to every site user (DenyGroups). */
+  sshDenyFile: env('LARES_SSH_DENY_FILE', dryRun ? path.join(dataDir, 'sshd-lares-sites.conf') : '/etc/ssh/sshd_config.d/lares-sites.conf'),
   /** The panel's own env file (secrets): hidden from the site sandboxes. */
   envFile: env('LARES_ENV_FILE', '/etc/lares/lares.env'),
   /** Per-site logs live outside /var/log/nginx so they don't collide with the distro's nginx logrotate rule. */

@@ -12,6 +12,7 @@ import * as databases from './databases.js';
 import * as githubApp from './githubApp.js';
 import { host, type HostLogger } from './host.js';
 import * as isolation from './isolation.js';
+import * as mysql from './mysql.js';
 import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type VhostSpec } from './nginx.js';
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
@@ -184,6 +185,8 @@ export interface ProvisionInput {
   listenPort?: number | null;
   /** exec() & co. in the site's PHP (isolated sites only). Off unless copied from a clone's source. */
   phpExecAllowed?: boolean;
+  /** Resource limits from the start (isolated sites only; MySQL connections are applied by the caller once the database exists). */
+  limits?: SiteLimits;
 }
 
 /** Synthetic, unique identifier for port-based sites; doubles as directory / vhost / log name. */
@@ -239,12 +242,17 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
   const siteId = Number(info.lastInsertRowid);
   undo.push(t('xoá bản ghi site {domain}', { domain: input.domain }), async () => db.prepare('DELETE FROM sites WHERE id = ?').run(siteId));
 
+  if (input.limits && !config.siteIsolation && Object.values(input.limits).some((v) => v !== null)) {
+    log(t('Bỏ qua giới hạn tài nguyên: tính năng cách ly site đang tắt trên máy chủ này (LARES_SITE_ISOLATION=0)'));
+  }
   if (config.siteIsolation) {
     // Own Linux user and PHP-FPM before the vhost: the nginx reload that applies the vhost is also
     // what gives nginx's workers the site's group.
     const user = await isolation.ensureSiteUser(siteId, layout.rootPath, log);
     undo.push(t('xoá user {user}', { user }), () => isolation.removeSiteUser(user, log));
     setSiteIsolation(siteId, { sysUser: user, phpExecAllowed: input.phpExecAllowed ?? false });
+    // MySQL connections wait for the database (createSite); PHP workers mean nothing without PHP
+    if (input.limits) setSiteLimits(siteId, { ...input.limits, phpWorkers: usesPhp(input.appType) ? input.limits.phpWorkers : null, mysqlConnections: null });
     if (usesPhp(input.appType)) {
       undo.push(t('xoá PHP-FPM của site {domain}', { domain: input.domain }), () => isolation.removeSitePhp(siteId, log));
       await isolation.applySitePhp(getSite(siteId), log);
@@ -287,6 +295,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
         phpVersion: 'phpVersion' in input ? input.phpVersion : undefined,
         nodeConfig,
         listenPort,
+        limits: 'limits' in input ? input.limits : undefined,
       },
       log,
       undo,
@@ -301,6 +310,11 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
       undo.push(t('xoá database {name}', { name }), () => databases.deleteDatabase(created.record.id, log));
       database = { name, username: name, password: created.password };
       log(t('Đã tạo database {name}', { name }));
+      const maxConns = 'limits' in input ? input.limits?.mysqlConnections : null;
+      if (maxConns) {
+        await mysql.setMaxUserConnections(name, maxConns, log);
+        setSiteLimits(site.id, { ...getSite(site.id).limits, mysqlConnections: maxConns });
+      }
     }
 
     switch (input.type) {
