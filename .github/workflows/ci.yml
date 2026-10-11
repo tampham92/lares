@@ -157,9 +157,14 @@ jobs:
         run: |
           token=$(curl -skf -X POST -H 'Content-Type: application/json' \
             -d '{"username":"admin","password":"CiSmokeTest-12345"}' "$PANEL/api/auth/login" | jq -r .token)
-          api() { curl -sk -X "$1" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' ${3:+-d "$3"} "$PANEL$2"; }
+          # a JSON content type with an empty body is a 400: POST/PUT always send at least {}
+          api() {
+            if [ "$1" = GET ]; then curl -sk -H "Authorization: Bearer $token" "$PANEL$2"
+            else curl -sk -X "$1" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "${3:-"{}"}" "$PANEL$2"; fi
+          }
           run() {
-            task=$(api "$1" "$2" "${3:-}" | jq -r .id)
+            task=$(api "$1" "$2" "${3:-"{}"}" | jq -r .id)
+            if [ -z "$task" ] || [ "$task" = null ]; then api "$1" "$2" "${3:-"{}"}"; echo; exit 1; fi
             for _ in $(seq 1 120); do st=$(api GET "/api/tasks/$task" | jq -r .status); [ "$st" != running ] && break; sleep 2; done
             api GET "/api/tasks/$task" | jq -r '.logs[].msg'; test "$st" = completed
           }
