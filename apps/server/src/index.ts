@@ -20,9 +20,10 @@ import { leadRoutes } from './routes/leads.js';
 import { releaseRoutes } from './routes/release.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { siteRoutes } from './routes/sites.js';
+import { siteSecurityRoutes } from './routes/siteSecurity.js';
 import { siteToolsRoutes } from './routes/sitetools.js';
 import { startUpgradeConversion } from './services/isolateSites.js';
-import { syncSiteFirewall } from './services/isolation.js';
+import { ensureSshDeny, syncSiteFirewall } from './services/isolation.js';
 import { githubRoutes } from './routes/github.js';
 import { systemRoutes } from './routes/system.js';
 import { templateRoutes } from './routes/templates.js';
@@ -76,6 +77,7 @@ app.setErrorHandler((err, req, reply) => {
 await app.register(authRoutes);
 await app.register(systemRoutes);
 await app.register(siteRoutes);
+await app.register(siteSecurityRoutes);
 await app.register(notificationRoutes);
 await app.register(databaseRoutes);
 await app.register(migrationRoutes);
@@ -126,4 +128,5 @@ await app.listen({ port: config.port, host: config.host });
 // Per-site isolation: reload the outbound rules (cheap, idempotent), then convert the sites an older
 // Lares created on the shared web user - in the background, one site at a time, rolled back on failure.
 void syncSiteFirewall((m) => app.log.warn(m));
+void ensureSshDeny((m) => app.log.warn(m));
 startUpgradeConversion((m) => app.log.info(m));

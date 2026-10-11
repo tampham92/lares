@@ -17,6 +17,7 @@ import * as ports from './ports.js';
 import * as sites from './sites.js';
 import { runAsOf, siteOwner } from './isolation.js';
 import { ensurePortHostFix, rewriteWpConfig, wordpressReplaceUrl } from './wordpress.js';
+import { assertNotQuarantined } from './securityStore.js';
 
 /** Caches in the site's home dir (HOME of the web user) and Next.js build cache: rebuilt on demand. */
 const CLONE_EXCLUDES = ['.npm', '.cache', '.pnpm-store', 'app/.next/cache', '.lares-sso.json'];
@@ -53,6 +54,8 @@ export async function databasesSize(names: string[]): Promise<number> {
  */
 export async function cloneSite(sourceId: number, input: CloneSiteInput, log: HostLogger): Promise<CreateSiteResult> {
   const src = sites.getSite(sourceId);
+  // a copy of a hijacked site is a second hijacked site
+  assertNotQuarantined(src);
   const srcAppDir = path.join(src.rootPath, src.appType === 'nextjs' ? 'app' : 'public_html');
   const webRootSubdir = path.relative(srcAppDir, src.webRoot);
   if (webRootSubdir.startsWith('..') || path.isAbsolute(webRootSubdir)) {
@@ -119,7 +122,7 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
         const cfgFile = inClone(wpConfig!);
         await host.writeFile(cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), 0o640);
         log(t('wp-config.php: trỏ sang database mới'));
-        if (listenPort) await ensurePortHostFix(site.webRoot, siteOwner(site), log);
+        if (listenPort) await ensurePortHostFix(site, log);
         // wp-cli runs as the site's user and must be able to read the copied files
         await sites.fixPermissions(site, log);
         await wordpressReplaceUrl(site.webRoot, runAsOf(site), url, log);

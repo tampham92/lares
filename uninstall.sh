@@ -240,6 +240,11 @@ if [[ $PURGE == 1 ]]; then
   for f in /etc/cron.deny /etc/at.deny; do
     if [[ -f "$f" ]]; then sed -i -E '/^lares-s[1-9][0-9]*$/d' "$f"; fi
   done
+  if getent group lares-sites >/dev/null; then groupdel lares-sites >/dev/null 2>&1 || true; fi
+  if [[ -f /etc/ssh/sshd_config.d/lares-sites.conf ]]; then
+    rm -f /etc/ssh/sshd_config.d/lares-sites.conf
+    systemctl try-reload-or-restart ssh.service >/dev/null 2>&1 || systemctl try-reload-or-restart sshd.service >/dev/null 2>&1 || true
+  fi
   systemctl daemon-reload
 
   if [[ ${#DATABASES[@]} -gt 0 ]]; then

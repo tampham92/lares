@@ -145,10 +145,52 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: ci-isolation.test' http://127.0.0.1/)
           echo "site answers HTTP $code"; test "$code" = 200
           sudo nft list table inet lares_sites | grep -q 'tcp dport 25'
+          # sshd refuses the site users (nologin alone still allows `ssh -N` tunnels)
+          id -nG lares-s1 | grep -qw lares-sites
+          if command -v sshd >/dev/null; then sudo sshd -T | grep -qix 'denygroups lares-sites'; fi
           # the site's PHP cannot reach the panel port (it is trusted on loopback)
           echo '<?php $s = @fsockopen("127.0.0.1", 8686, $e, $m, 2); echo $s ? "open" : "blocked";' | sudo tee /var/www/ci-isolation.test/public_html/p.php >/dev/null
           sudo chown lares-s1:lares-s1 /var/www/ci-isolation.test/public_html/p.php
           test "$(curl -s -H 'Host: ci-isolation.test' http://127.0.0.1/p.php)" = blocked
+
+      - name: Malware scan, quarantine and code lock on that site
+        run: |
+          token=$(curl -skf -X POST -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"CiSmokeTest-12345"}' "$PANEL/api/auth/login" | jq -r .token)
+          # a JSON content type with an empty body is a 400: POST/PUT always send at least {}
+          api() {
+            if [ "$1" = GET ]; then curl -sk -H "Authorization: Bearer $token" "$PANEL$2"
+            else curl -sk -X "$1" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "${3:-"{}"}" "$PANEL$2"; fi
+          }
+          run() {
+            task=$(api "$1" "$2" "${3:-"{}"}" | jq -r .id)
+            if [ -z "$task" ] || [ "$task" = null ]; then api "$1" "$2" "${3:-"{}"}"; echo; exit 1; fi
+            for _ in $(seq 1 120); do st=$(api GET "/api/tasks/$task" | jq -r .status); [ "$st" != running ] && break; sleep 2; done
+            api GET "/api/tasks/$task" | jq -r '.logs[].msg'; test "$st" = completed
+          }
+          site() { curl -s -o /dev/null -w '%{http_code}' -H 'Host: ci-isolation.test' http://127.0.0.1/; }
+          # a webshell in uploads is found
+          sudo -u lares-s1 mkdir -p /var/www/ci-isolation.test/public_html/uploads
+          echo '<?php eval(base64_decode($_POST["x"]));' | sudo -u lares-s1 tee /var/www/ci-isolation.test/public_html/uploads/x.php >/dev/null
+          run POST /api/sites/1/security/scan
+          test "$(api GET /api/sites/1/security | jq -r .lastScan.status)" = infected
+          # quarantine: 503, PHP stopped, outbound cut
+          run POST /api/sites/1/security/quarantine '{"reason":"ci"}'
+          test "$(site)" = 503
+          if systemctl is-active --quiet lares-php-1; then echo "PHP still running"; exit 1; fi
+          sudo nft list table inet lares_sites | grep -q block_quarantine
+          # cleaning parks the webshell outside the web root, the new scan is clean, release brings the site back
+          run POST /api/sites/1/security/clean '{}'
+          test ! -e /var/www/ci-isolation.test/public_html/uploads/x.php
+          run POST /api/sites/1/security/release '{}'
+          test "$(site)" = 200
+          # code lock: root owns the code, uploads stay the site's (sudo: the runner user cannot enter the 0750 site folder)
+          run PUT /api/sites/1/security/code-lock '{"locked":true,"writableDirs":["public_html/uploads"]}'
+          test "$(sudo stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = root
+          test "$(sudo stat -c '%U' /var/www/ci-isolation.test/public_html/uploads)" = lares-s1
+          test "$(site)" = 200
+          run PUT /api/sites/1/security/code-lock '{"locked":false}'
+          test "$(sudo stat -c '%U' /var/www/ci-isolation.test/public_html/index.php)" = lares-s1
 
       - name: Telemetry opt-out was saved
         run: |
@@ -183,3 +225,5 @@ jobs:
           if id lares-s1 >/dev/null 2>&1; then echo "user lares-s1 still exists"; exit 1; fi
           test ! -e /etc/systemd/system/lares-php-1.service
           if sudo nft list table inet lares_sites >/dev/null 2>&1; then echo "nft table still loaded"; exit 1; fi
+          test ! -e /etc/ssh/sshd_config.d/lares-sites.conf
+          if getent group lares-sites >/dev/null; then echo "group lares-sites still exists"; exit 1; fi

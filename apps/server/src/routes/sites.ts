@@ -16,6 +16,8 @@ import { tailFile, trafficStats, truncateLog } from '../services/logs.js';
 import { siteLogPaths } from '../services/nginx.js';
 import * as nodeapp from '../services/nodeapp.js';
 import * as sites from '../services/sites.js';
+import { latestScan } from '../services/malware.js';
+import { assertNotQuarantined, codeLock, isQuarantined } from '../services/securityStore.js';
 import { startTask } from '../services/tasks.js';
 
 const logQuerySchema = z.object({
@@ -41,6 +43,8 @@ export async function siteRoutes(app: FastifyInstance) {
       nodeApp,
       // env values and the git token are secrets: return env keys only and whether a token is set
       nodeConfig: cfg ? { ...cfg, gitToken: undefined, hasGitToken: Boolean(cfg.gitToken), env: Object.fromEntries(Object.keys(cfg.env ?? {}).map((k) => [k, ''])) } : null,
+      // header badges; details in GET /api/sites/:id/security
+      security: { quarantined: isQuarantined(site.id), codeLocked: codeLock(site.id).locked, lastScan: latestScan(site.id)?.status ?? null },
     };
   });
 
@@ -61,6 +65,7 @@ export async function siteRoutes(app: FastifyInstance) {
     const id = idParam(req.params);
     const input = parse(cloneSiteSchema, req.body);
     const site = sites.getSite(id);
+    assertNotQuarantined(site);
     if (sites.findSiteByHostname(input.domain)) throw badRequest(t('{domain} đã tồn tại', { domain: input.domain }));
     input.publicHost ||= req.hostname.replace(/:\d+$/, '');
     const target = input.domain === LOCALHOST ? (input.listenPort != null ? `port ${input.listenPort}` : t('port mới')) : input.domain;
@@ -110,6 +115,7 @@ export async function siteRoutes(app: FastifyInstance) {
   app.post('/api/sites/:id/deploy', async (req) => {
     const id = idParam(req.params);
     const site = sites.getSite(id);
+    assertNotQuarantined(site);
     return startTask(`Build & deploy ${site.domain}`, (log) => sites.deploySite(id, log));
   });
 
@@ -118,6 +124,7 @@ export async function siteRoutes(app: FastifyInstance) {
     const action = (req.params as { action: string }).action;
     if (!['start', 'stop', 'restart'].includes(action)) throw badRequest(t('Hành động không hợp lệ'));
     const site = sites.getSite(id);
+    if (action !== 'stop') assertNotQuarantined(site);
     await nodeapp.serviceAction(site.domain, action as 'start' | 'stop' | 'restart');
     return nodeapp.serviceStatus(site.domain, site.appPort, site.webRoot);
   });

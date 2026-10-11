@@ -22,6 +22,8 @@ export interface VhostSpec {
   listenPort?: number | null;
   accessLog: boolean;
   disabled: boolean;
+  /** Emergency quarantine (services/quarantine.ts): served like a disabled site, with a neutral maintenance page. */
+  quarantined?: boolean;
   ssl: { certificate: string; privateKey: string; forceHttps: boolean } | null;
   /** client_max_body_size in MB, following the site's PHP upload limit (services/phpSettings.ts); unset = 256. */
   clientMaxBodyMb?: number | null;
@@ -84,10 +86,13 @@ function appBody(spec: VhostSpec): string {
     'location ~ /\\.(?!well-known) {\n    deny all;\n}',
   ];
   // ---- Lead capture (contact forms -> panel), see services/leadsNginx.ts ----
-  if (!spec.disabled) common.push('', leadLocation(spec.domain));
+  const stopped = spec.disabled || spec.quarantined;
+  if (!stopped) common.push('', leadLocation(spec.domain));
 
-  if (spec.disabled) {
-    return [...common, '', `location / {\n    default_type text/html;\n    return 503 "<h1>${tDefault('Site tạm ngưng hoạt động')}</h1>";\n}`].join('\n');
+  if (stopped) {
+    // visitors are not told why: "under maintenance" for a quarantined site
+    const page = spec.quarantined ? tDefault('Site đang bảo trì, vui lòng quay lại sau') : tDefault('Site tạm ngưng hoạt động');
+    return [...common, '', `location / {\n    default_type text/html;\n    return 503 "<h1>${page}</h1>";\n}`].join('\n');
   }
 
   if (spec.appType === 'nextjs') {

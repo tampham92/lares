@@ -12,6 +12,7 @@ import * as nodeapp from './nodeapp.js';
 import { notify, registerNotificationSource } from './notifications.js';
 import * as sites from './sites.js';
 import { startTask, type TaskInfo } from './tasks.js';
+import { assertNotQuarantined } from './securityStore.js';
 
 /*
  * Converting a site created by an older Lares (shared www-data, shared PHP-FPM pool) to its own user
@@ -25,7 +26,7 @@ import { startTask, type TaskInfo } from './tasks.js';
  */
 
 /** HTTP status of the site's home page as nginx serves it on this machine ('000' = no answer). */
-async function probe(site: Site): Promise<string> {
+export async function probe(site: Site): Promise<string> {
   const port = site.listenPort ?? (site.ssl.enabled ? 443 : 80);
   const scheme = site.ssl.enabled && !site.listenPort ? 'https' : 'http';
   const r = await host.exec(
@@ -34,7 +35,7 @@ async function probe(site: Site): Promise<string> {
   return r.stdout.trim() || '000';
 }
 
-const broken = (code: string) => code === '000' || code.startsWith('5');
+export const broken = (code: string) => code === '000' || code.startsWith('5');
 
 export async function isolateSite(site: Site, log: HostLogger): Promise<Site> {
   if (site.sysUser) return site;
@@ -157,6 +158,7 @@ export async function isolationView(siteId: number): Promise<SiteIsolationView> 
     phpService: ownPhp ? isolation.phpPathsFor(site.id).unit : null,
     phpExecAllowed: site.phpExecAllowed,
     firewall: site.sysUser ? await isolation.siteFirewallLoaded() : null,
+    ssh: site.sysUser ? await isolation.sshDenyActive() : null,
     error: sites.siteIsolationError(site.id),
     disabled: !config.siteIsolation,
   };
@@ -166,6 +168,7 @@ export async function isolationView(siteId: number): Promise<SiteIsolationView> 
 export async function setPhpExecAllowed(siteId: number, allowed: boolean, log?: HostLogger): Promise<SiteIsolationView> {
   const site = sites.getSite(siteId);
   if (!site.sysUser || !sites.usesPhp(site.appType)) throw conflict(t('Chỉ áp dụng cho site PHP đã có user riêng'));
+  assertNotQuarantined(site);
   if (site.phpExecAllowed !== allowed) {
     await isolation.applySitePhp({ ...site, phpExecAllowed: allowed }, log);
     if (site.status === 'disabled') await isolation.setSitePhpRunning(site, false, log);

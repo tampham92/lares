@@ -260,3 +260,44 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TEXT NOT NULL
 );
 `);
+
+// ---- Site security: malware scans, quarantine, code lock (services/malware.ts, quarantine.ts, codeLock.ts) ----
+// findings_json: ScanFinding[] (raw paths/details, labels translated in the UI). File hashes of the
+// previous scan live on disk (<dataDir>/security/<siteId>-baseline.json), not here: they can be large.
+// site_security.admins_json: ids of the administrators known as legitimate (first scan, "mark as
+// checked", cleaning). quarantine_json: QuarantineState. security_events: who did what, when.
+db.exec(`
+CREATE TABLE IF NOT EXISTS malware_scans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_id INTEGER NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  status TEXT NOT NULL,
+  trigger TEXT NOT NULL,
+  counts_json TEXT NOT NULL DEFAULT '{}',
+  findings_json TEXT NOT NULL DEFAULT '[]',
+  files_scanned INTEGER NOT NULL DEFAULT 0,
+  truncated INTEGER NOT NULL DEFAULT 0,
+  error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_malware_scans_site ON malware_scans(site_id, id);
+CREATE TABLE IF NOT EXISTS site_security (
+  site_id INTEGER PRIMARY KEY,
+  admins_json TEXT,
+  admins_ack_at TEXT,
+  quarantine_json TEXT,
+  code_locked INTEGER NOT NULL DEFAULT 0,
+  writable_dirs_json TEXT
+);
+CREATE TABLE IF NOT EXISTS security_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_id INTEGER NOT NULL,
+  at TEXT NOT NULL,
+  action TEXT NOT NULL,
+  by TEXT,
+  detail TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_site ON security_events(site_id, id);
+`);
+// mu-plugins known as legitimate (path -> sha256), like admins_json: a new one stays flagged until acknowledged
+ensureColumn('site_security', 'mu_plugins_json', 'TEXT');

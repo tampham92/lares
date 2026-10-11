@@ -23,6 +23,26 @@ breaking changes; upgrading is always the install command run again
   Next.js app (cgroups: throttled near the limit, only the offending request is stopped above it, no
   swap), PHP workers (`pm.max_children`) and max MySQL connections (`MAX_USER_CONNECTIONS`), with
   current usage. Empty = no limit.
+- **Malware scan** (site page → Security, daily at 04:30): WordPress core and plugin files against the
+  wordpress.org checksums, PHP in uploads, `.user.ini` hooks, unknown mu-plugins, malware code
+  patterns, files new or changed since the last scan, new administrators, a hijacked site URL,
+  `<script>` in the database and the firewall's block log. Read-only, never runs the site's code. New
+  findings go to the bell and, optionally, to the Telegram/webhook set up for leads.
+- **Emergency quarantine**: 503 maintenance page, every outgoing connection of the site cut, PHP/Node
+  and leftover processes stopped, cron removed, evidence backup (hidden from a normal restore, restoring
+  it needs an explicit confirmation). Updates, cloning, wp-admin login, PHP settings and enabling the
+  site are refused meanwhile.
+- **Clean site**: WordPress core, plugins and themes replaced with copies from wordpress.org, flagged
+  files moved to `.lares-quarantine/` outside the web root, salts and the database password changed,
+  chosen administrators deleted, application passwords revoked, then a new scan. Releasing the
+  quarantine needs a clean scan (or an explicit override, recorded).
+- **Code lock** (per PHP site): the code belongs to root and PHP may only write to uploads/caches; panel
+  updates and cleaning unlock for the job and lock again.
+- Site users can no longer log in over SSH, tunnels included (group `lares-sites` in sshd's
+  `DenyGroups`): `nologin` alone still allowed `ssh -N` with a key the site wrote into its own home.
+- The site firewall logs every block with the site's user and limits each site to about 20 new outgoing
+  connections per second.
+- Resource limits can be set in the new-site form.
 - **Notification bell** in the top bar (also on phones): a new Lares release, sites that could not be
   isolated, and events such as the result of the upgrade's site conversion. Read state is kept per
   account on the server. Features add their own notices (`registerNotificationSource` / `notify` in
@@ -36,8 +56,17 @@ breaking changes; upgrading is always the install command run again
   (`disable_symlinks if_not_owner`) in PHP and static sites.
 - `/var/www` is now `0711`: sites can no longer list each other's domains.
 - The new-release notice moved from the sidebar footer to the bell.
+- Site units get `IOWeight=50`: under disk contention MySQL and the panel come first.
 
 ### Fixed
+- New WordPress sites were missing some WordPress 7 core files: `wp core download` unpacks with PHP's
+  PharData, which cuts file names longer than 100 characters. Lares now unpacks with the system `tar`.
+  Existing sites are repaired by Security → Clean site (core reinstall) or a core update.
+- Restoring a backup taken before the database password changed now updates `DB_PASSWORD` in
+  `wp-config.php` to the current password.
+- `.user.ini` (PHP settings), the one-click-login mu-plugin and the port fix in `wp-config.php` are
+  written with the site user's rights instead of root's, so a symlink planted by the site cannot
+  redirect the write.
 - Settings → Updates could show a "latest version" older than the running one (a check made just
   before a release was tagged, then upgraded). The panel now checks again after its version changes
   and never reports a latest version below its own.

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { SiteLimits } from './limits.js';
+import { siteLimitsSchema, type SiteLimits } from './limits.js';
 import { builderSpecSchema } from './builder.js';
 
 export * from './i18n.js';
@@ -16,6 +16,7 @@ export * from './sitetools.js';
 export * from './builder.js';
 export * from './notifications.js';
 export * from './limits.js';
+export * from './sitesecurity.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)
@@ -173,10 +174,13 @@ const templateFields = {
 };
 const phpVersionSchema = z.string().regex(PHP_VERSION_RE).optional();
 
+/** Resource limits set while creating the site (limits.ts); the site page edits them later. */
+const limitsField = { limits: siteLimitsSchema.optional() };
+
 export const createSiteSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('wordpress'), ...siteBase, ...templateFields, phpVersion: phpVersionSchema, wordpress: wordpressConfigSchema.default({}) }),
-  z.object({ type: z.literal('nextjs'), ...siteBase, nextjs: nextjsConfigSchema.default({}) }),
-  z.object({ type: z.literal('php'), ...siteBase, phpVersion: phpVersionSchema, createDatabase: z.boolean().default(false) }),
+  z.object({ type: z.literal('wordpress'), ...siteBase, ...templateFields, ...limitsField, phpVersion: phpVersionSchema, wordpress: wordpressConfigSchema.default({}) }),
+  z.object({ type: z.literal('nextjs'), ...siteBase, ...limitsField, nextjs: nextjsConfigSchema.default({}) }),
+  z.object({ type: z.literal('php'), ...siteBase, ...limitsField, phpVersion: phpVersionSchema, createDatabase: z.boolean().default(false) }),
   z.object({ type: z.literal('static'), ...siteBase, ...templateFields }),
 ]);
 export type CreateSiteInput = z.infer<typeof createSiteSchema>;
@@ -238,6 +242,8 @@ export interface SiteIsolationView {
   phpExecAllowed: boolean;
   /** Outbound firewall rules loaded; null = unknown (dry-run). */
   firewall: boolean | null;
+  /** sshd refuses the site users (DenyGroups); null = unknown (dry-run, no OpenSSH). */
+  ssh: boolean | null;
   /** Why converting this site to its own user failed last time (it stays on the shared user). */
   error: string | null;
   /** Isolation turned off on this server (LARES_SITE_ISOLATION=0). */

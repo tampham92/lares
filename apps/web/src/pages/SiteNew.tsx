@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LANG_LABELS, LOCALHOST, SITE_TYPES, msg, type AutoDnsInput, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
+import { LANG_LABELS, LOCALHOST, SITE_LIMIT_RANGES, SITE_TYPES, msg, type SiteLimitKey, type AutoDnsInput, type Branding, type CreateSiteResult, type SiteType, type SystemStats } from '@lares/shared';
 import { get, post, type TaskInfo } from '../api';
 import { CloudflareDnsOption } from '../components/CloudflareDnsOption';
 import { GitSourceFields } from '../components/GitSourceFields';
@@ -31,9 +31,28 @@ export function SiteNew() {
   const [branding, setBranding] = useState<Branding>({});
   const [listenPort, setListenPort] = useState('');
   const [cfDns, setCfDns] = useState<AutoDnsInput | null>(null);
+  const [limits, setLimits] = useState<Record<SiteLimitKey, string>>({ memoryMb: '', cpuPercent: '', phpWorkers: '', mysqlConnections: '' });
   const [task, setTask] = useState<string | null>(null);
   const [result, setResult] = useState<CreateSiteResult | null>(null);
   const [error, setError] = useState<unknown>(null);
+
+  const limitShown = (k: SiteLimitKey) =>
+    k === 'phpWorkers' ? type === 'wordpress' || type === 'php' : k === 'mysqlConnections' ? type === 'wordpress' || (type === 'php' && createDb) : type !== 'static';
+  const limitInput = (k: SiteLimitKey, label: string, hint: string) =>
+    limitShown(k) && (
+      <Field label={label} hint={hint}>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={SITE_LIMIT_RANGES[k].min}
+          max={SITE_LIMIT_RANGES[k].max}
+          step={1}
+          placeholder={t('Không giới hạn')}
+          value={limits[k]}
+          onChange={(e) => setLimits({ ...limits, [k]: e.target.value })}
+        />
+      </Field>
+    );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +70,11 @@ export function SiteNew() {
     if (type === 'wordpress' || type === 'php') body.phpVersion = php || undefined;
     if (type === 'wordpress') body.wordpress = wp;
     if (type === 'php') body.createDatabase = createDb;
+    if (type !== 'static') {
+      const n = (k: SiteLimitKey) => (limitShown(k) && limits[k].trim() ? Number(limits[k]) : null);
+      const l = { memoryMb: n('memoryMb'), cpuPercent: n('cpuPercent'), phpWorkers: n('phpWorkers'), mysqlConnections: n('mysqlConnections') };
+      if (Object.values(l).some((v) => v !== null)) body.limits = l;
+    }
     if (type === 'nextjs') {
       const env: Record<string, string> = {};
       for (const line of next.env.split('\n')) {
@@ -302,6 +326,21 @@ export function SiteNew() {
           <Check checked={createDb} onChange={setCreateDb}>
             {t('Tạo database MySQL cho site')}
           </Check>
+        )}
+
+        {type !== 'static' && (
+          <details>
+            <summary>{t('Giới hạn tài nguyên (tuỳ chọn)')}</summary>
+            <div className="sub" style={{ marginTop: 10 }}>
+              {t('Giữ một site quá tải hoặc bị tấn công không chiếm hết tài nguyên của các site khác. Để trống = không giới hạn; đổi được sau trong trang site.')}
+            </div>
+            <div className="form-grid" style={{ marginTop: 10 }}>
+              {limitInput('memoryMb', t('RAM tối đa (MB)'), t('Gần mức này site bị làm chậm, vượt thì tiến trình bị dừng.'))}
+              {limitInput('cpuPercent', t('CPU tối đa (%)'), t('100 = một nhân CPU.'))}
+              {limitInput('phpWorkers', t('Số worker PHP'), t('Số request PHP xử lý cùng lúc (pm.max_children).'))}
+              {limitInput('mysqlConnections', t('Kết nối MySQL tối đa'), t('Cho mỗi user database của site (MAX_USER_CONNECTIONS).'))}
+            </div>
+          </details>
         )}
 
         <div className="row end">

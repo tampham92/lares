@@ -14,6 +14,11 @@ export const ISOLATION_EN: Dict = {
 
   // ---- outbound firewall ----
   'Cảnh báo: không cập nhật được tường lửa của site: {error}': 'Warning: could not update the site firewall: {error}',
+  'Bỏ qua giới hạn tài nguyên: tính năng cách ly site đang tắt trên máy chủ này (LARES_SITE_ISOLATION=0)': 'Resource limits skipped: site isolation is turned off on this server (LARES_SITE_ISOLATION=0)',
+  'Cảnh báo: chưa chặn được SSH cho user của site: {error}': 'Warning: could not block SSH for the site users: {error}',
+  'Cảnh báo: /etc/ssh/sshd_config không đọc thư mục {dir} nên chưa chặn được SSH cho user của site. Thêm dòng "Include {dir}/*.conf" vào đầu file rồi khởi động lại panel.':
+    'Warning: /etc/ssh/sshd_config does not read {dir}, so SSH is not blocked for the site users yet. Add the line "Include {dir}/*.conf" at the top of that file, then restart the panel.',
+  'Đã chặn đăng nhập SSH cho user của các site ({file})': 'SSH login blocked for the site users ({file})',
   'Cảnh báo: máy chủ chưa có nftables (apt install nftables) nên chưa chặn được kết nối ra ngoài của các site':
     "Warning: nftables is not installed (apt install nftables), so the sites' outgoing connections are not restricted",
 

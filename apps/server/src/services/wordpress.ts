@@ -1,13 +1,13 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { DB_IDENT_RE, type WordpressConfig } from '@lares/shared';
+import { DB_IDENT_RE, type Site, type WordpressConfig } from '@lares/shared';
 import { config } from '../config.js';
 import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { parseWpConfig } from '../migration/appDetect.js';
 import { host, type HostLogger } from './host.js';
-import type { RunAs } from './isolation.js';
+import { writeSiteFile, type RunAs } from './isolation.js';
 import * as mysql from './mysql.js';
 
 const phpStr = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -89,12 +89,10 @@ export async function installWordpress(
 ): Promise<boolean> {
   const hasCli = config.dryRun || (await host.has('wp'));
   log(t('Đang tải WordPress...'));
-  if (hasCli) {
-    await host.mutate(wpCli(webRoot, `core download --locale=${shq(wp.locale)} --force`), { log, timeoutMs: 10 * 60_000 });
-  } else {
-    const url = wp.locale === 'en_US' ? 'https://wordpress.org/latest.tar.gz' : `https://${wp.locale.split('_')[0]}.wordpress.org/latest-${wp.locale}.tar.gz`;
-    await host.mutate(`curl -fsSL ${shq(url)} | tar -xz --strip-components=1 -C ${shq(webRoot)}`, { log, timeoutMs: 10 * 60_000 });
-  }
+  // Always the system tar, never `wp core download`: wp-cli unpacks the .tar.gz with PHP's PharData,
+  // which cuts file names longer than 100 characters - WordPress 7 has such files in wp-includes.
+  const url = wp.locale === 'en_US' ? 'https://wordpress.org/latest.tar.gz' : `https://${wp.locale.split('_')[0]}.wordpress.org/latest-${wp.locale}.tar.gz`;
+  await host.mutate(`curl -fsSL ${shq(url)} | tar -xz --strip-components=1 -C ${shq(webRoot)}`, { log, timeoutMs: 10 * 60_000 });
   await host.writeFile(path.join(webRoot, 'wp-config.php'), renderWpConfig({ ...db, host: 'localhost' }), 0o640);
 
   if (hasCli && wp.adminUser && wp.adminPassword && wp.adminEmail) {
@@ -112,13 +110,21 @@ export async function installWordpress(
   return false;
 }
 
+/** Set (or add) a string constant in wp-config.php source. */
+export function setWpConfigDefine(text: string, key: string, value: string): string {
+  const re = new RegExp(`define\\s*\\(\\s*(['"])${key}\\1\\s*,\\s*(['"])(?:\\\\.|(?!\\2).)*\\2\\s*\\)`, 'i');
+  const replacement = `define( '${key}', ${phpStr(value)} )`;
+  return re.test(text) ? text.replace(re, () => replacement) : text.replace(/<\?php/, () => `<?php\n${replacement};`);
+}
+
+export const WP_SALT_KEYS = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'];
+
+/** New random salts: every login cookie (an attacker's too) stops working. */
+export const shuffleWpSalts = (src: string): string => WP_SALT_KEYS.reduce((text, key) => setWpConfigDefine(text, key, salt()), src);
+
 /** Update DB credentials in an existing wp-config.php (migrated sites). */
 export function rewriteWpConfig(src: string, db: { name: string; user: string; password: string; host: string }): string {
-  const set = (text: string, key: string, value: string) => {
-    const re = new RegExp(`define\\s*\\(\\s*(['"])${key}\\1\\s*,\\s*(['"])(?:\\\\.|(?!\\2).)*\\2\\s*\\)`, 'i');
-    const replacement = `define( '${key}', ${phpStr(value)} )`;
-    return re.test(text) ? text.replace(re, () => replacement) : text.replace(/<\?php/, () => `<?php\n${replacement};`);
-  };
+  const set = setWpConfigDefine;
   let out = set(src, 'DB_NAME', db.name);
   out = set(out, 'DB_USER', db.user);
   out = set(out, 'DB_PASSWORD', db.password);
@@ -224,14 +230,13 @@ export async function wordpressReplaceUrl(webRoot: string, runAs: RunAs, to: str
 }
 
 /** Patch wp-config.php of a port-based site that was created before PORT_HOST_FIX existed. */
-export async function ensurePortHostFix(webRoot: string, owner: string, log?: HostLogger): Promise<boolean> {
-  const file = path.join(webRoot, 'wp-config.php');
+export async function ensurePortHostFix(site: Pick<Site, 'id' | 'sysUser' | 'rootPath' | 'webRoot' | 'appType'>, log?: HostLogger): Promise<boolean> {
+  const file = path.join(site.webRoot, 'wp-config.php');
   const src = await fs.readFile(file, 'utf8').catch(() => null);
   if (src === null) return false;
   const next = addPortHostFix(src);
   if (next === src) return false;
-  await host.writeFile(file, next, 0o640);
-  await host.mutate(`chown ${shq(`${owner}:${owner}`)} ${shq(file)}`, { log });
+  await writeSiteFile(site, file, next, log);
   log?.(t('Đã vá wp-config.php (giữ port trong HTTP_HOST): {file}', { file }));
   return true;
 }

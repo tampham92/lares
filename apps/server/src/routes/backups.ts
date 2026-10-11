@@ -58,9 +58,9 @@ export async function backupRoutes(app: FastifyInstance) {
       const id = idParam(req.params);
       const backupId = backupIdParam(req.params);
       // the UI makes the admin type the domain; the API insists on it too
-      const { confirm } = parse(z.object({ confirm: z.string() }), req.body ?? {});
+      const { confirm, allowInfected } = parse(z.object({ confirm: z.string(), allowInfected: z.boolean().default(false) }), req.body ?? {});
       if (confirm !== sites.getSite(id).domain) throw badRequest(t('Xác nhận không khớp tên miền của site'));
-      return backups.startRestore(id, backupId);
+      return backups.startRestore(id, backupId, { allowInfected });
     });
 
     priv.post('/api/sites/:id/backups/:backupId/download', async (req) => {

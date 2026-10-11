@@ -83,3 +83,16 @@ export async function deleteDatabase(id: number, log?: HostLogger) {
   if (row.managed) await mysql.dropDatabase(row.name, row.username, log);
   db.prepare('DELETE FROM databases WHERE id = ?').run(id);
 }
+
+/** Managed database with this name, or null (a database Lares did not create keeps its password). */
+export function managedDatabase(name: string): { id: number; username: string; password: string } | null {
+  const row = db.prepare('SELECT * FROM databases WHERE name = ? AND managed = 1').get(name) as DbRow | undefined;
+  return row ? { id: row.id, username: row.username, password: decrypt<string>(row.password_enc) } : null;
+}
+
+/** Set a managed database user's password (MySQL + the stored copy). */
+export async function setDatabasePassword(id: number, password: string, log?: HostLogger) {
+  const { username } = getDatabaseCredentials(id);
+  await mysql.setUserPassword(username, password, log);
+  db.prepare('UPDATE databases SET password_enc = ? WHERE id = ?').run(encrypt(password), id);
+}

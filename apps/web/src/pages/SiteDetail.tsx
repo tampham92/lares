@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { APP_LABELS, LOCALHOST, msg, type AutoDnsInput, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
+import { APP_LABELS, LOCALHOST, msg, type ScanStatus, type AutoDnsInput, type CreateSiteResult, type DatabaseRecord, type LogTail, type LogType, type NodeAppStatus, type Site, type SystemStats, type TrafficStats } from '@lares/shared';
 import { auth, del, errMsg, fmtBytes, fmtDate, get, patch, post, put, siteHref, siteLabel, type TaskInfo } from '../api';
 import { AdminerButton } from '../components/AdminerButton';
 import { AiWriter } from '../components/AiWriter';
@@ -13,6 +13,7 @@ import { LimitsCard } from '../components/LimitsCard';
 import { SiteDnsCard } from '../components/SiteDnsCard';
 import { LeadsTab } from '../components/LeadsTab';
 import { PhpSettingsTab } from '../components/PhpSettingsTab';
+import { SecurityTab } from '../components/SecurityTab';
 import { Alert, Badge, Check, Console, ErrorBox, Field, Tabs, TaskLog } from '../components/ui';
 import { WpAdminButton } from '../components/WpAdminButton';
 import { WpUpdatesTab, useWpUpdatesTabLabel } from '../components/WpUpdatesTab';
@@ -22,10 +23,12 @@ interface SiteDetailResponse {
   site: Site;
   databases: DatabaseRecord[];
   nodeApp: NodeAppStatus | null;
+  security: { quarantined: boolean; codeLocked: boolean; lastScan: ScanStatus | null };
   nodeConfig: { gitUrl?: string; hasGitToken?: boolean; branch?: string; packageManager?: string; installCommand?: string; buildCommand?: string; startCommand?: string; env?: Record<string, string> } | null;
 }
 
-type Tab = 'overview' | 'ssl' | 'logs' | 'leads' | 'php' | 'nextjs' | 'ai' | 'updates' | 'backups' | 'clone' | 'danger';
+type Tab = 'overview' | 'ssl' | 'logs' | 'leads' | 'php' | 'nextjs' | 'ai' | 'updates' | 'security' | 'backups' | 'clone' | 'danger';
+const TABS: Tab[] = ['overview', 'ssl', 'logs', 'leads', 'php', 'nextjs', 'ai', 'updates', 'security', 'backups', 'clone', 'danger'];
 
 export function SiteDetail() {
   const id = Number(useParams().id);
@@ -35,7 +38,9 @@ export function SiteDetail() {
 
 function SitePage({ id }: { id: number }) {
   const q = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetailResponse>(`/api/sites/${id}`) });
-  const [tab, setTab] = useState<Tab>('overview');
+  // ?tab=security: links from the notification bell
+  const wanted = useSearchParams()[0].get('tab') as Tab | null;
+  const [tab, setTab] = useState<Tab>(wanted && TABS.includes(wanted) ? wanted : 'overview');
   const updatesLabel = useWpUpdatesTabLabel(id, q.data?.site.appType === 'wordpress');
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data) return <div className="sub">{t('Đang tải…')}</div>;
@@ -48,6 +53,7 @@ function SitePage({ id }: { id: number }) {
     ...(site.phpVersion ? ([['php', 'PHP']] as Array<[Tab, string]>) : []),
     ...(site.appType === 'nextjs' ? ([['nextjs', 'Next.js']] as Array<[Tab, string]>) : []),
     ...(site.appType === 'wordpress' ? ([['ai', t('Viết bài AI')], ['updates', updatesLabel]] as Array<[Tab, string]>) : []),
+    ['security', q.data.security.quarantined ? t('Bảo mật (đang cách ly)') : t('Bảo mật')],
     ['backups', t('Sao lưu')],
     ['clone', t('Nhân bản')],
     ['danger', t('Xoá site')],
@@ -66,6 +72,9 @@ function SitePage({ id }: { id: number }) {
             {site.status === 'active' ? <Badge tone="ok">{t('Hoạt động')}</Badge> : <Badge tone="warn">{t('Tạm ngưng')}</Badge>}
             {site.ssl.enabled ? <Badge tone="ok">HTTPS</Badge> : <Badge>HTTP</Badge>}
             {site.listenPort && <Badge tone="info">{t('chạy theo port {port}', { port: site.listenPort })}</Badge>}
+            {q.data.security.quarantined && <Badge tone="err">{t('Đang cách ly khẩn')}</Badge>}
+            {!q.data.security.quarantined && q.data.security.lastScan === 'infected' && <Badge tone="err">{t('Có dấu hiệu mã độc')}</Badge>}
+            {q.data.security.codeLocked && <Badge tone="info">{t('Code đã khoá')}</Badge>}
           </div>
         </div>
         <div className="row">
@@ -84,6 +93,7 @@ function SitePage({ id }: { id: number }) {
       {tab === 'nextjs' && <NextTab data={q.data} />}
       {tab === 'ai' && <AiWriter site={site} />}
       {tab === 'updates' && <WpUpdatesTab site={site} />}
+      {tab === 'security' && <SecurityTab site={site} />}
       {tab === 'backups' && <BackupsTab site={site} />}
       {tab === 'clone' && <CloneTab site={site} dbs={q.data.databases} />}
       {tab === 'danger' && <DangerTab site={site} dbs={q.data.databases} />}

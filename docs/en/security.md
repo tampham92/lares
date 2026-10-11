@@ -45,11 +45,15 @@ Every site has its own Linux user (`lares-s<id>`) and its own PHP-FPM, so a site
   in the site page → Overview → Site isolation when a plugin really needs them.
 - **Outgoing connections** (nftables, per site user): direct mail on port 25 (spam), the cloud
   metadata service (169.254.169.254) and the panel/Adminer ports on the machine are blocked. Sending
-  mail through SMTP (587/465) still works.
-- Site users have no password, no shell and are listed in `/etc/cron.deny`: they cannot log in or
-  schedule jobs.
+  mail through SMTP (587/465) still works. Each site opens at most about 20 new connections per second
+  (botnets, port scans, outgoing DDoS are cut short). Every block goes to the kernel log with the
+  site's user (`journalctl -k -g lares-block`), and the malware scan reads it back.
+- Site users have no password, no shell, are listed in `/etc/cron.deny` and belong to the group
+  `lares-sites`, which sshd refuses (`/etc/ssh/sshd_config.d/lares-sites.conf`): no login, no SSH
+  tunnel, no scheduled jobs.
+- Under disk contention MySQL and the panel come before the sites (`IOWeight`).
 
-**Resource limits** (site page → Overview → Resource limits), empty = no limit:
+**Resource limits** (when creating the site, or site page → Overview → Resource limits), empty = no limit:
 
 - **Max RAM** and **max CPU** (100% = one core) for the site's PHP-FPM or Next.js app, through cgroups.
   Near the RAM limit the site is slowed down; a request going over it is the only one stopped (502),
@@ -64,6 +68,57 @@ off (new sites then share `www-data` again).
 
 Limit: sites still share the kernel, so a privilege escalation to root bypasses every layer above.
 Let the server install security updates automatically (see [Updates](#updates)).
+
+## Malware scan, quarantine and cleaning
+
+Site page → **Security**.
+
+**Malware scan** (daily at 04:30, changeable on that tab). The scan only reads and never runs the
+site's code, so it also works on a quarantined site:
+
+- WordPress core and plugin files are compared with the release checksums from wordpress.org:
+  modified files, unknown files in `wp-admin`/`wp-includes`, missing core files.
+- PHP files in `uploads` and images carrying PHP code; `.user.ini` files with `auto_prepend_file`
+  (Wordfence's firewall excepted); unknown or modified files in `mu-plugins` (reported until you
+  acknowledge them).
+- Code typical of webshells and malware (`eval(base64_decode(...))`, `system($_GET[...])`...); PHP
+  files new or modified since the last scan.
+- In the database: new administrators, `siteurl`/`home` pointing at another domain, `<script>` injected
+  into posts or options.
+- Firewall blocks of the site in the last 24 hours (spam, cloud metadata...).
+
+New findings are reported in the notification bell and, when enabled, to the Telegram/webhook set up
+under Leads → Notifications. No scanner catches every backdoor: a clean result is not a guarantee.
+
+**Quarantine** (when you suspect an infection): the site serves a 503 maintenance page, every outgoing
+connection of the site is blocked, its PHP-FPM/Next.js and any leftover process of its user are
+stopped, its cron jobs are removed, then Lares keeps a backup as evidence. That backup is hidden from
+the normal restore list and restoring it takes an explicit confirmation. While quarantined the site
+cannot be enabled, updated, cloned, have its PHP settings changed or be logged into: all of that runs
+the site's code.
+
+**Clean site** (quarantined site; most complete for WordPress): replaces code with clean copies rather
+than trusting "scan and delete".
+
+1. WordPress core, plugins and themes are downloaded again from wordpress.org in the versions in use
+   (or the latest). Premium or custom plugins/themes are listed for you to upload again.
+2. Flagged files are moved to `<site folder>/.lares-quarantine/<time>/`, outside the web root and never
+   deleted. Foreign `auto_prepend_file` lines are removed from `.user.ini`.
+3. New salts in `wp-config.php` (every old login session ends), a new database password, the
+   administrators you select deleted, application passwords revoked.
+4. Scan again. A safety backup is taken first.
+
+Lares does not run the site's code while cleaning: the panel downloads the files, then the site's user
+unpacks and moves them into place (root never writes into the site folder). Afterwards, change the
+admin passwords and related FTP/hosting accounts. **Release** needs a scan after the quarantine without
+critical findings; if you checked the site yourself you can release without one (recorded in the
+history).
+
+**Code lock** (optional, per PHP site): the site's code belongs to root, PHP can read it and only write
+to the allowed folders (WordPress default: `wp-content/uploads`, `wp-content/cache`,
+`wp-content/upgrade`). A hijacked plugin cannot modify the site's own code. Installing or updating
+plugins/themes from wp-admin stops working: update from the panel's Updates tab, which unlocks for the
+update and locks again.
 
 ## Two-factor authentication (2FA)
 

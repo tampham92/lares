@@ -16,7 +16,11 @@ export function BackupsTab({ site }: { site: Site }) {
   const [active, setActive] = useState(false);
   const [restoring, setRestoring] = useState<BackupEntry | null>(null);
   const [error, setError] = useState<unknown>(null);
+  // backups taken at quarantine may hold the malware: listed only on request
+  const [showInfected, setShowInfected] = useState(false);
   const data = q.data;
+  const infected = (data?.backups ?? []).filter((b) => b.trigger === 'quarantine').length;
+  const listed = (data?.backups ?? []).filter((b) => showInfected || b.trigger !== 'quarantine');
   const busy = active || !!data?.running;
   const refresh = () => void qc.invalidateQueries({ queryKey: key });
 
@@ -125,6 +129,13 @@ export function BackupsTab({ site }: { site: Site }) {
       </div>
 
       <div className="card table-wrap">
+        {infected > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <Check checked={showInfected} onChange={setShowInfected}>
+              {t('Hiện {n} bản sao lưu chụp lúc cách ly khẩn (có thể nhiễm mã độc)', { n: infected })}
+            </Check>
+          </div>
+        )}
         <table>
           <thead>
             <tr>
@@ -136,13 +147,13 @@ export function BackupsTab({ site }: { site: Site }) {
             </tr>
           </thead>
           <tbody>
-            {(data?.backups ?? []).map((b) => (
+            {listed.map((b) => (
               <tr key={b.id}>
                 <td>
                   {b.damaged ? <span className="mono">{b.id}</span> : fmtDate(b.createdAt)}
                   <div className="sub mono">{b.id}</div>
                 </td>
-                <td>{b.damaged ? <Badge tone="err">{t('hỏng')}</Badge> : <Badge tone={b.trigger === 'safety' ? 'warn' : b.trigger === 'scheduled' ? 'info' : 'default'}>{t(BACKUP_TRIGGER_LABELS[b.trigger])}</Badge>}</td>
+                <td>{b.damaged ? <Badge tone="err">{t('hỏng')}</Badge> : <Badge tone={b.trigger === 'quarantine' ? 'err' : b.trigger === 'safety' ? 'warn' : b.trigger === 'scheduled' ? 'info' : 'default'}>{t(BACKUP_TRIGGER_LABELS[b.trigger])}</Badge>}</td>
                 <td>{b.damaged ? '—' : fmtBytes(b.totalBytes)}</td>
                 <td className="sub">
                   {!b.damaged && (
@@ -177,7 +188,7 @@ export function BackupsTab({ site }: { site: Site }) {
             ))}
           </tbody>
         </table>
-        {data?.backups.length === 0 && <div className="empty">{t('Chưa có bản sao lưu nào')}</div>}
+        {data && listed.length === 0 && <div className="empty">{t('Chưa có bản sao lưu nào')}</div>}
       </div>
 
       {restoring && (
@@ -199,12 +210,14 @@ function RestoreDialog({ site, backup, onClose, onStarted }: { site: Site; backu
   const [confirmText, setConfirmText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const infected = backup.trigger === 'quarantine';
+  const [allowInfected, setAllowInfected] = useState(false);
 
   const start = async () => {
     setError(null);
     setSending(true);
     try {
-      onStarted((await post<TaskInfo>(`/api/sites/${site.id}/backups/${backup.id}/restore`, { confirm: confirmText })).id);
+      onStarted((await post<TaskInfo>(`/api/sites/${site.id}/backups/${backup.id}/restore`, { confirm: confirmText, allowInfected })).id);
     } catch (e) {
       setError(errMsg(e));
       setSending(false);
@@ -224,6 +237,14 @@ function RestoreDialog({ site, backup, onClose, onStarted }: { site: Site; backu
           {backup.databases.length > 0 && <li>{t('Ghi đè database: {names}', { names: backup.databases.map((d) => d.name).join(', ') })}</li>}
           {site.appType === 'nextjs' && <li>{t('Khởi động lại ứng dụng Next.js (cài lại dependencies và build nếu cần)')}</li>}
         </ul>
+        {infected && (
+          <>
+            <Alert tone="err">{t('Bản sao lưu này được chụp lúc site bị cách ly khẩn: nó có thể chứa chính mã độc đã khiến site bị cách ly.')}</Alert>
+            <Check checked={allowInfected} onChange={setAllowInfected}>
+              {t('Tôi hiểu và vẫn muốn khôi phục bản này')}
+            </Check>
+          </>
+        )}
         {error && <Alert tone="err">{error}</Alert>}
         <Field label={t('Gõ "{domain}" để xác nhận', { domain: site.domain })}>
           <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoFocus />
@@ -232,7 +253,7 @@ function RestoreDialog({ site, backup, onClose, onStarted }: { site: Site; backu
           <button className="btn" onClick={onClose}>
             {t('Huỷ')}
           </button>
-          <button className="btn danger solid" disabled={confirmText !== site.domain || sending} onClick={start}>
+          <button className="btn danger solid" disabled={confirmText !== site.domain || sending || (infected && !allowInfected)} onClick={start}>
             {t('Khôi phục')}
           </button>
         </div>

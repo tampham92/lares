@@ -26,6 +26,8 @@ import { reloadSitePhp, runAsOf } from './isolation.js';
 import { wpCliAsWebUser } from './wordpress.js';
 import { markLogs, takeHealth } from './wpHealth.js';
 import * as policy from './wpUpdatePolicy.js';
+import { assertNotQuarantined, isQuarantined } from './securityStore.js';
+import { withCodeUnlocked } from './codeLock.js';
 
 /*
  * WordPress updates with automatic rollback. A run, holding the site's backup/restore lock:
@@ -50,6 +52,8 @@ async function requireWpCli() {
 
 /** wp-cli as the web user (site code is untrusted), plugins and themes not loaded. */
 const wp = (site: Site, args: string, opts: { timeoutMs?: number; log?: HostLogger } = {}) => {
+  // wp-cli loads wp-config.php: never on a quarantined site
+  assertNotQuarantined(site);
   let partial = '';
   return host.exec(wpCliAsWebUser(site.webRoot, runAsOf(site), args), {
     timeoutMs: opts.timeoutMs ?? WP_TIMEOUT,
@@ -573,7 +577,9 @@ export async function startUpdate(siteId: number, req: WpUpdateRequest): Promise
   assertWordpress(site);
   if (!req.all && !req.core && !req.plugins.length && !req.themes.length) throw badRequest(t('Chưa chọn mục nào để cập nhật'));
   await requireWpCli();
-  return backups.startLocked(site, 'update', t('Cập nhật WordPress {domain}', { domain: site.domain }), (log) => runUpdate(site, req, log));
+  assertNotQuarantined(site);
+  // a locked site's code goes back to the site user for the update, then is locked again
+  return backups.startLocked(site, 'update', t('Cập nhật WordPress {domain}', { domain: site.domain }), (log) => withCodeUnlocked(site, log, () => runUpdate(site, req, log)));
 }
 
 // ---- Startup / background -----------------------------------------------------------------
@@ -602,7 +608,7 @@ export async function checkerTick(now = Date.now()) {
   for (const s of stale) {
     if (backups.runningJob(s.siteId)) continue;
     const site = sites.getSite(s.siteId);
-    if (site.status !== 'active') continue;
+    if (site.status !== 'active' || isQuarantined(site.id)) continue;
     if (!config.dryRun && !(await host.has('wp'))) return;
     await refreshInventory(site);
     return;

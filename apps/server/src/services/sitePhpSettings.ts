@@ -6,7 +6,8 @@ import { t } from '../i18n/index.js';
 import { badRequest, conflict, errorMessage } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import { host, type HostLogger } from './host.js';
-import { phpPathsFor, phpSocketFor, reloadSitePhp, siteOwner } from './isolation.js';
+import { phpPathsFor, phpSocketFor, reloadSitePhp, writeSiteFile } from './isolation.js';
+import { assertNotQuarantined } from './securityStore.js';
 import {
   blockSettings,
   clientMaxBodyFor,
@@ -91,6 +92,8 @@ export async function getPhpSettingsView(siteId: number): Promise<PhpSettingsVie
 /** Write the site's overrides, follow them in nginx, then reload PHP-FPM so they apply at once. */
 export async function savePhpSettings(siteId: number, settings: PhpSettings, log?: HostLogger): Promise<PhpSettingsView> {
   const site = phpSite(siteId);
+  // reloading PHP-FPM would start a quarantined site's workers
+  assertNotQuarantined(site);
   const server = await serverPhpFor(site);
   if (!server.userIniFilename) {
     throw conflict(t('user_ini.filename đang để trống trong php.ini của PHP {version} nên PHP không đọc file cấu hình theo thư mục. Đặt lại user_ini.filename = .user.ini rồi thử lại.', { version: site.phpVersion }));
@@ -117,9 +120,9 @@ export async function savePhpSettings(siteId: number, settings: PhpSettings, log
   const writeIni = async (content: string | null) => {
     if (content === null) await fs.rm(file, { force: true });
     else {
-      await host.writeFile(file, content, site.sysUser ? 0o640 : 0o644);
-      // the site's own tools (Wordfence...) append their lines to this file, so it belongs to the site's user like the rest
-      await host.mutate(`chown ${shq(`${siteOwner(site)}:${siteOwner(site)}`)} ${shq(file)}`, { log });
+      // the site's own tools (Wordfence...) append their lines to this file, so it belongs to the site's
+      // user like the rest - root's when the code is locked (writeSiteFile)
+      await writeSiteFile(site, file, content, log);
     }
   };
 

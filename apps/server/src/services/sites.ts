@@ -12,9 +12,11 @@ import * as databases from './databases.js';
 import * as githubApp from './githubApp.js';
 import { host, type HostLogger } from './host.js';
 import * as isolation from './isolation.js';
+import * as mysql from './mysql.js';
 import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type VhostSpec } from './nginx.js';
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
+import { assertNotQuarantined, forgetSite, isQuarantined } from './securityStore.js';
 import { resolvePhpVersion } from './php.js';
 import { siteClientMaxBodyMb } from './phpSettings.js';
 import * as ssl from './ssl.js';
@@ -137,6 +139,7 @@ export function vhostSpecFor(site: Site): VhostSpec {
     listenPort: site.listenPort,
     accessLog: site.accessLog,
     disabled: site.status === 'disabled',
+    quarantined: isQuarantined(site.id),
     ssl: sslPaths ? { ...sslPaths, forceHttps: site.ssl.forceHttps } : null,
     clientMaxBodyMb: siteClientMaxBodyMb(site.id),
   };
@@ -184,6 +187,8 @@ export interface ProvisionInput {
   listenPort?: number | null;
   /** exec() & co. in the site's PHP (isolated sites only). Off unless copied from a clone's source. */
   phpExecAllowed?: boolean;
+  /** Resource limits from the start (isolated sites only; MySQL connections are applied by the caller once the database exists). */
+  limits?: SiteLimits;
 }
 
 /** Synthetic, unique identifier for port-based sites; doubles as directory / vhost / log name. */
@@ -239,12 +244,17 @@ export async function provisionSite(input: ProvisionInput, log: HostLogger, undo
   const siteId = Number(info.lastInsertRowid);
   undo.push(t('xoá bản ghi site {domain}', { domain: input.domain }), async () => db.prepare('DELETE FROM sites WHERE id = ?').run(siteId));
 
+  if (input.limits && !config.siteIsolation && Object.values(input.limits).some((v) => v !== null)) {
+    log(t('Bỏ qua giới hạn tài nguyên: tính năng cách ly site đang tắt trên máy chủ này (LARES_SITE_ISOLATION=0)'));
+  }
   if (config.siteIsolation) {
     // Own Linux user and PHP-FPM before the vhost: the nginx reload that applies the vhost is also
     // what gives nginx's workers the site's group.
     const user = await isolation.ensureSiteUser(siteId, layout.rootPath, log);
     undo.push(t('xoá user {user}', { user }), () => isolation.removeSiteUser(user, log));
     setSiteIsolation(siteId, { sysUser: user, phpExecAllowed: input.phpExecAllowed ?? false });
+    // MySQL connections wait for the database (createSite); PHP workers mean nothing without PHP
+    if (input.limits) setSiteLimits(siteId, { ...input.limits, phpWorkers: usesPhp(input.appType) ? input.limits.phpWorkers : null, mysqlConnections: null });
     if (usesPhp(input.appType)) {
       undo.push(t('xoá PHP-FPM của site {domain}', { domain: input.domain }), () => isolation.removeSitePhp(siteId, log));
       await isolation.applySitePhp(getSite(siteId), log);
@@ -287,6 +297,7 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
         phpVersion: 'phpVersion' in input ? input.phpVersion : undefined,
         nodeConfig,
         listenPort,
+        limits: 'limits' in input ? input.limits : undefined,
       },
       log,
       undo,
@@ -301,6 +312,11 @@ export async function createSite(input: CreateSiteInput, log: HostLogger): Promi
       undo.push(t('xoá database {name}', { name }), () => databases.deleteDatabase(created.record.id, log));
       database = { name, username: name, password: created.password };
       log(t('Đã tạo database {name}', { name }));
+      const maxConns = 'limits' in input ? input.limits?.mysqlConnections : null;
+      if (maxConns) {
+        await mysql.setMaxUserConnections(name, maxConns, log);
+        setSiteLimits(site.id, { ...getSite(site.id).limits, mysqlConnections: maxConns });
+      }
     }
 
     switch (input.type) {
@@ -377,6 +393,7 @@ async function gitRepoFor(cfg: { gitUrl: string; branch?: string; gitToken?: str
 export async function deploySite(id: number, log: HostLogger, signal?: AbortSignal) {
   const site = getSite(id);
   if (site.appType !== 'nextjs' || !site.appPort) throw conflict(t('Chỉ site Next.js mới có thể build/deploy'));
+  assertNotQuarantined(site);
   const cfg = getNodeConfig(id);
   if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, isolation.runAsOf(site), await gitRepoFor({ ...cfg, gitUrl: cfg.gitUrl }, log), log, signal);
   await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, cfg, log, signal);
@@ -389,6 +406,7 @@ export async function updateSite(
   log?: HostLogger,
 ) {
   const site = getSite(id);
+  assertNotQuarantined(site);
   if (patch.aliases) assertHostnamesFree(patch.aliases, id);
   const next: Site = {
     ...site,
@@ -422,6 +440,8 @@ function saveSsl(id: number, state: SslState) {
 
 export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger) {
   const site = getSite(id);
+  // the WordPress URL update after the certificate runs wp-cli, i.e. the site's code
+  assertNotQuarantined(site);
   if (site.listenPort) throw conflict(t('Site đang chạy theo port (chưa có tên miền) nên không cài được SSL. Hãy tạo site với tên miền thật.'));
   let state: SslState;
   if (input.type === 'letsencrypt') {
@@ -496,7 +516,7 @@ export async function disableSsl(id: number, revoke: boolean, log?: HostLogger) 
 /** One-off repairs for sites created by older Lares versions (runs at startup, idempotent). */
 export async function repairSites(log: HostLogger) {
   for (const s of listSites()) {
-    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, isolation.siteOwner(s), log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
+    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s, log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
   }
 }
 
@@ -516,6 +536,7 @@ export async function refreshSslExpiry() {
  */
 export async function changeDomain(id: number, input: { domain: string; aliases: string[] }, log: HostLogger) {
   const site = getSite(id);
+  assertNotQuarantined(site);
   const domain = input.domain.toLowerCase();
   if (domain === LOCALHOST) throw conflict(t('Hãy nhập tên miền thật'));
   if (domain === site.domain && !site.listenPort) throw conflict(t('Site đã dùng tên miền này'));
@@ -613,6 +634,7 @@ export async function deleteSite(
     await isolation.syncSiteFirewall(log);
   }
   if (opts.removeLogs) await fs.rm(siteLogPaths(site.domain).dir, { recursive: true, force: true });
+  await forgetSite(id).catch(() => undefined);
   db.prepare('DELETE FROM sites WHERE id = ?').run(id);
   log(t('Đã xoá site {domain}', { domain: site.domain }));
 }
