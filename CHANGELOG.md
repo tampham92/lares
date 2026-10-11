@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.1-beta] - 2026-10-11
+
 ### Fixed
 - Isolating a site (and creating one, cleaning, the code lock) failed with "find: Failed to change
   directory: /opt/lares/src/apps/server: Permission denied" on servers where that folder is not
@@ -207,7 +209,8 @@ First public beta under the name **Lares Panel by ThoCode**.
 - Re-running the installer (upgrade) no longer resets a custom `--port` to 8686, and no longer
   installs the default PHP versions again: the saved port and PHP list are kept.
 
-[Unreleased]: https://github.com/tampham92/lares/compare/v0.4.0-beta...HEAD
+[Unreleased]: https://github.com/tampham92/lares/compare/v0.4.1-beta...HEAD
+[0.4.1-beta]: https://github.com/tampham92/lares/compare/v0.4.0-beta...v0.4.1-beta
 [0.4.0-beta]: https://github.com/tampham92/lares/compare/v0.3.0-beta...v0.4.0-beta
 [0.3.0-beta]: https://github.com/tampham92/lares/compare/v0.2.0-beta...v0.3.0-beta
 [0.2.0-beta]: https://github.com/tampham92/lares/releases/tag/v0.2.0-beta
