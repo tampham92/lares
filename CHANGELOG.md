@@ -8,6 +8,11 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Fixed
+- Isolating a site (and creating one, cleaning, the code lock) failed with "find: Failed to change
+  directory: /opt/lares/src/apps/server: Permission denied" on servers where that folder is not
+  readable by other users (root umask 027/077): commands run as the site user now start from `/`.
+
 ## [0.4.0-beta] - 2026-10-11
 
 ### Added
