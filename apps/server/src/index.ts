@@ -20,6 +20,7 @@ import { leadRoutes } from './routes/leads.js';
 import { releaseRoutes } from './routes/release.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { siteRoutes } from './routes/sites.js';
+import { siteSecurityRoutes } from './routes/siteSecurity.js';
 import { siteToolsRoutes } from './routes/sitetools.js';
 import { startUpgradeConversion } from './services/isolateSites.js';
 import { ensureSshDeny, syncSiteFirewall } from './services/isolation.js';
@@ -76,6 +77,7 @@ app.setErrorHandler((err, req, reply) => {
 await app.register(authRoutes);
 await app.register(systemRoutes);
 await app.register(siteRoutes);
+await app.register(siteSecurityRoutes);
 await app.register(notificationRoutes);
 await app.register(databaseRoutes);
 await app.register(migrationRoutes);

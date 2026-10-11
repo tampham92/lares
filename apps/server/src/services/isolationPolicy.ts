@@ -451,3 +451,44 @@ export function permissionCommands(rootPath: string, owner: string, isolated: bo
     ),
   ];
 }
+
+// ---- Code lock (C7) ----------------------------------------------------------------------
+
+/**
+ * Folders PHP keeps writing to when the code is locked (relative to the site folder): media and
+ * caches. Everything else becomes root's, readable by the site through its group.
+ */
+export function defaultWritableDirs(site: { rootPath: string; webRoot: string; appType: string }): string[] {
+  const rel = (p: string) => path.relative(site.rootPath, p).split(path.sep).join('/');
+  const web = site.webRoot;
+  if (site.appType === 'wordpress') return ['wp-content/uploads', 'wp-content/cache', 'wp-content/upgrade'].map((d) => rel(path.join(web, d)));
+  if (site.appType === 'laravel') {
+    const app = path.dirname(web);
+    return [rel(path.join(app, 'storage')), rel(path.join(app, 'bootstrap', 'cache'))];
+  }
+  return [rel(path.join(web, 'uploads'))];
+}
+
+/** A writable dir from the form or the defaults, as an absolute path strictly inside the site folder (null = refused). */
+export function resolveWritableDir(rootPath: string, dir: string): string | null {
+  if (!dir || dir.startsWith('/') || /(^|\/)\.\.(\/|$)/.test(dir) || /[\0\r\n]/.test(dir)) return null;
+  const abs = path.resolve(rootPath, dir);
+  return abs.startsWith(path.resolve(rootPath) + path.sep) ? abs : null;
+}
+
+/**
+ * Shell commands (run as root, AFTER the normal layout of permissionCommands) that hand the code to
+ * root: owner root, group = the site's group (PHP and nginx read through it), u=rwX,g=rX,o=. The
+ * writable folders are pruned from both passes and stay the site user's. Race-free against the
+ * site's own code: once the chown pass is done no folder outside the writable ones is the site
+ * user's, so nothing can be swapped for a symlink under the chmod pass.
+ */
+export function lockCommands(rootPath: string, user: string, writableAbs: string[]): string[] {
+  if (!SITE_USER_RE.test(user)) throw new Error(`invalid site user: ${user}`);
+  const root = shq(rootPath);
+  const prune = writableAbs.length ? `\\( ${writableAbs.map((w) => `-path ${shq(w)}`).join(' -o ')} \\) -prune -o ` : '';
+  return [
+    `find ${root} ${prune}-exec chown -h ${shq(`root:${user}`)} {} +`,
+    `find ${root} ${prune}! -type l -exec chmod u=rwX,g=rX,o= {} +`,
+  ];
+}

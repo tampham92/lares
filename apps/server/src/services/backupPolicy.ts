@@ -43,7 +43,8 @@ export const PRE_UPDATE_KEEP = 3;
  * Newest = latest createdAt, then highest id.
  */
 export function selectExpired<T extends { id: string; trigger: BackupTrigger; createdAt: string }>(backups: T[], trigger: BackupTrigger, keep: number): T[] {
-  if (trigger === 'manual') return [];
+  // manual backups and the evidence taken at quarantine are only deleted by hand
+  if (trigger === 'manual' || trigger === 'quarantine') return [];
   return backups
     .filter((b) => b.trigger === trigger)
     .sort((a, b) => (a.createdAt === b.createdAt ? b.id.localeCompare(a.id, 'en', { numeric: true }) : b.createdAt < a.createdAt ? -1 : 1))

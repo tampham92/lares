@@ -13,6 +13,7 @@ import {
   type BackupTrigger,
   type Site,
   type SiteBackupsResponse,
+  type SiteJobKind,
 } from '@lares/shared';
 import { config } from '../config.js';
 import { db, getSetting, nowIso, setSetting } from '../db/index.js';
@@ -28,6 +29,7 @@ import { databasesSize, findWpConfig } from './clone.js';
 import * as databases from './databases.js';
 import { host, type HostLogger } from './host.js';
 import { restartSitePhp } from './isolation.js';
+import { isQuarantined } from './securityStore.js';
 import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
 import * as sites from './sites.js';
@@ -45,7 +47,8 @@ const LONG = 12 * 3_600_000;
 
 /** Caches (rebuilt on demand) and transient files; .env* files are always kept. */
 function backupExcludes(site: Site): string[] {
-  const list = ['.npm', '.cache', '.pnpm-store', '.yarn/cache', '.lares-sso.json', '*/wp-content/cache'];
+  // .lares-quarantine: files cleaning moved out of a hijacked site - a restore must not bring them back
+  const list = ['.npm', '.cache', '.pnpm-store', '.yarn/cache', '.lares-sso.json', '*/wp-content/cache', '.lares-quarantine', '.lares-clean'];
   const rel = path.relative(site.rootPath, site.webRoot);
   if (site.appType === 'nextjs' && rel && isInside(site.rootPath, site.webRoot)) list.push(`${rel}/node_modules`, `${rel}/.next/cache`);
   return list;
@@ -150,7 +153,7 @@ function recordResult(siteId: number, status: 'ok' | 'failed', error: string | n
 
 // ---- Locks ------------------------------------------------------------------------
 
-export type SiteJobKind = 'backup' | 'restore' | 'update' | 'isolate';
+export type { SiteJobKind } from '@lares/shared';
 
 const running = new Map<number, { taskId: string; kind: SiteJobKind }>();
 
@@ -158,9 +161,10 @@ const running = new Map<number, { taskId: string; kind: SiteJobKind }>();
 export const runningJob = (siteId: number) => running.get(siteId) ?? null;
 
 function busy(site: Site) {
-  return running.get(site.id)?.kind === 'update'
-    ? conflict(t('{domain} đang cập nhật WordPress - hãy đợi nó xong', { domain: site.domain }))
-    : conflict(t('{domain} đang có tác vụ sao lưu/khôi phục chạy - hãy đợi nó xong', { domain: site.domain }));
+  const kind = running.get(site.id)?.kind;
+  if (kind === 'update') return conflict(t('{domain} đang cập nhật WordPress - hãy đợi nó xong', { domain: site.domain }));
+  if (kind === 'backup' || kind === 'restore') return conflict(t('{domain} đang có tác vụ sao lưu/khôi phục chạy - hãy đợi nó xong', { domain: site.domain }));
+  return conflict(t('{domain} đang có tác vụ khác chạy (cách ly, quét mã độc hoặc dọn site) - hãy đợi nó xong', { domain: site.domain }));
 }
 
 /**
@@ -545,7 +549,9 @@ async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { sa
     const warn = (what: string, err: unknown) => log(t('Cảnh báo: {what} thất bại: {error}', { what, error: errorMessage(err) }));
     await sites.fixPermissions(site, log).catch((e) => warn(t('phân quyền'), e));
     if (hadRoot) await fs.rm(old, { recursive: true, force: true }).catch((e) => warn(t('xoá thư mục cũ'), e));
-    if (site.appType === 'nextjs' && site.appPort) {
+    // a disabled or quarantined site stays stopped: its processes start again when it is enabled / released
+    const halted = site.status === 'disabled' || isQuarantined(site.id);
+    if (site.appType === 'nextjs' && site.appPort && !halted) {
       const ready = (await host.exists(path.join(site.webRoot, 'node_modules'))) && (await host.exists(path.join(site.webRoot, '.next')));
       if (ready) await nodeapp.serviceAction(site.domain, 'restart', log).catch((e) => warn(t('khởi động lại {service}', { service: nodeapp.serviceName(site.domain) }), e));
       else {
@@ -553,7 +559,7 @@ async function restoreBackup(site: Site, id: string, log: HostLogger, opts: { sa
         await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, sites.getNodeConfig(site.id), log).catch((e) => warn('build', e));
       }
     }
-    if (site.phpVersion) await restartSitePhp(site, log).catch((e) => warn('php-fpm', e));
+    if (site.phpVersion && !halted) await restartSitePhp(site, log).catch((e) => warn('php-fpm', e));
     await sites.applySiteVhost(sites.getSite(site.id), log).catch((e) => warn('nginx', e));
     log(t('Đã khôi phục {domain} từ bản sao lưu {id}', { domain: site.domain, id }));
     return { safetyId };
@@ -597,7 +603,7 @@ async function rollback(s: {
       await fs.rm(failed, { recursive: true, force: true });
     });
     // an isolated site's PHP-FPM still has the swapped-out folder mounted (see restartSitePhp)
-    if (site.sysUser && site.phpVersion) await step('php-fpm', () => restartSitePhp(site, log));
+    if (site.sysUser && site.phpVersion && site.status !== 'disabled' && !isQuarantined(site.id)) await step('php-fpm', () => restartSitePhp(site, log));
   }
   if (s.touched.length) {
     if (!s.safetyId) {
@@ -621,8 +627,13 @@ async function rollback(s: {
   if (s.stopped) await step(t('khởi động lại {service}', { service: nodeapp.serviceName(site.domain) }), () => nodeapp.serviceAction(site.domain, 'restart', log));
 }
 
-export function startRestore(siteId: number, id: string): TaskInfo {
+/** `allowInfected`: a backup taken at quarantine may hold the malware; restoring it takes an explicit yes. */
+export async function startRestore(siteId: number, id: string, opts: { allowInfected?: boolean } = {}): Promise<TaskInfo> {
   const site = sites.getSite(siteId);
+  const entry = isSafeDomainSegment(site.domain) ? (await storage().list(site.domain)).find((b) => b.id === id) : undefined;
+  if (entry?.manifest?.trigger === 'quarantine' && !opts.allowInfected) {
+    throw conflict(t('Bản sao lưu {id} được chụp lúc site bị cách ly khẩn và có thể chứa mã độc. Chỉ khôi phục khi bạn chắc chắn (đánh dấu xác nhận trong hộp thoại khôi phục).', { id }));
+  }
   return startLocked(site, 'restore', t('Khôi phục {domain} từ {id}', { domain: site.domain, id }), (log) => restoreBackup(site, id, log));
 }
 

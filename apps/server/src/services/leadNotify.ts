@@ -137,8 +137,8 @@ export async function sendTelegram(cfg: StoredNotifyConfig['telegram'], text: st
   return { ok: false, error: `Telegram ${res.status}: ${description}${hint ? ` - ${hint}` : ''}`, retry: isTransientStatus(res.status) };
 }
 
-export async function sendWebhook(cfg: StoredNotifyConfig['webhook'], payload: unknown, fetchFn: Fetch = fetch): Promise<SendResult> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': `Lares-Panel/${VERSION}`, 'X-Lares-Event': 'lead.created' };
+export async function sendWebhook(cfg: StoredNotifyConfig['webhook'], payload: unknown, fetchFn: Fetch = fetch, event = 'lead.created'): Promise<SendResult> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': `Lares-Panel/${VERSION}`, 'X-Lares-Event': event };
   if (cfg.secret) headers[cfg.secretHeader || 'X-Lares-Secret'] = cfg.secret;
   let res: Response;
   try {

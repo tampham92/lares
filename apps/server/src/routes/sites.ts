@@ -16,6 +16,8 @@ import { tailFile, trafficStats, truncateLog } from '../services/logs.js';
 import { siteLogPaths } from '../services/nginx.js';
 import * as nodeapp from '../services/nodeapp.js';
 import * as sites from '../services/sites.js';
+import { latestScan } from '../services/malware.js';
+import { codeLock, isQuarantined } from '../services/securityStore.js';
 import { startTask } from '../services/tasks.js';
 
 const logQuerySchema = z.object({
@@ -41,6 +43,8 @@ export async function siteRoutes(app: FastifyInstance) {
       nodeApp,
       // env values and the git token are secrets: return env keys only and whether a token is set
       nodeConfig: cfg ? { ...cfg, gitToken: undefined, hasGitToken: Boolean(cfg.gitToken), env: Object.fromEntries(Object.keys(cfg.env ?? {}).map((k) => [k, ''])) } : null,
+      // header badges; details in GET /api/sites/:id/security
+      security: { quarantined: isQuarantined(site.id), codeLocked: codeLock(site.id).locked, lastScan: latestScan(site.id)?.status ?? null },
     };
   });
 

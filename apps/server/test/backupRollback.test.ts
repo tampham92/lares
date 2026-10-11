@@ -57,7 +57,7 @@ describe('restore failures (dry-run)', () => {
     const { backups: [first], root: backupRoot } = await backups.siteBackups(s.siteId);
     fs.writeFileSync(path.join(s.web, 'index.html'), 'v2');
 
-    const task = await wait(backups.startRestore(s.siteId, first!.id).id);
+    const task = await wait((await backups.startRestore(s.siteId, first!.id)).id);
     expect(task.status).toBe('failed');
     expect(task.error).toMatch(/simulated import failure/);
     // the current state is back: files of v2, database re-imported from the safety backup
@@ -77,7 +77,7 @@ describe('restore failures (dry-run)', () => {
     fs.writeFileSync(path.join(s.web, 'index.html'), 'v2');
     imports.length = 0;
 
-    const task = await wait(backups.startRestore(s.siteId, first!.id).id);
+    const task = await wait((await backups.startRestore(s.siteId, first!.id)).id);
     expect(task.status).toBe('failed');
     expect(fs.readFileSync(path.join(s.web, 'index.html'), 'utf8')).toBe('v2');
     expect(imports).toEqual([]);

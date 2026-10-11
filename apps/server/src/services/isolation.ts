@@ -1,3 +1,4 @@
+import { constants as fsc } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Site } from '@lares/shared';
@@ -9,6 +10,9 @@ import { adminerPaths, adminerPort } from './adminer.js';
 import { host, type HostLogger } from './host.js';
 import {
   DEFAULT_PHP_MAX_CHILDREN,
+  defaultWritableDirs,
+  lockCommands,
+  resolveWritableDir,
   FIREWALL_TABLE,
   FIREWALL_UNIT,
   SITE_USER_RE,
@@ -30,6 +34,7 @@ import {
   type SandboxOptions,
 } from './isolationPolicy.js';
 import { phpSocket } from './php.js';
+import { codeLock as codeLockOf, codeLockActive, quarantinedSiteIds } from './securityStore.js';
 
 /** System side of per-site isolation: users, the per-site PHP-FPM units, the firewall. Rules: isolationPolicy.ts. */
 
@@ -59,10 +64,79 @@ export function phpServiceFor(site: Pick<Site, 'id' | 'sysUser' | 'phpVersion'>)
 /** `runuser` wrapper for short root-started commands that must run with the site's rights. */
 export const asUser = (user: string, command: string) => `runuser -u ${shq(user)} -- sh -c ${shq(command)}`;
 
-/** chown + modes of a site folder for its owner (see permissionCommands). */
-export function fixPermissions(site: SiteIdentity, log?: HostLogger) {
+/**
+ * Write a file inside a site folder with the site user's rights, never root's: a path the site's code
+ * swapped for a symlink to /etc/... then fails instead of overwriting a system file. The content goes
+ * through a temporary file only that user can read.
+ */
+export async function writeAsUser(site: SiteIdentity, target: string, content: string, log?: HostLogger, mode?: number) {
+  if (config.dryRun) {
+    await host.writeFile(target, content, mode);
+    return;
+  }
   const owner = siteOwner(site);
-  return host.mutate(permissionCommands(site.rootPath, owner, site.sysUser !== null, (c) => asUser(owner, c)).join(' && '), { log, timeoutMs: 30 * 60_000 });
+  const dir = await fs.mkdtemp(path.join('/var/tmp', 'lares-write-'));
+  const tmp = path.join(dir, 'content');
+  try {
+    await fs.chmod(dir, 0o711);
+    await fs.writeFile(tmp, content, { mode: 0o600 });
+    await host.run(`chown ${shq(owner)} ${shq(tmp)}`);
+    // cat > keeps the target's owner and mode (cp would too, but cat cannot be tricked into a new inode elsewhere)
+    await host.mutate(asUser(owner, `cat ${shq(tmp)} > ${shq(target)}${mode ? ` && chmod ${mode.toString(8)} ${shq(target)}` : ''}`), { log });
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+type LockableSite = SiteIdentity & Partial<Pick<Site, 'id' | 'webRoot' | 'appType'>>;
+
+/** Writable folders of a locked site (stored, else the defaults), absolute and inside the site folder. */
+export function writableDirsOf(site: Pick<Site, 'id' | 'rootPath' | 'webRoot' | 'appType'>): string[] {
+  const stored = codeLockOf(site.id).writableDirs;
+  const dirs = stored ?? defaultWritableDirs(site);
+  return [...new Set(dirs.map((d) => resolveWritableDir(site.rootPath, d)).filter((d): d is string => d !== null))];
+}
+
+/** Is this site's code locked right now (C7)? Only isolated PHP sites can be. */
+const lockedNow = (site: LockableSite): site is SiteIdentity & Pick<Site, 'id' | 'webRoot' | 'appType'> =>
+  site.id !== undefined && site.sysUser !== null && site.webRoot !== undefined && site.appType !== undefined && codeLockActive(site.id);
+
+/**
+ * chown + modes of a site folder for its owner (see permissionCommands), then - for a site whose
+ * code is locked - hand the code to root again (lockCommands). Writable folders are created first,
+ * as the site user, while the tree is still the site's.
+ */
+export async function fixPermissions(site: LockableSite, log?: HostLogger) {
+  const owner = siteOwner(site);
+  await host.mutate(permissionCommands(site.rootPath, owner, site.sysUser !== null, (c) => asUser(owner, c)).join(' && '), { log, timeoutMs: 30 * 60_000 });
+  if (!lockedNow(site)) return;
+  const writable = writableDirsOf(site);
+  if (writable.length) await host.mutate(asUser(owner, `mkdir -p ${writable.map(shq).join(' ')}`), { log }).catch(() => undefined);
+  await host.mutate(lockCommands(site.rootPath, site.sysUser!, writable).join(' && '), { log, timeoutMs: 30 * 60_000 });
+}
+
+/**
+ * Write a file the panel manages inside a site folder (.user.ini, the SSO mu-plugin, a patched
+ * wp-config.php). Unlocked site: as the site user (writeAsUser), so a symlink planted by the site
+ * cannot redirect root's write. Locked site: every folder is root's, so root writes it (refusing a
+ * symlink as the last component) and keeps it root's - the site must not be able to edit PHP-loaded
+ * files like .user.ini or a mu-plugin while locked.
+ */
+export async function writeSiteFile(site: LockableSite, target: string, content: string, log?: HostLogger) {
+  const isolated = site.sysUser !== null;
+  if (!lockedNow(site)) return writeAsUser(site, target, content, log, isolated ? 0o640 : 0o644);
+  const rootReal = await fs.realpath(site.rootPath);
+  const dirReal = await fs.realpath(path.dirname(target));
+  if (dirReal !== rootReal && !dirReal.startsWith(rootReal + path.sep)) throw new Error(`refusing to write outside the site: ${target}`);
+  const fh = await fs.open(path.join(dirReal, path.basename(target)), fsc.O_WRONLY | fsc.O_CREAT | fsc.O_TRUNC | fsc.O_NOFOLLOW, 0o640);
+  try {
+    await fh.writeFile(content);
+    // the locked site root is root:<site group>
+    await fh.chown(0, (await fs.stat(rootReal)).gid);
+    await fh.chmod(0o640);
+  } finally {
+    await fh.close();
+  }
 }
 
 // ---- Users -----------------------------------------------------------------------------
@@ -308,7 +382,6 @@ async function siteAccounts(): Promise<Array<{ user: string; uid: number }>> {
     .map((f) => ({ user: f[0]!, uid: Number(f[2]) }))
     .filter((a) => Number.isSafeInteger(a.uid) && a.uid > 0);
 }
-const siteUids = async () => (await siteAccounts()).map((a) => a.uid);
 const siteUsers = async () => (await siteAccounts()).map((a) => a.user);
 
 let firewallQueue: Promise<void> = Promise.resolve();
@@ -323,7 +396,13 @@ export function syncSiteFirewall(log?: HostLogger): Promise<void> {
 }
 
 async function doSyncFirewall(log?: HostLogger) {
-  const rules = renderSiteFirewall({ uids: config.dryRun ? [] : await siteUids(), localPorts: [config.port, adminerPort()] });
+  const accounts = config.dryRun ? [] : await siteAccounts();
+  const quarantinedUsers = new Set(quarantinedSiteIds().map(siteUserName));
+  const rules = renderSiteFirewall({
+    uids: accounts.map((a) => a.uid),
+    localPorts: [config.port, adminerPort()],
+    quarantined: accounts.filter((a) => quarantinedUsers.has(a.user)).map((a) => a.uid),
+  });
   await host.writeFile(config.siteFirewallFile, rules, 0o644);
   if (config.dryRun) {
     log?.(`[dry-run] nft -f ${config.siteFirewallFile}`);

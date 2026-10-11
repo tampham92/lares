@@ -16,6 +16,7 @@ import * as mysql from './mysql.js';
 import { applyVhost, nginxRunning, port80Owner, removeVhost, siteLogPaths, type VhostSpec } from './nginx.js';
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
+import { assertNotQuarantined, forgetSite, isQuarantined } from './securityStore.js';
 import { resolvePhpVersion } from './php.js';
 import { siteClientMaxBodyMb } from './phpSettings.js';
 import * as ssl from './ssl.js';
@@ -138,6 +139,7 @@ export function vhostSpecFor(site: Site): VhostSpec {
     listenPort: site.listenPort,
     accessLog: site.accessLog,
     disabled: site.status === 'disabled',
+    quarantined: isQuarantined(site.id),
     ssl: sslPaths ? { ...sslPaths, forceHttps: site.ssl.forceHttps } : null,
     clientMaxBodyMb: siteClientMaxBodyMb(site.id),
   };
@@ -391,6 +393,7 @@ async function gitRepoFor(cfg: { gitUrl: string; branch?: string; gitToken?: str
 export async function deploySite(id: number, log: HostLogger, signal?: AbortSignal) {
   const site = getSite(id);
   if (site.appType !== 'nextjs' || !site.appPort) throw conflict(t('Chỉ site Next.js mới có thể build/deploy'));
+  assertNotQuarantined(site);
   const cfg = getNodeConfig(id);
   if (cfg.gitUrl) await nodeapp.gitCloneOrPull(site.webRoot, isolation.runAsOf(site), await gitRepoFor({ ...cfg, gitUrl: cfg.gitUrl }, log), log, signal);
   await nodeapp.buildAndRestart({ ...site, appPort: site.appPort }, cfg, log, signal);
@@ -403,6 +406,7 @@ export async function updateSite(
   log?: HostLogger,
 ) {
   const site = getSite(id);
+  assertNotQuarantined(site);
   if (patch.aliases) assertHostnamesFree(patch.aliases, id);
   const next: Site = {
     ...site,
@@ -436,6 +440,8 @@ function saveSsl(id: number, state: SslState) {
 
 export async function issueSsl(id: number, input: IssueSslInput, log: HostLogger) {
   const site = getSite(id);
+  // the WordPress URL update after the certificate runs wp-cli, i.e. the site's code
+  assertNotQuarantined(site);
   if (site.listenPort) throw conflict(t('Site đang chạy theo port (chưa có tên miền) nên không cài được SSL. Hãy tạo site với tên miền thật.'));
   let state: SslState;
   if (input.type === 'letsencrypt') {
@@ -510,7 +516,7 @@ export async function disableSsl(id: number, revoke: boolean, log?: HostLogger) 
 /** One-off repairs for sites created by older Lares versions (runs at startup, idempotent). */
 export async function repairSites(log: HostLogger) {
   for (const s of listSites()) {
-    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s.webRoot, isolation.siteOwner(s), log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
+    if (s.appType === 'wordpress' && s.listenPort) await ensurePortHostFix(s, log).catch((e) => log(t('Không vá được {domain}: {error}', { domain: s.domain, error: e instanceof Error ? e.message : String(e) })));
   }
 }
 
@@ -530,6 +536,7 @@ export async function refreshSslExpiry() {
  */
 export async function changeDomain(id: number, input: { domain: string; aliases: string[] }, log: HostLogger) {
   const site = getSite(id);
+  assertNotQuarantined(site);
   const domain = input.domain.toLowerCase();
   if (domain === LOCALHOST) throw conflict(t('Hãy nhập tên miền thật'));
   if (domain === site.domain && !site.listenPort) throw conflict(t('Site đã dùng tên miền này'));
@@ -627,6 +634,7 @@ export async function deleteSite(
     await isolation.syncSiteFirewall(log);
   }
   if (opts.removeLogs) await fs.rm(siteLogPaths(site.domain).dir, { recursive: true, force: true });
+  await forgetSite(id).catch(() => undefined);
   db.prepare('DELETE FROM sites WHERE id = ?').run(id);
   log(t('Đã xoá site {domain}', { domain: site.domain }));
 }

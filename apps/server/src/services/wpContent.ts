@@ -8,8 +8,9 @@ import { conflict } from '../lib/errors.js';
 import { shq } from '../lib/shell.js';
 import type { SiteContext } from './ai.js';
 import { host, type HostLogger } from './host.js';
-import { runAsOf, siteOwner } from './isolation.js';
+import { asUser, runAsOf, siteOwner, writeSiteFile } from './isolation.js';
 import { wpCliAsWebUser } from './wordpress.js';
+import { assertNotQuarantined } from './securityStore.js';
 
 /*
  * Talking to a WordPress install goes through `wp eval-file` as the web user: one PHP process per
@@ -111,6 +112,7 @@ interface RawContext {
 
 export async function wpSiteInfo(site: Site): Promise<RawContext> {
   assertWordpress(site);
+  assertNotQuarantined(site);
   if (config.dryRun) return { name: site.domain, tagline: '', categories: [{ id: 1, name: 'Chưa phân loại', count: 0 }], posts: [] }; // i18n-ignore - dry-run stand-in for WordPress data
   await requireWpCli();
   return wpEval<RawContext>(site, CONTEXT_PHP);
@@ -128,6 +130,7 @@ export async function aiSiteContext(site: Site, log: HostLogger): Promise<SiteCo
 
 export async function publishArticle(site: Site, input: PublishArticleInput, log?: HostLogger): Promise<PublishedPost> {
   assertWordpress(site);
+  assertNotQuarantined(site);
   const meta = {
     // Yoast SEO and Rank Math read these; harmless when the plugin is not installed
     _yoast_wpseo_metadesc: input.metaDescription,
@@ -247,11 +250,10 @@ async function realMuPluginDir(site: Site): Promise<string | null> {
   return r.code === 0 && dir.startsWith('/') ? dir : null;
 }
 
-async function installSsoPlugin(muDir: string, tokenFile: string, owner: string, log?: HostLogger) {
-  const existed = await host.exists(muDir);
-  const plugin = path.join(muDir, SSO_PLUGIN);
-  await host.writeFile(plugin, renderSsoPlugin(tokenFile), 0o640);
-  await host.mutate(`chown ${shq(`${owner}:${owner}`)} ${shq(plugin)}${existed ? '' : ` ${shq(muDir)}`}`, { log });
+async function installSsoPlugin(site: Site, muDir: string, tokenFile: string, log?: HostLogger) {
+  // mu-plugins may not exist yet: created by the site user (or by root and handed over when the code is locked)
+  if (!(await host.exists(muDir))) await host.mutate(asUser(siteOwner(site), `mkdir -p ${shq(muDir)}`), { log }).catch(() => fs.mkdir(muDir, { recursive: true }));
+  await writeSiteFile(site, path.join(muDir, SSO_PLUGIN), renderSsoPlugin(tokenFile), log);
 }
 
 /**
@@ -261,12 +263,13 @@ async function installSsoPlugin(muDir: string, tokenFile: string, owner: string,
  */
 export async function wpLoginUrl(site: Site, baseUrl: string, target: string, log?: HostLogger): Promise<string> {
   assertWordpress(site);
+  assertNotQuarantined(site);
   const base = baseUrl.replace(/\/+$/, '');
   const content = path.join(site.webRoot, 'wp-content');
   if (!(await host.exists(content))) throw conflict(t('Không tìm thấy {path} - site chưa cài WordPress xong?', { path: content }));
   const tokenFile = path.join(site.rootPath, '.lares-sso.json');
   const marker = ssoMarker(tokenFile);
-  await installSsoPlugin(path.join(content, 'mu-plugins'), tokenFile, siteOwner(site), log);
+  await installSsoPlugin(site, path.join(content, 'mu-plugins'), tokenFile, log);
 
   if (!config.dryRun) {
     let pub = await probeSso(base, marker, false);
@@ -276,7 +279,7 @@ export async function wpLoginUrl(site: Site, baseUrl: string, target: string, lo
         // wp-content moved by wp-config (WP_CONTENT_DIR / WPMU_PLUGIN_DIR): ask WordPress where mu-plugins live
         const dir = await realMuPluginDir(site);
         if (dir && path.resolve(dir) !== path.resolve(content, 'mu-plugins')) {
-          await installSsoPlugin(dir, tokenFile, siteOwner(site), log);
+          await installSsoPlugin(site, dir, tokenFile, log);
           [pub, local] = await Promise.all([probeSso(base, marker, false), probeSso(base, marker, true)]);
         }
       }

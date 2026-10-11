@@ -8,6 +8,7 @@ import * as isolation from './isolation.js';
 import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
 import * as sites from './sites.js';
+import { assertNotQuarantined } from './securityStore.js';
 
 /*
  * Per-site resource limits (issue #1): RAM and CPU are cgroup limits of the site's own systemd unit
@@ -52,6 +53,8 @@ export async function limitsView(siteId: number): Promise<SiteLimitsView> {
  */
 export async function setLimits(siteId: number, next: SiteLimits, log?: HostLogger): Promise<SiteLimitsView> {
   const site = sites.getSite(siteId);
+  // applying restarts the site's PHP / Node service
+  assertNotQuarantined(site);
   const users = mysqlUsers(site.id);
   if (!ownProcess(site) && (next.memoryMb !== null || next.cpuPercent !== null)) {
     throw conflict(t('Giới hạn RAM/CPU cần site có user và tiến trình riêng (site PHP hoặc Next.js đã cách ly)'));

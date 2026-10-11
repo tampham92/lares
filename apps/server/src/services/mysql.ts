@@ -77,6 +77,16 @@ export async function setMaxUserConnections(user: string, max: number, log?: Hos
   await query(`ALTER USER ?@'localhost' WITH MAX_USER_CONNECTIONS ${max}`, [user]);
 }
 
+/** New password for a site's database user (after a compromise: the old one was in a readable wp-config.php). */
+export async function setUserPassword(user: string, password: string, log?: HostLogger) {
+  assertIdent(user, t('Tên user'));
+  if (config.dryRun) {
+    log?.(`[dry-run] ALTER USER '${user}'@'localhost' IDENTIFIED BY '***'`);
+    return;
+  }
+  await query(`ALTER USER ?@'localhost' IDENTIFIED BY ?`, [user, password]);
+}
+
 /** Open connections of these users right now. */
 export async function userConnections(users: string[]): Promise<number | null> {
   if (config.dryRun || !users.length) return null;

@@ -16,6 +16,7 @@ export * from './sitetools.js';
 export * from './builder.js';
 export * from './notifications.js';
 export * from './limits.js';
+export * from './sitesecurity.js';
 
 // ---------------------------------------------------------------------------
 // Primitive validators (shared by server & web so both reject the same input)

@@ -12,6 +12,7 @@ import * as nodeapp from './nodeapp.js';
 import { notify, registerNotificationSource } from './notifications.js';
 import * as sites from './sites.js';
 import { startTask, type TaskInfo } from './tasks.js';
+import { assertNotQuarantined } from './securityStore.js';
 
 /*
  * Converting a site created by an older Lares (shared www-data, shared PHP-FPM pool) to its own user
@@ -167,6 +168,7 @@ export async function isolationView(siteId: number): Promise<SiteIsolationView> 
 export async function setPhpExecAllowed(siteId: number, allowed: boolean, log?: HostLogger): Promise<SiteIsolationView> {
   const site = sites.getSite(siteId);
   if (!site.sysUser || !sites.usesPhp(site.appType)) throw conflict(t('Chỉ áp dụng cho site PHP đã có user riêng'));
+  assertNotQuarantined(site);
   if (site.phpExecAllowed !== allowed) {
     await isolation.applySitePhp({ ...site, phpExecAllowed: allowed }, log);
     if (site.status === 'disabled') await isolation.setSitePhpRunning(site, false, log);

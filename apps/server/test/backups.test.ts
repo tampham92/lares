@@ -213,7 +213,7 @@ describe('backup and restore (dry-run)', () => {
 
     fs.writeFileSync(path.join(web, 'index.html'), 'v2');
     fs.writeFileSync(path.join(web, 'new.html'), 'added later');
-    expect(() => backups.startRestore(siteId, backupId)).not.toThrow();
+    await expect(backups.startRestore(siteId, backupId)).resolves.toBeTruthy();
     const restored = await wait((await backups.siteBackups(siteId)).running!.taskId);
     expect(restored.status, restored.error).toBe('completed');
     expect(fs.readFileSync(path.join(web, 'index.html'), 'utf8')).toBe('v1');
