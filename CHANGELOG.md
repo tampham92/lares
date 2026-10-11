@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.2-beta] - 2026-10-11
+
 ### Added
 - Security tab: **Not malware** on a finding (a false positive) after checking the file. Lares
   remembers the file's sha256; the finding no longer counts or blocks the release, and comes back if

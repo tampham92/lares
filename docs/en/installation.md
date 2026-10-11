@@ -128,7 +128,7 @@ panel send a tiny anonymous ping. **This is all that is sent:**
 | Field | Example | Notes |
 |---|---|---|
 | `install_id` | `0b5c3f9e-2f4b-…` | Random UUID, generated once and stored in `/etc/lares/install-id`. Not derived from the machine |
-| `version` | `0.4.1-beta` | Lares version |
+| `version` | `0.4.2-beta` | Lares version |
 | `event` | `install` / `upgrade` / `heartbeat` | |
 | `os`, `os_version` | `ubuntu`, `24.04` | From `/etc/os-release` |
 | `arch` | `amd64` | CPU architecture |
