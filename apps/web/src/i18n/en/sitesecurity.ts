@@ -120,5 +120,6 @@ export const SITESECURITY_EN: Dict = {
   'Thư mục PHP được ghi (mỗi dòng một thư mục, tính từ thư mục site)': 'Folders PHP may write (one per line, relative to the site folder)',
   'Mặc định: {dirs}': 'Default: {dirs}',
   'Lưu thư mục': 'Save folders',
+  'Dọn site và gỡ cách ly trước khi khoá code.': 'Clean and release the site before locking its code.',
   'Lịch sử bảo mật': 'Security history',
 };

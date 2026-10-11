@@ -442,9 +442,12 @@ function CodeLockCard({ site, v, busy, start }: { site: Site; v: SiteSecurityVie
             </button>
           </>
         ) : (
-          <button className="btn primary" disabled={busy || v.quarantine.active} onClick={() => start(`/api/sites/${site.id}/security/code-lock`, body(true))}>
-            {t('Khoá code')}
-          </button>
+          <>
+            <button className="btn primary" disabled={busy || v.quarantine.active} onClick={() => start(`/api/sites/${site.id}/security/code-lock`, body(true))}>
+              {t('Khoá code')}
+            </button>
+            {v.quarantine.active && <span className="hint">{t('Dọn site và gỡ cách ly trước khi khoá code.')}</span>}
+          </>
         )}
       </div>
     </div>
@@ -520,9 +523,11 @@ export function SecurityTab({ site }: { site: Site }) {
               <tbody>
                 {v.events.map((e, i) => (
                   <tr key={i}>
-                    <td>{fmtDate(e.at)}</td>
-                    <td>{t(SECURITY_EVENT_LABELS[e.action])}</td>
-                    <td className="sub">{e.by ?? '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(e.at)}</td>
+                    <td>
+                      {t(SECURITY_EVENT_LABELS[e.action])}
+                      <div className="sub">{e.by ?? '—'}</div>
+                    </td>
                     <td className="sub">{e.detail ?? ''}</td>
                   </tr>
                 ))}
