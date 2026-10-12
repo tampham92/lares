@@ -394,6 +394,17 @@ async function parkFlagged(c: CleanCtx, scan: MalwareScan) {
     await asSite(c, `mkdir -p ${shq(path.dirname(parked))} && mv -- ${shq(abs)} ${shq(parked)}`);
     moved.push(rel);
   }
+  // A theme or plugin missing a file now (its functions.php loaded the implant, say) and that the
+  // reinstall could not replace (bought, not on wordpress.org): only a clean copy brings it back.
+  // The implant's own plugin folder (named after it) is meant to go.
+  const implants = new Set(scan.findings.filter((f) => f.check === 'implant-ref' && f.detail).map((f) => f.detail!));
+  const toReinstall = new Set<string>();
+  for (const rel of moved) {
+    const loc = policy.wpLocation(path.relative(c.webRoot, path.join(c.site.rootPath, rel)).split(path.sep).join('/'));
+    const ext = loc.theme ? `theme ${loc.theme}` : loc.plugin ? `plugin ${loc.plugin}` : null;
+    if (ext && !implants.has(loc.theme ?? loc.plugin!) && !replaced(rel)) toReinstall.add(ext);
+  }
+  for (const ext of [...toReinstall].sort()) c.manual.push(tDefault('{label}: đã chuyển file nhiễm ra ngoài - cài lại bản sạch từ nơi bạn mua rồi mới gỡ cách ly', { label: ext }));
   for (const f of scan.findings.filter((x) => x.check === 'user-ini' && x.severity === 'critical' && x.path)) {
     const abs = path.join(c.site.rootPath, f.path!);
     if (!isInside(c.site.rootPath, abs)) continue;
@@ -403,7 +414,7 @@ async function parkFlagged(c: CleanCtx, scan: MalwareScan) {
   if (moved.length) c.log(t('Đã chuyển {n} file bị đánh dấu vào {dir}', { n: moved.length, dir: c.qdir }));
 }
 
-async function cleanDatabase(c: CleanCtx, input: CleanSiteInput) {
+async function cleanDatabase(c: CleanCtx, input: CleanSiteInput, scan: MalwareScan) {
   const d = await wpDbOf(c.site);
   if (!d) {
     c.log(t('Bỏ qua bước database: không đọc được wp-config.php hoặc database không nằm trên máy chủ này'));
@@ -432,6 +443,19 @@ async function cleanDatabase(c: CleanCtx, input: CleanSiteInput) {
       await mysql.query(`UPDATE ${tbl('users')} SET user_pass = ?, user_activation_key = '' WHERE ID = ?`, [hashed, a.id]);
     }
     c.log(t('Đã đặt mật khẩu ngẫu nhiên cho {n} tài khoản quản trị: sau khi gỡ cách ly, vào wp-admin bằng nút của panel (hoặc "Quên mật khẩu") và đặt mật khẩu mới', { n: keep.length }));
+  }
+  // WP-Cron jobs of the implant: they re-download it on schedule. Edited in the database (WordPress
+  // would run the site's code), keeping every other job byte for byte.
+  const hooks = new Set(scan.findings.filter((f) => f.check === 'cron' && f.severity !== 'info' && f.path).map((f) => f.path!));
+  if (hooks.size) {
+    const rows = await mysql.query<Array<{ option_value: string }>>(`SELECT option_value FROM ${tbl('options')} WHERE option_name = 'cron'`);
+    const raw = rows[0]?.option_value;
+    const next = raw ? policy.removeCronHooks(raw, hooks) : null;
+    if (next === null) c.manual.push(tDefault('Xoá các tác vụ WP-Cron lạ: {hooks}', { hooks: [...hooks].join(', ') }));
+    else {
+      await mysql.query(`UPDATE ${tbl('options')} SET option_value = ? WHERE option_name = 'cron'`, [next]);
+      c.log(t('Đã xoá {n} tác vụ WP-Cron lạ: {hooks}', { n: hooks.size, hooks: [...hooks].join(', ') }));
+    }
   }
   if (input.resetSiteUrl && !c.site.listenPort) {
     const own = sites.siteUrl(c.site);
@@ -513,7 +537,7 @@ async function clean(site: Site, input: CleanSiteInput, by: string, log: HostLog
       }
       if (site.appType === 'wordpress') {
         log(t('Bước 7: database và wp-config.php'));
-        await cleanDatabase(c, input);
+        await cleanDatabase(c, input, before);
         // injected <script> may be legitimate (analytics, embeds): only a person can tell
         for (const f of before.findings.filter((x) => x.check === 'db-script')) {
           c.manual.push(tDefault('<script> trong database ({place}: {ids}): mở Adminer ở tab Tổng quan, xem và xoá đoạn lạ', { place: f.path ?? '', ids: f.detail ?? '' }));

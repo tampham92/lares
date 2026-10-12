@@ -80,7 +80,18 @@ của site, nên quét được cả site đang cách ly:
   thiếu. `wp-config.php` cũng được dò các đoạn mã độc.
 - File ảnh có chứa mã PHP tiếp tục bị báo ở các lần quét sau cho tới khi được xử lý.
 - File PHP trong `uploads` và file ảnh có chứa mã PHP; `.user.ini` có `auto_prepend_file` (trừ
-  firewall của Wordfence); file lạ hoặc bị sửa trong `mu-plugins` (báo cho tới khi bạn xác nhận).
+  firewall của Wordfence).
+- `mu-plugins` và drop-in (`db.php`, `object-cache.php`, `advanced-cache.php`...): WordPress nạp chúng ở
+  mọi request mà không hiện trong wp-admin. File lạ hoặc bị sửa được báo cho tới khi bạn xác nhận, **kể
+  cả ở lần quét đầu** (site clone hay migrate có thể mang mã độc theo). Drop-in có code ghi vào
+  `mu-plugins` luôn bị báo nghiêm trọng.
+- Mã độc tự cài lại thường rải nhiều phần, phần nào cũng dựng lại được các phần khác. Bộ quét tìm:
+  - file PHP trong thư mục hoặc file ẩn của `wp-content` (ví dụ `wp-content/.sc_5e965fa4/`);
+  - file ẩn và file zip đặt thẳng trong `wp-content` hay trong thư mục theme (gói cài lại);
+  - mọi file mang tên, hoặc có code nhắc tới, một mu-plugin chưa được xác nhận (thư mục plugin cùng tên,
+    file đánh dấu, đoạn nạp lại trong `functions.php` của theme);
+  - tác vụ WP-Cron không có code nào đăng ký mà tên trông như sinh ngẫu nhiên, hoặc chỉ được đăng ký
+    trong file đã bị đánh dấu.
 - Các đoạn mã thường gặp trong webshell và mã độc (`eval(base64_decode(...))`, `system($_GET[...])`...);
   file PHP mới hoặc bị sửa từ lần quét trước.
 - Trong database: tài khoản quản trị mới, `siteurl`/`home` trỏ sang tên miền khác, `<script>` chèn vào
@@ -111,7 +122,10 @@ vào việc quét rồi xoá.
 1. WordPress core, plugin và theme được tải lại từ wordpress.org đúng phiên bản đang dùng (hoặc bản mới
    nhất). Plugin/theme trả phí hoặc tự viết được liệt kê để bạn tải lại bằng tay.
 2. File bị đánh dấu được chuyển vào `<thư mục site>/.lares-quarantine/<thời điểm>/`, nằm ngoài thư mục
-   web và không bị xoá. Dòng `auto_prepend_file` lạ bị xoá khỏi `.user.ini`.
+   web và không bị xoá. Dòng `auto_prepend_file` lạ bị xoá khỏi `.user.ini`. Nếu một theme hay plugin
+   mua ngoài bị chuyển mất file (ví dụ `functions.php` nạp mã độc), Lares nhắc bạn cài lại bản sạch
+   trước khi gỡ cách ly.
+   Tác vụ WP-Cron bị đánh dấu được xoá thẳng trong database, không chạy code của site.
 3. Đổi salt trong `wp-config.php` (mọi phiên đăng nhập cũ hết hiệu lực), đổi mật khẩu database, xoá các
    tài khoản quản trị bạn chọn, thu hồi application password, đặt mật khẩu ngẫu nhiên cho các tài khoản
    quản trị còn lại (sau khi gỡ cách ly, vào wp-admin bằng nút của panel hoặc "Quên mật khẩu" rồi đặt

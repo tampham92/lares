@@ -81,8 +81,19 @@ site's code, so it also works on a quarantined site:
   (disguised as core), missing core files. `wp-config.php` is searched for malware code too.
 - Images carrying PHP code keep being reported by later scans until they are dealt with.
 - PHP files in `uploads` and images carrying PHP code; `.user.ini` files with `auto_prepend_file`
-  (Wordfence's firewall excepted); unknown or modified files in `mu-plugins` (reported until you
-  acknowledge them).
+  (Wordfence's firewall excepted).
+- `mu-plugins` and drop-ins (`db.php`, `object-cache.php`, `advanced-cache.php`...): WordPress loads them
+  on every request and wp-admin does not list them. Unknown or modified files are reported until you
+  acknowledge them, **the first scan included** (a cloned or migrated site may bring malware along). A
+  drop-in with code writing into `mu-plugins` is always reported as critical.
+- Malware that reinstalls itself spreads over several parts, each able to rebuild the others. The scan
+  looks for:
+  - PHP files in hidden folders or files of `wp-content` (e.g. `wp-content/.sc_5e965fa4/`);
+  - hidden files and zip files directly in `wp-content` or in a theme folder (re-install kits);
+  - every file named after, or with code mentioning, an unacknowledged mu-plugin (a plugin folder of
+    the same name, marker files, a loader in the theme's `functions.php`);
+  - WP-Cron jobs no code registers and whose name looks generated, or registered only by flagged
+    files.
 - Code typical of webshells and malware (`eval(base64_decode(...))`, `system($_GET[...])`...); PHP
   files new or modified since the last scan.
 - In the database: new administrators, `siteurl`/`home` pointing at another domain, `<script>` injected
@@ -115,7 +126,10 @@ than trusting "scan and delete".
 1. WordPress core, plugins and themes are downloaded again from wordpress.org in the versions in use
    (or the latest). Premium or custom plugins/themes are listed for you to upload again.
 2. Flagged files are moved to `<site folder>/.lares-quarantine/<time>/`, outside the web root and never
-   deleted. Foreign `auto_prepend_file` lines are removed from `.user.ini`.
+   deleted. Foreign `auto_prepend_file` lines are removed from `.user.ini`. When a bought theme or plugin
+   loses a file this way (a `functions.php` loading the malware, say), Lares tells you to reinstall a
+   clean copy before releasing the quarantine.
+   Flagged WP-Cron jobs are deleted directly in the database, without running the site's code.
 3. New salts in `wp-config.php` (every old login session ends), a new database password, the
    administrators you select deleted, application passwords revoked, random passwords for the remaining
    administrators (after the release, open wp-admin with the panel's button or "Lost your password?"
