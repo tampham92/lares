@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.4-beta] - 2026-10-12
+
 ### Fixed
 - Deleting a site, changing its domain or turning SSL off no longer deletes a Let's Encrypt
   certificate that another nginx config still uses. After a same-VPS migration from Webinoly the old
