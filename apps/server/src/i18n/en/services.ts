@@ -146,6 +146,8 @@ export const SERVICES_EN: Dict = {
   '{domain} đang trỏ về {ips}, không phải máy chủ này': '{domain} points to {ips}, not this server',
   '{domain} chưa có bản ghi DNS A': '{domain} has no DNS A record',
   'Chưa cài certbot (apt install certbot)': 'certbot is not installed (apt install certbot)',
+  'Giữ lại chứng chỉ {domain}: nginx vẫn dùng nó trong {files}': 'Kept the {domain} certificate: nginx still uses it in {files}',
+  'Giữ lại chứng chỉ {domain}: không kiểm tra được cấu hình nginx': 'Kept the {domain} certificate: could not check the nginx configuration',
   'Private key không khớp với certificate': 'The private key does not match the certificate',
   'Certificate hoặc private key không đọc được': 'The certificate or private key cannot be read',
   'Không reload được nginx: {error}': 'Could not reload nginx: {error}',
