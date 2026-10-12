@@ -8,6 +8,13 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Fixed
+- Deleting a site, changing its domain or turning SSL off no longer deletes a Let's Encrypt
+  certificate that another nginx config still uses. After a same-VPS migration from Webinoly the old
+  panel's vhost loads the same `/etc/letsencrypt/live/<domain>/` files, and deleting them made every
+  later nginx change (new domain, SSL) fail with "cannot load certificate". Lares now keeps the
+  certificate and says which file uses it.
+
 ## [0.4.3-beta] - 2026-10-12
 
 ### Fixed

@@ -71,7 +71,46 @@ export async function renewLetsEncrypt(domain: string, log: HostLogger) {
   await host.mutate(`certbot renew --cert-name ${shq(domain)} --force-renewal --deploy-hook ${shq('systemctl reload nginx')}`, { log, timeoutMs: 5 * 60_000 });
 }
 
+/**
+ * Files of the loaded nginx config (an `nginx -T` dump) that use `needle` outside a comment.
+ * `nginx -T` prints every file it loads under a `# configuration file <path>:` header.
+ */
+export function confFilesUsing(dump: string, needle: string): string[] {
+  const files = new Set<string>();
+  let current: string | null = null;
+  for (const line of dump.split('\n')) {
+    const header = line.match(/^# configuration file (.+):$/);
+    if (header) {
+      current = header[1]!;
+      continue;
+    }
+    const code = line.trimStart();
+    if (current && !code.startsWith('#') && code.includes(needle)) files.add(current);
+  }
+  return [...files];
+}
+
+/**
+ * Delete a site's Let's Encrypt certificate - unless nginx still loads it from somewhere else. Webinoly
+ * and other panels name the certificate after the domain like Lares does, so after a same-VPS migration
+ * the old panel's vhost (still enabled) uses the very same /etc/letsencrypt/live/<domain>/ files:
+ * deleting them would break `nginx -t`, and with it every later vhost change.
+ * Called once the site's own vhost no longer references the certificate.
+ */
 export async function deleteLetsEncrypt(domain: string, log?: HostLogger) {
+  if (!config.dryRun) {
+    const dump = await host.exec(`${shq(config.nginxBin)} -T 2>/dev/null`);
+    // unreadable config: keeping a certificate costs nothing, deleting a used one takes nginx down
+    const users = dump.code === 0 ? confFilesUsing(dump.stdout, path.dirname(certPaths(domain, 'letsencrypt').certificate) + '/') : null;
+    if (!users || users.length) {
+      log?.(
+        users
+          ? t('Giữ lại chứng chỉ {domain}: nginx vẫn dùng nó trong {files}', { domain, files: users.join(', ') })
+          : t('Giữ lại chứng chỉ {domain}: không kiểm tra được cấu hình nginx', { domain }),
+      );
+      return;
+    }
+  }
   await host.mutate(`certbot delete --cert-name ${shq(domain)} --non-interactive 2>/dev/null || true`, { log });
 }
 

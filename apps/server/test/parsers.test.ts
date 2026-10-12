@@ -4,11 +4,33 @@ import { dbFromEnv, isNextPackage, parseDbHost, parseDotEnv, parseWpConfig, rewr
 import { rewriteWpConfig } from '../src/services/wordpress.js';
 import { parseAccessLine, parseNginxTime } from '../src/services/logs.js';
 import { shq } from '../src/lib/shell.js';
+import { confFilesUsing } from '../src/services/ssl.js';
 
 describe('shq', () => {
   it('quotes single quotes safely', () => {
     expect(shq("it's")).toBe(`'it'\\''s'`);
     expect(shq('$(rm -rf /)')).toBe(`'$(rm -rf /)'`);
+  });
+});
+
+describe('certificate users in nginx -T', () => {
+  const dump = `# configuration file /etc/nginx/nginx.conf:
+http { include /etc/nginx/sites-enabled/*; }
+
+# configuration file /etc/nginx/sites-enabled/myweb.com:
+server {
+    ssl_certificate /etc/letsencrypt/live/myweb.com/fullchain.pem;
+}
+
+# configuration file /etc/nginx/sites-enabled/other.com.conf:
+server {
+    # ssl_certificate /etc/letsencrypt/live/myweb.com/fullchain.pem;
+    ssl_certificate /etc/letsencrypt/live/myweb.com-0001/fullchain.pem;
+}
+`;
+  it('lists only files that really load the certificate', () => {
+    expect(confFilesUsing(dump, '/etc/letsencrypt/live/myweb.com/')).toEqual(['/etc/nginx/sites-enabled/myweb.com']);
+    expect(confFilesUsing(dump, '/etc/letsencrypt/live/gone.com/')).toEqual([]);
   });
 });
 
