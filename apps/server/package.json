@@ -1,6 +1,6 @@
 {
   "name": "@lares/server",
-  "version": "0.4.5-beta",
+  "version": "0.4.6-beta",
   "private": true,
   "type": "module",
   "scripts": {

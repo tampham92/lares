@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.6-beta] - 2026-10-12
+
 ### Changed
 - Malware scan: unknown mu-plugins are reported on the first scan too, instead of being trusted. A cloned
   or migrated site used to bring its implant along unreported. Drop-ins (`db.php`, `object-cache.php`,
