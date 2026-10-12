@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.5-beta] - 2026-10-12
+
 ### Fixed
 - Creating or cloning a site without a domain failed with "/var/www/site8001.localhost/public_html
   already exists and is not empty" when an earlier port-based site had since been given a real domain

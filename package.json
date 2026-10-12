@@ -1,7 +1,7 @@
 {
   "name": "lares",
   "private": true,
-  "version": "0.4.4-beta",
+  "version": "0.4.5-beta",
   "description": "Lares Panel by ThoCode - web hosting control panel written in TypeScript",
   "workspaces": [
     "packages/*",
