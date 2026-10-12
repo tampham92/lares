@@ -127,7 +127,7 @@ gửi một ping ẩn danh rất nhỏ. **Ping chỉ gồm các trường sau:**
 | Trường | Ví dụ | Ghi chú |
 |---|---|---|
 | `install_id` | `0b5c3f9e-2f4b-…` | UUID ngẫu nhiên, tạo một lần, lưu ở `/etc/lares/install-id`. Không suy ra từ phần cứng |
-| `version` | `0.4.4-beta` | Phiên bản Lares |
+| `version` | `0.4.5-beta` | Phiên bản Lares |
 | `event` | `install` / `upgrade` / `heartbeat` | |
 | `os`, `os_version` | `ubuntu`, `24.04` | Lấy từ `/etc/os-release` |
 | `arch` | `amd64` | Kiến trúc CPU |
