@@ -26,14 +26,20 @@ type DbTarget = { name: string; user: string; password: string; host: string };
 
 const fmtGb = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 
-/** wp-config.php sits in the web root, or one level above it (WordPress looks there too). */
-export async function findWpConfig(site: Site): Promise<string | null> {
+/** Every wp-config.php WordPress could load: in the web root, then one level above it (inside the site). */
+async function wpConfigFiles(site: Site): Promise<string[]> {
+  const files: string[] = [];
   for (const dir of [site.webRoot, path.dirname(site.webRoot)]) {
     if (dir !== site.rootPath && !dir.startsWith(site.rootPath + path.sep)) continue;
     const file = path.join(dir, 'wp-config.php');
-    if (await host.exists(file)) return file;
+    if (await host.exists(file)) files.push(file);
   }
-  return null;
+  return files;
+}
+
+/** The wp-config.php WordPress loads: the web root's wins over the one a level up. */
+export async function findWpConfig(site: Site): Promise<string | null> {
+  return (await wpConfigFiles(site))[0] ?? null;
 }
 
 export async function databasesSize(names: string[]): Promise<number> {
@@ -122,10 +128,13 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
 
     switch (src.appType) {
       case 'wordpress': {
-        const cfgFile = inClone(wpConfig!);
-        // as the site user, like every later write: a root-owned wp-config.php would lock the site out of it
-        await writeSiteFile(site, cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), log);
-        log(t('wp-config.php: trỏ sang database mới'));
+        // Every copy, not only the one WordPress loads: a site migrated from Webinoly keeps the old
+        // panel's wp-config.php next to public_html, and a stale copy would show (and hand the clone's
+        // code) the source site's database password. Written as the site user, like every later write.
+        for (const cfgFile of await wpConfigFiles(site)) {
+          await writeSiteFile(site, cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), log);
+          log(t('{file}: trỏ sang database mới', { file: cfgFile }));
+        }
         if (listenPort) await ensurePortHostFix(site, log);
         await wordpressReplaceUrl(site.webRoot, runAsOf(site), url, log);
         break;

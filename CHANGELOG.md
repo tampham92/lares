@@ -15,6 +15,9 @@ breaking changes; upgrading is always the install command run again
   already exists and is not empty" when an earlier port-based site had since been given a real domain
   (its files stay in the old folder) or was deleted with its files kept. Lares now skips port numbers
   whose `siteNNNN.localhost` folder still exists.
+- Cloning a WordPress site migrated from Webinoly left the old panel's `wp-config.php` (next to
+  `public_html`) with the source site's database name and password. Every `wp-config.php` in the
+  clone now points at the clone's own database.
 
 ## [0.4.4-beta] - 2026-10-12
 

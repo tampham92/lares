@@ -42,7 +42,7 @@ export const SERVICES_EN: Dict = {
   'xoá database {name}': 'delete database {name}',
   'Đang sao chép database {from} → {to}...': 'Copying database {from} → {to}...',
   'Đã sao chép database {from} → {to}': 'Copied database {from} → {to}',
-  'wp-config.php: trỏ sang database mới': 'wp-config.php: pointed to the new database',
+  '{file}: trỏ sang database mới': '{file}: pointed to the new database',
   '.env: cập nhật {keys}': '.env: updated {keys}',
   'CẦN KIỂM TRA: cấu hình của site vẫn có thể trỏ tới database {from} - hãy đổi sang {to} (mật khẩu xem ở mục Database)':
     'CHECK NEEDED: the site configuration may still point to database {from} - change it to {to} (the password is under Databases)',
