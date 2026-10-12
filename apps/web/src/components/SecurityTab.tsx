@@ -41,6 +41,8 @@ const DETAIL: Record<string, string> = {
   added: msg('file không có trong bản gốc'),
   unverified: msg('không có trên wordpress.org, chưa đối chiếu được'),
   missing: msg('thiếu file so với bản gốc (site có thể bị lỗi)'),
+  unregistered: msg('không có code nào đăng ký tác vụ này, tên trông như sinh ngẫu nhiên'),
+  'mu-plugins': msg('có code ghi vào thư mục mu-plugins (cách mã độc tự cài lại)'),
 };
 const FIREWALL_KIND: Record<string, string> = {
   smtp: msg('gửi mail thẳng ra cổng 25 (spam)'),
@@ -51,13 +53,16 @@ const FIREWALL_KIND: Record<string, string> = {
 const DB_PLACE: Record<string, string> = { posts: msg('bài viết / trang'), options: msg('tuỳ chọn (wp_options)') };
 
 /** Findings about one file's content: the owner may mark it as not malware (same rule as malwarePolicy.ignorable). */
-const IGNORABLE = new Set<ScanFinding['check']>(['core-checksum', 'plugin-checksum', 'uploads-php', 'uploads-code', 'pattern', 'user-ini']);
+const IGNORABLE = new Set<ScanFinding['check']>(['core-checksum', 'plugin-checksum', 'uploads-php', 'uploads-code', 'pattern', 'user-ini', 'payload', 'implant-ref']);
 const ignorable = (f: ScanFinding) => IGNORABLE.has(f.check) && !!f.path && !f.count && !f.path.endsWith('/') && f.severity !== 'info';
 
 /** What to do about findings the cleaning cannot fix by itself. */
 const FIX_HINT: Partial<Record<ScanFinding['check'], string>> = {
   'db-script': msg('Mở Adminer ở tab Tổng quan để xem và xoá đoạn lạ (có thể là mã hợp lệ như analytics).'),
   'site-url': msg('Dọn site đặt lại địa chỉ này về tên miền của site.'),
+  'drop-in': msg('WordPress tự nạp file này ở mọi request. Chỉ giữ nếu plugin cache/database bạn đang dùng tạo ra nó.'),
+  'implant-ref': msg('Thường là một phần khác của cùng mã độc (bộ cài lại). Nếu file thuộc theme/plugin mua ngoài, cài lại bản sạch từ nơi bạn mua.'),
+  cron: msg('Không có code nào đăng ký tác vụ này, hoặc chỉ file bị đánh dấu đăng ký nó (tên file ở trên). Dọn site sẽ xoá nó khỏi database.'),
 };
 
 type OnIgnore = (path: string, ignore: boolean) => void;
@@ -210,7 +215,7 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
       setAckBusy(false);
     }
   };
-  const toAcknowledge = scan?.findings.some((f) => (f.check === 'new-admin' || f.check === 'mu-plugin') && f.severity !== 'info');
+  const toAcknowledge = scan?.findings.some((f) => (f.check === 'new-admin' || f.check === 'mu-plugin' || f.check === 'drop-in') && f.severity !== 'info');
   const acknowledge = async () => {
     setAckBusy(true);
     try {
@@ -227,7 +232,7 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
         {scan && <Badge tone={STATUS[scan.status].tone}>{t(STATUS[scan.status].label)}</Badge>}
       </div>
       <div className="sub">
-        {t('Đối chiếu file lõi WordPress và plugin với bản gốc trên wordpress.org, tìm file PHP trong uploads, .user.ini nạp file lạ, các đoạn mã thường gặp trong mã độc, tài khoản quản trị mới, địa chỉ site bị đổi và các lần tường lửa chặn site. Không chạy code của site.')}
+        {t('Đối chiếu file lõi WordPress và plugin với bản gốc trên wordpress.org, tìm file PHP trong uploads, .user.ini nạp file lạ, mu-plugin và drop-in lạ, PHP và file zip giấu trong wp-content, các đoạn mã thường gặp trong mã độc, tác vụ WP-Cron lạ, tài khoản quản trị mới, địa chỉ site bị đổi và các lần tường lửa chặn site. Không chạy code của site.')}
       </div>
       <div className="hint">{t('Máy quét không bắt được mọi backdoor: kết quả sạch không có nghĩa là chắc chắn sạch. Site đã nhiễm thì cách ly và dọn bằng bản gốc.')}</div>
       {scan && (
@@ -272,9 +277,9 @@ function ScanCard({ site, v, busy, start, refresh }: { site: Site; v: SiteSecuri
       {toAcknowledge && site.appType === 'wordpress' && (
         <div className="row">
           <button className="btn sm" disabled={ackBusy} onClick={() => void acknowledge()}>
-            {t('Tài khoản quản trị và mu-plugin hiện tại là của tôi')}
+            {t('Tài khoản quản trị, mu-plugin và drop-in hiện tại là của tôi')}
           </button>
-          <span className="hint">{t('Lần quét sau sẽ không báo chúng nữa (một mu-plugin bị sửa sau đó vẫn bị báo).')}</span>
+          <span className="hint">{t('Lần quét sau sẽ không báo chúng nữa (file bị sửa sau đó vẫn bị báo). Chỉ bấm khi bạn biết từng file từ đâu ra.')}</span>
         </div>
       )}
       <History scans={v.history} />

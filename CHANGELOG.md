@@ -8,6 +8,24 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Changed
+- Malware scan: unknown mu-plugins are reported on the first scan too, instead of being trusted. A cloned
+  or migrated site used to bring its implant along unreported. Drop-ins (`db.php`, `object-cache.php`,
+  `advanced-cache.php`...) are now tracked the same way; the acknowledge button covers them. After
+  upgrading, a site's existing drop-ins (from a cache plugin, say) are reported once: check them and
+  press the acknowledge button.
+
+### Added
+- Malware scan finds the parts that let an implant come back after cleaning:
+  - PHP in hidden folders or files of `wp-content`;
+  - hidden files and zips placed directly in `wp-content` or a theme folder;
+  - drop-ins that write into `mu-plugins`;
+  - every file named after, or mentioning, an unacknowledged mu-plugin (its plugin folder, marker
+    files, a loader in the theme);
+  - WP-Cron jobs no code registers (with a generated-looking name) or registered only by flagged files.
+- Cleaning moves all of these out and deletes the flagged WP-Cron jobs directly in the database. When a
+  bought theme or plugin loses a file, it says to reinstall a clean copy.
+
 ## [0.4.5-beta] - 2026-10-12
 
 ### Fixed

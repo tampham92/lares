@@ -8,6 +8,11 @@ export const SITESECURITY_EN: Dict = {
   'File PHP trong thư mục uploads': 'PHP file in the uploads folder',
   'File trong uploads có chứa mã PHP': 'File in uploads contains PHP code',
   'File lạ trong mu-plugins': 'Unknown file in mu-plugins',
+  'Drop-in lạ trong wp-content (WordPress nạp ở mọi request)': 'Unknown drop-in in wp-content (WordPress loads it on every request)',
+  'File PHP trong thư mục hoặc file ẩn của wp-content': 'PHP file in a hidden folder or file of wp-content',
+  'File ẩn hoặc file zip lạ trong wp-content': 'Hidden or zip file out of place in wp-content',
+  'File mang tên hoặc nhắc tới mu-plugin bị đánh dấu': 'File named after or mentioning a flagged mu-plugin',
+  'Tác vụ WP-Cron đáng ngờ': 'Suspicious WP-Cron job',
   '.user.ini nạp file PHP vào mọi request': '.user.ini loads a PHP file into every request',
   'Mã thường gặp trong mã độc': 'Code typical of malware',
   'File PHP mới hoặc bị sửa từ lần quét trước': 'PHP file new or modified since the last scan',
@@ -47,6 +52,8 @@ export const SITESECURITY_EN: Dict = {
   'file không có trong bản gốc': 'not part of the release',
   'không có trên wordpress.org, chưa đối chiếu được': 'not on wordpress.org, could not be compared',
   'thiếu file so với bản gốc (site có thể bị lỗi)': 'missing compared to the release (the site may be broken)',
+  'không có code nào đăng ký tác vụ này, tên trông như sinh ngẫu nhiên': 'no code registers this job and its name looks generated',
+  'có code ghi vào thư mục mu-plugins (cách mã độc tự cài lại)': 'contains code writing into mu-plugins (how malware reinstalls itself)',
   'gửi mail thẳng ra cổng 25 (spam)': 'direct mail to port 25 (spam)',
   'gọi dịch vụ metadata của cloud (lấy khoá của máy chủ)': "the cloud metadata service (the server's credentials)",
   'gọi cổng panel / Adminer': 'the panel / Adminer port',
@@ -64,8 +71,8 @@ export const SITESECURITY_EN: Dict = {
   'Các lần quét trước': 'Previous scans',
   '{critical} nghiêm trọng · {warning} cần xem · {files} file': '{critical} critical · {warning} to review · {files} files',
   'Quét mã độc': 'Malware scan',
-  'Đối chiếu file lõi WordPress và plugin với bản gốc trên wordpress.org, tìm file PHP trong uploads, .user.ini nạp file lạ, các đoạn mã thường gặp trong mã độc, tài khoản quản trị mới, địa chỉ site bị đổi và các lần tường lửa chặn site. Không chạy code của site.':
-    "Compares WordPress core and plugin files with the releases on wordpress.org and looks for PHP in uploads, .user.ini files loading foreign code, code typical of malware, new administrators, a changed site address and firewall blocks. The site's code is never run.",
+  'Đối chiếu file lõi WordPress và plugin với bản gốc trên wordpress.org, tìm file PHP trong uploads, .user.ini nạp file lạ, mu-plugin và drop-in lạ, PHP và file zip giấu trong wp-content, các đoạn mã thường gặp trong mã độc, tác vụ WP-Cron lạ, tài khoản quản trị mới, địa chỉ site bị đổi và các lần tường lửa chặn site. Không chạy code của site.':
+    "Compares WordPress core and plugin files with the releases on wordpress.org and looks for PHP in uploads, .user.ini files loading foreign code, unknown mu-plugins and drop-ins, PHP and zip files hidden in wp-content, code typical of malware, unknown WP-Cron jobs, new administrators, a changed site address and firewall blocks. The site's code is never run.",
   'Máy quét không bắt được mọi backdoor: kết quả sạch không có nghĩa là chắc chắn sạch. Site đã nhiễm thì cách ly và dọn bằng bản gốc.': 'No scanner catches every backdoor: a clean result is not a guarantee. An infected site is quarantined and cleaned with original copies.',
   'Lần quét gần nhất': 'Latest scan',
   '{files} file': '{files} files',
@@ -73,8 +80,9 @@ export const SITESECURITY_EN: Dict = {
   'Quét ngay': 'Scan now',
   'Quét tự động đang tắt.': 'Scheduled scans are off.',
   'Tự quét mỗi ngày lúc {time}.': 'Scanned daily at {time}.',
-  'Tài khoản quản trị và mu-plugin hiện tại là của tôi': 'The current administrators and mu-plugins are mine',
-  'Lần quét sau sẽ không báo chúng nữa (một mu-plugin bị sửa sau đó vẫn bị báo).': 'The next scans will not report them again (a mu-plugin modified later is still reported).',
+  'Tài khoản quản trị, mu-plugin và drop-in hiện tại là của tôi': 'The current administrators, mu-plugins and drop-ins are mine',
+  'Lần quét sau sẽ không báo chúng nữa (file bị sửa sau đó vẫn bị báo). Chỉ bấm khi bạn biết từng file từ đâu ra.':
+    'The next scans will not report them again (a file modified later is still reported). Only confirm when you know where each file comes from.',
 
   // ---- quarantine and cleaning ----
   'Thay code bằng bản sạch thay vì tin vào việc quét rồi xoá: WordPress, plugin và theme được tải lại từ wordpress.org đúng phiên bản đang dùng. Chỉ giữ dữ liệu (database, uploads).':
@@ -133,6 +141,12 @@ export const SITESECURITY_EN: Dict = {
   // ---- not malware, next steps, incomplete quarantine ----
   'Mở Adminer ở tab Tổng quan để xem và xoá đoạn lạ (có thể là mã hợp lệ như analytics).': 'Open Adminer on the Overview tab to review and remove it (it may be legitimate, like analytics).',
   'Dọn site đặt lại địa chỉ này về tên miền của site.': 'Cleaning resets this address to the site\'s domain.',
+  'WordPress tự nạp file này ở mọi request. Chỉ giữ nếu plugin cache/database bạn đang dùng tạo ra nó.':
+    'WordPress loads this file on every request. Keep it only if a cache/database plugin you use created it.',
+  'Thường là một phần khác của cùng mã độc (bộ cài lại). Nếu file thuộc theme/plugin mua ngoài, cài lại bản sạch từ nơi bạn mua.':
+    'Usually another part of the same malware (its re-installer). If the file belongs to a bought theme/plugin, reinstall a clean copy from where you bought it.',
+  'Không có code nào đăng ký tác vụ này, hoặc chỉ file bị đánh dấu đăng ký nó (tên file ở trên). Dọn site sẽ xoá nó khỏi database.':
+    'No code registers this job, or only a flagged file does (named above). Cleaning removes it from the database.',
   'đã đánh dấu không phải mã độc (vốn là: {severity})': 'marked as not malware (was: {severity})',
   'Không phải mã độc': 'Not malware',
   'Bỏ đánh dấu': 'Unmark',

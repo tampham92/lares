@@ -34,6 +34,11 @@ export const SITESECURITY_EN: Dict = {
 
   // ---- scan ----
   'Bỏ qua kiểm tra database: không đọc được wp-config.php hoặc database không nằm trên máy chủ này': 'Database checks skipped: wp-config.php is unreadable or the database is not on this server',
+  'Cảnh báo: không đọc được danh sách WP-Cron: {error}': 'Warning: could not read the WP-Cron jobs: {error}',
+  '{label}: đã chuyển file nhiễm ra ngoài - cài lại bản sạch từ nơi bạn mua rồi mới gỡ cách ly':
+    '{label}: infected files were moved out - reinstall a clean copy from where you bought it before lifting the quarantine',
+  'Xoá các tác vụ WP-Cron lạ: {hooks}': 'Delete the unknown WP-Cron jobs: {hooks}',
+  'Đã xoá {n} tác vụ WP-Cron lạ: {hooks}': 'Deleted {n} unknown WP-Cron jobs: {hooks}',
   'Cảnh báo: không kiểm tra được database: {error}': 'Warning: could not check the database: {error}',
   'Đã đọc {n} file...': '{n} files read...',
   'Cảnh báo: không tải được checksum của WordPress {version} từ wordpress.org - bỏ qua bước so file lõi': 'Warning: could not download the checksums of WordPress {version} from wordpress.org - core files not compared',
