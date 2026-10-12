@@ -15,7 +15,7 @@ import * as mysql from './mysql.js';
 import * as nodeapp from './nodeapp.js';
 import * as ports from './ports.js';
 import * as sites from './sites.js';
-import { runAsOf, siteOwner } from './isolation.js';
+import { runAsOf, siteOwner, writeSiteFile } from './isolation.js';
 import { ensurePortHostFix, rewriteWpConfig, wordpressReplaceUrl } from './wordpress.js';
 import { assertNotQuarantined } from './securityStore.js';
 
@@ -104,6 +104,9 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
     log(t('Đang sao chép file {from} → {to} ({size})...', { from: src.rootPath, to: site.rootPath, size: fmtGb(sizeKb * 1024) }));
     await host.run(`${tarCreate(src.rootPath, tarExcludes(CLONE_EXCLUDES))} | tar -C ${shq(site.rootPath)} -xpf -`, { timeoutMs: 12 * 3_600_000 });
     log(t('Đã sao chép file'));
+    // tar -p keeps the source's owner: hand the copy to the clone's user before anything below
+    // writes into it as that user (writeSiteFile, wp-cli, artisan)
+    await sites.fixPermissions(site, log);
 
     const copies = new Map<string, DbTarget>();
     const flags = dbNames.length && !config.dryRun ? await mysqldumpFlags(localExecutor) : [];
@@ -120,11 +123,10 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
     switch (src.appType) {
       case 'wordpress': {
         const cfgFile = inClone(wpConfig!);
-        await host.writeFile(cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), 0o640);
+        // as the site user, like every later write: a root-owned wp-config.php would lock the site out of it
+        await writeSiteFile(site, cfgFile, rewriteWpConfig(await fs.readFile(cfgFile, 'utf8'), copies.get(wpDb!.name)!), log);
         log(t('wp-config.php: trỏ sang database mới'));
         if (listenPort) await ensurePortHostFix(site, log);
-        // wp-cli runs as the site's user and must be able to read the copied files
-        await sites.fixPermissions(site, log);
         await wordpressReplaceUrl(site.webRoot, runAsOf(site), url, log);
         break;
       }
@@ -140,7 +142,7 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
           if (target) Object.assign(values, { DB_DATABASE: target.name, DB_USERNAME: target.user, DB_PASSWORD: target.password });
           if (current.APP_URL) values.APP_URL = url;
           if (Object.keys(values).length) {
-            await host.writeFile(envFile, rewriteDotEnv(env, values), 0o640);
+            await writeSiteFile(site, envFile, rewriteDotEnv(env, values), log);
             log(t('.env: cập nhật {keys}', { keys: Object.keys(values).join(', ') }));
           }
         }
@@ -148,7 +150,6 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
           if (to !== target) log(t('CẦN KIỂM TRA: cấu hình của site vẫn có thể trỏ tới database {from} - hãy đổi sang {to} (mật khẩu xem ở mục Database)', { from, to: to.name }));
         }
         if (src.appType === 'laravel' && (await host.has('php'))) {
-          await sites.fixPermissions(site, log);
           await host
             .mutate(host.asWebUser('php artisan config:clear && php artisan cache:clear', { cwd: appDir, ...runAsOf(site) }), { log })
             .catch((err) => log(`artisan: ${errorMessage(err)}`));
@@ -159,7 +160,6 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
         undo.push(t('xoá service {name}', { name: nodeapp.serviceName(domain) }), () => nodeapp.removeService(domain, log));
         await nodeapp.writeServiceFiles({ ...site, appPort: site.appPort! }, nodeConfig!, log);
         if (await host.exists(path.join(site.webRoot, '.next'))) {
-          await sites.fixPermissions(site, log);
           await nodeapp.serviceAction(domain, 'restart', log);
           log(t('Đã khởi động {service} trên 127.0.0.1:{port} (dùng bản build của site nguồn)', { service: nodeapp.serviceName(domain), port: String(site.appPort) }));
           log(t('Lưu ý: biến NEXT_PUBLIC_* được đóng gói lúc build - nếu có giá trị chứa tên miền cũ, sửa ở tab Next.js rồi build lại.'));

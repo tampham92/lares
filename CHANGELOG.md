@@ -8,6 +8,11 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Fixed
+- Cloning a WordPress site to a port (`siteNNNN.localhost`) failed with "Permission denied" on
+  `wp-config.php` and rolled back. The copied files are now handed to the clone's user before Lares
+  edits them, and `wp-config.php`/`.env` are written as that user instead of root.
+
 ## [0.4.2-beta] - 2026-10-11
 
 ### Added
