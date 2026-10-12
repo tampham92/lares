@@ -86,8 +86,8 @@ export async function cloneSite(sourceId: number, input: CloneSiteInput, log: Ho
   try {
     let listenPort: number | null = null;
     if (input.domain === LOCALHOST) {
-      if (input.listenPort && !(await ports.isPortFree(input.listenPort))) throw conflict(t('Port {port} đang được sử dụng', { port: input.listenPort }));
-      listenPort = input.listenPort ?? (await ports.allocatePort(config.sitePortStart));
+      if (input.listenPort && !(await ports.isSitePortFree(input.listenPort))) throw conflict(t('Port {port} đang được sử dụng', { port: input.listenPort }));
+      listenPort = input.listenPort ?? (await ports.allocateSitePort());
     }
     const domain = listenPort ? sites.portSiteDomain(listenPort) : input.domain;
     // the source keeps its internal port; the clone gets a free one

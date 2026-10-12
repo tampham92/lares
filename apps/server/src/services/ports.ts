@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+import { LOCALHOST } from '@lares/shared';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { t } from '../i18n/index.js';
@@ -28,6 +30,31 @@ export async function allocatePort(start: number, extraReserved: Iterable<number
 
 export async function isPortFree(port: number): Promise<boolean> {
   return !reservedPorts().has(port) && !(await listeningPorts()).has(port);
+}
+
+/**
+ * Ports whose port-site folder (<sitesRoot>/siteNNNN.localhost) still exists. Files stay put when a
+ * port-based site gets a real domain, and a site deleted without its files leaves the folder behind:
+ * handing that port out again would make the new site collide with the old folder.
+ */
+export async function portsWithSiteDir(): Promise<Set<number>> {
+  const names = await fs.readdir(config.sitesRoot).catch(() => [] as string[]);
+  const re = new RegExp(`^site(\\d+)\\.${LOCALHOST}$`);
+  const taken = new Set<number>();
+  for (const name of names) {
+    const m = re.exec(name);
+    if (m) taken.add(Number(m[1]));
+  }
+  return taken;
+}
+
+/** A port for a new port-based site: free, and not the name of an existing site folder. */
+export async function allocateSitePort(): Promise<number> {
+  return allocatePort(config.sitePortStart, await portsWithSiteDir());
+}
+
+export async function isSitePortFree(port: number): Promise<boolean> {
+  return (await isPortFree(port)) && !(await portsWithSiteDir()).has(port);
 }
 
 async function ufwActive(): Promise<boolean> {
