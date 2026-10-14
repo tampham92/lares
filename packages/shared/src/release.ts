@@ -45,6 +45,8 @@ export interface UpgradeStatus {
   exitCode: number | null;
   /** Last lines of the installer output. */
   log: string[];
+  /** Why a failed run stopped, when systemd's journal tells: 'oom' = killed for lack of memory. */
+  reason: 'oom' | null;
 }
 
 /** A release tag: v + semver, nothing that a shell or git could read as an option or a path. */

@@ -8,6 +8,17 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Fixed
+- An upgrade on a small VPS (2 GB RAM, busy sites) could be killed for lack of memory in the middle of
+  the build. The panel then stopped answering for minutes, and the upgrade showed only "interrupted".
+  The source folder was left half replaced, so the panel would not have started again after a reboot.
+  - The new version is now built in `/opt/lares/src.new` and swapped in only once the build is done.
+    A failed build leaves the running version as it was, and a new version that does not start is
+    replaced by the previous one.
+  - The build runs at low CPU/disk priority with a bounded Node heap. With less than 2 GB of free
+    RAM + swap, it gets a temporary 2 GB swap file, removed right after.
+  - Settings → Updates says when an upgrade was stopped because the server ran out of memory.
+
 ## [0.4.6-beta] - 2026-10-12
 
 ### Changed

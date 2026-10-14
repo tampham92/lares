@@ -86,8 +86,13 @@ mode:
 curl -sSL https://lares.thocode.dev/install | sudo bash
 ```
 
-- Only `/opt/lares/src` is replaced and rebuilt. The panel restarts and is down for a few seconds.
-  **Websites keep running.**
+- Only `/opt/lares/src` is replaced. The new version is built in a folder of its own
+  (`/opt/lares/src.new`) while the running one stays as it is until the switch. The panel restarts
+  and is down for a few seconds. **Websites keep running.** A failed build leaves the old version
+  running; a new version that does not start is replaced by the old one again.
+- The build runs at low CPU/disk priority so it does not take resources from the websites. With less
+  than 2 GB of free RAM + swap, the installer adds a temporary 2 GB swap file for the build and
+  removes it right after (it needs that much free disk space).
 - Sites, databases, vhosts, SSL certificates, accounts, the saved language, port, PHP versions and
   telemetry choice are kept.
 - `/etc/lares` + the SQLite database + custom templates are backed up first to

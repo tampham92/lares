@@ -201,8 +201,17 @@ jobs:
 
       - name: Upgrade in place
         run: |
-          sudo bash ./install.sh --tarball "file://$RUNNER_TEMP/lares.tar.gz" --php 8.3
+          set -o pipefail   # the installer's exit code, not tee's
+          # a huge memory threshold: the build gets the temporary swap a small VPS would get
+          sudo LARES_BUILD_MIN_FREE_MB=1000000 bash ./install.sh --tarball "file://$RUNNER_TEMP/lares.tar.gz" --php 8.3 | tee "$RUNNER_TEMP/upgrade.log"
           test "$(curl -sk -o /dev/null -w '%{http_code}' "$PANEL/api/auth/me")" = 401
+          grep -q 'temporary 2048 MB swap' "$RUNNER_TEMP/upgrade.log"
+          # built aside, swapped in, nothing left behind: no staging copy, no old copy, no swap
+          sudo test -f /opt/lares/src/apps/server/dist/index.js
+          sudo test ! -e /opt/lares/src.new
+          sudo test ! -e /opt/lares/src.old
+          sudo test ! -e /opt/lares/build.swap
+          if grep -q build.swap /proc/swaps; then echo "temporary swap still on"; exit 1; fi
           sudo sh -c 'ls -1 /var/lib/lares/backups/lares-*.tar.gz'
           # an upgrade keeps the saved choices
           sudo grep -qx 'LARES_TELEMETRY=0' /etc/lares/lares.env

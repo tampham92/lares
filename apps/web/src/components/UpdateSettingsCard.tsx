@@ -136,9 +136,13 @@ export function UpdateSettingsCard() {
           )}
           {status.state === 'failed' && (
             <Alert tone="err">
-              {status.exitCode === null
-                ? t('Lần nâng cấp lên v{version} bị gián đoạn.', { version: status.target ?? '' })
-                : t('Nâng cấp lên v{version} thất bại (mã lỗi {code}).', { version: status.target ?? '', code: status.exitCode })}{' '}
+              {status.reason === 'oom'
+                ? t('Lần nâng cấp lên v{version} bị dừng vì máy chủ hết bộ nhớ (RAM và swap) lúc build. Bản đang chạy không bị ảnh hưởng. Tắt bớt tiến trình nặng hoặc thêm swap rồi thử lại.', {
+                    version: status.target ?? '',
+                  })
+                : status.exitCode === null
+                  ? t('Lần nâng cấp lên v{version} bị gián đoạn.', { version: status.target ?? '' })
+                  : t('Nâng cấp lên v{version} thất bại (mã lỗi {code}).', { version: status.target ?? '', code: status.exitCode })}{' '}
               {t('Xem log bên dưới, hoặc chạy lệnh nâng cấp trên VPS:')} <code>{v?.upgradeCommand}</code>
             </Alert>
           )}

@@ -303,6 +303,8 @@ else
 fi
 
 step "$(L 'Xoá mã nguồn Lares' 'Deleting Lares source code')"
+# the temporary swap of an interrupted build (install.sh) must be released before its file goes
+swapoff "$INSTALL_DIR/build.swap" 2>/dev/null || true
 rm -rf "$INSTALL_DIR"
 ok "$(L 'Đã xoá' 'Deleted') $INSTALL_DIR"
 
