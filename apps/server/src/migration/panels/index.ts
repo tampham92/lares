@@ -1,7 +1,12 @@
 import type { PanelType } from '@lares/shared';
 import type { Executor } from '../../executors/index.js';
+import { t } from '../../i18n/index.js';
+import { shq } from '../../lib/shell.js';
 import {
   detectPhpVersion,
+  laresSitesFromRows,
+  parseLaresVhosts,
+  type LaresSiteRow,
   parseApache,
   parseCpanelUserdata,
   parseHestiaWebConf,
@@ -18,7 +23,8 @@ interface PanelAdapter {
   id: Exclude<PanelType, 'auto' | 'manual'>;
   /** Any of these paths existing means the panel is installed. */
   markers: string[];
-  discover(ex: Executor): Promise<RawSite[]>;
+  /** `warn`: something the owner should know about the discovery (sites left out...). */
+  discover(ex: Executor, warn: (msg: string) => void): Promise<RawSite[]>;
 }
 
 /**
@@ -205,6 +211,58 @@ const webinoly: PanelAdapter = {
   },
 };
 
+/*
+ * Another Lares panel (moving to a new VPS). Its vhosts carry "# Managed by Lares", which every other
+ * adapter skips so that this panel never offers its own sites; the source's database lists them
+ * exactly instead (folder, app type, PHP version, status). Read-only, never through the source's
+ * panel: sqlite3 when installed, else Node with the panel's own better-sqlite3 (in src, or in src.old
+ * left by an upgrade). When neither works (a half-finished upgrade on the source), its vhosts.
+ */
+const LARES_SITES_QUERY = 'SELECT domain, aliases_json, root_path, web_root, php_version, app_type, app_port, listen_port, status FROM sites ORDER BY domain';
+const LARES_NODE_READ = 'const D = require("better-sqlite3"); const db = new D(process.argv[1], { readonly: true, fileMustExist: true }); process.stdout.write(JSON.stringify(db.prepare(process.argv[2]).all()));';
+
+async function laresRows(ex: Executor): Promise<LaresSiteRow[] | null> {
+  const script = [
+    `dir=$(grep -E '^LARES_DATA_DIR=' /etc/lares/lares.env 2>/dev/null | tail -n 1 | cut -d= -f2-)`,
+    'db="${dir:-/var/lib/lares}/lares.db"',
+    '[ -f "$db" ] || exit 3',
+    `if command -v sqlite3 >/dev/null 2>&1 && sqlite3 -readonly -json "$db" ${shq(LARES_SITES_QUERY)} 2>/dev/null; then exit 0; fi`,
+    'for d in /opt/lares/src /opt/lares/src.old; do',
+    '  [ -d "$d/node_modules/better-sqlite3" ] || continue',
+    `  (cd "$d" && /usr/bin/node -e ${shq(LARES_NODE_READ)} "$db" ${shq(LARES_SITES_QUERY)} 2>/dev/null) && exit 0`,
+    'done',
+    'exit 4',
+  ].join('\n');
+  const r = await ex.exec(script, { timeoutMs: 60_000 });
+  if (r.code !== 0) return null;
+  try {
+    const rows: unknown = JSON.parse(r.stdout.trim() || '[]');
+    return Array.isArray(rows) ? (rows as LaresSiteRow[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+const lares: PanelAdapter = {
+  id: 'lares',
+  markers: ['/etc/lares/lares.env'],
+  async discover(ex, warn) {
+    // this machine's own Lares (same-VPS migration): nothing to move onto itself
+    if (ex.kind === 'local') return [];
+    const rows = await laresRows(ex);
+    let found;
+    if (rows) found = laresSitesFromRows(rows);
+    else {
+      warn(t('Không đọc được database của Lares nguồn: danh sách site lấy từ vhost nginx (phiên bản PHP và thư mục của site đang tắt có thể cần sửa tay)'));
+      found = parseLaresVhosts(await dumpFiles(ex, ['/etc/nginx/sites-enabled/*.conf']));
+    }
+    if (found.skipped.length) {
+      warn(t('Bỏ qua site chạy theo port (chưa có tên miền): {sites}. Gán tên miền cho site trên Lares nguồn, hoặc nhập thủ công.', { sites: found.skipped.join(', ') }));
+    }
+    return found.sites;
+  },
+};
+
 const generic: PanelAdapter = {
   id: 'generic',
   markers: [],
@@ -223,22 +281,28 @@ const generic: PanelAdapter = {
   },
 };
 
-/** Order matters: specific panels first, generic nginx/apache scan last. */
-export const ADAPTERS: PanelAdapter[] = [cpanel, plesk, directadmin, cyberpanel, hestiacp, aapanel, webinoly, cloudpanel, generic];
+/**
+ * Order matters: specific panels first, generic nginx/apache scan last. Lares after the others: on a
+ * machine where Lares was installed next to another panel, that panel's sites are the ones to move.
+ */
+export const ADAPTERS: PanelAdapter[] = [cpanel, plesk, directadmin, cyberpanel, hestiacp, aapanel, webinoly, cloudpanel, lares, generic];
 
 export async function detectPanel(ex: Executor): Promise<Exclude<PanelType, 'auto' | 'manual'>> {
-  const markers = ADAPTERS.flatMap((a) => a.markers);
+  // locally, /etc/lares is this panel itself, not a source
+  const markers = ADAPTERS.filter((a) => a !== lares || ex.kind !== 'local').flatMap((a) => a.markers);
   const r = await ex.exec(`for p in ${markers.map((m) => `'${m}'`).join(' ')}; do [ -e "$p" ] && echo "$p"; done; true`);
   const found = new Set(r.stdout.split('\n').map((l) => l.trim()));
   return ADAPTERS.find((a) => a.markers.some((m) => found.has(m)))?.id ?? 'generic';
 }
 
-export async function discoverRawSites(ex: Executor, panel: PanelType): Promise<{ panel: PanelType; sites: RawSite[] }> {
-  if (panel === 'manual') return { panel, sites: [] };
+export async function discoverRawSites(ex: Executor, panel: PanelType): Promise<{ panel: PanelType; sites: RawSite[]; warnings: string[] }> {
+  if (panel === 'manual') return { panel, sites: [], warnings: [] };
   const id = panel === 'auto' ? await detectPanel(ex) : panel;
   const adapter = ADAPTERS.find((a) => a.id === id) ?? generic;
-  let sites = await adapter.discover(ex);
+  const warnings: string[] = [];
+  const warn = (msg: string) => warnings.push(msg);
+  let sites = await adapter.discover(ex, warn);
   // A panel with non-standard layout: fall back to scanning the web server configs directly.
-  if (!sites.length && adapter !== generic) sites = await generic.discover(ex);
-  return { panel: id, sites };
+  if (!sites.length && adapter !== generic) sites = await generic.discover(ex, warn);
+  return { panel: id, sites, warnings };
 }

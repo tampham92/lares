@@ -113,8 +113,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
 
 export async function discoverSites(source: SourceInput): Promise<DiscoveryResult> {
   return withSource(source, async (s) => {
-    const { panel, sites: raw } = await discoverRawSites(s.ex, source.panel);
-    const warnings: string[] = [];
+    const { panel, sites: raw, warnings } = await discoverRawSites(s.ex, source.panel);
     const sites = await mapLimit(raw, 4, async (r): Promise<DiscoveredSite> => {
       const base: DiscoveredSite = {
         domain: r.domain,

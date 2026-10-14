@@ -60,6 +60,7 @@ export const SHARED_EN: Dict = {
   // Migration: source panels
   'Tự động nhận diện': 'Auto-detect',
   'VPS thuần (Nginx/Apache, không panel)': 'Plain VPS (Nginx/Apache, no panel)',
+  'Lares Panel (VPS khác)': 'Lares Panel (another VPS)',
   'Nhập thủ công': 'Enter manually',
   'Nhập IP/hostname VPS nguồn': 'Enter the source server IP/hostname',
   'Chọn ít nhất 1 site': 'Select at least 1 site',

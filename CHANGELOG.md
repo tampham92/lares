@@ -8,6 +8,22 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.8-beta] - 2026-10-14
+
+### Added
+- Migration from another Lares panel (moving to a new VPS): new source type **Lares Panel (another
+  VPS)**, also auto-detected.
+  - Sites are read from the source's database, read-only: sqlite3, or Node with the panel's own
+    better-sqlite3. This gives each site's folder, app type and PHP version, including a site that got
+    a domain but still lives in its `siteNNNN.localhost` folder.
+  - When that database cannot be read, for example after a half-finished upgrade, the sites are read
+    from its vhosts.
+  - Sites still served on a port are listed as skipped.
+
+### Fixed
+- Migration from a VPS running Lares found no site: every vhost written by Lares was skipped, a rule
+  meant only for this panel's own vhosts.
+
 ## [0.4.7-beta] - 2026-10-14
 
 ### Fixed

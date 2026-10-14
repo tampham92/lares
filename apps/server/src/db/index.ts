@@ -90,8 +90,15 @@ CREATE INDEX IF NOT EXISTS idx_migration_logs_mid ON migration_logs(migration_id
 
 /** Additive schema migrations for databases created by older versions. */
 function ensureColumn(table: string, column: string, definition: string) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  const has = () => (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((c) => c.name === column);
+  if (has()) return;
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch (err) {
+    // Another process opening the same database (the lares CLI, a parallel test worker) added it
+    // between the check and the ALTER: "duplicate column name" then means done.
+    if (!has()) throw err;
+  }
 }
 ensureColumn('sites', 'listen_port', 'INTEGER');
 // Per-site isolation (services/isolation.ts). sys_user NULL = still on the shared web user; the

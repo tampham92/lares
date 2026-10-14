@@ -140,7 +140,7 @@ IPs, domains, hostnames, site counts and site data are never sent. **To disable 
 
 **Migration** → enter the source server (IP, SSH user, password or private key, sudo), choose the source panel → **Scan sites** → select sites and adjust options → **Start**.
 
-Supported and auto-detected panels: **aaPanel, CyberPanel, HestiaCP/VestaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly**, plain Nginx/Apache VPS, or manual entry.
+Supported and auto-detected panels: **aaPanel, CyberPanel, HestiaCP/VestaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, Lares** (moving to a new VPS), plain Nginx/Apache VPS, or manual entry.
 
 For each site:
 
@@ -163,6 +163,7 @@ Lares detects this through `machine-id` or local IPs, even if you enter the VPS'
 - By default the database is **dumped into a new database** so the old site keeps running side by side. On the same MySQL server you can choose to **reuse** the old database instead (Lares checks `@@hostname/@@port/@@datadir`). A reused database is never deleted by Lares, and it is not search-replaced either, to avoid breaking the source site.
 - Warns when port 80 is held by the old panel's web server (e.g. CyberPanel's OpenLiteSpeed, aaPanel's nginx), or when a `server_name` may clash.
 - Webinoly keeps `wp-config.php` outside `htdocs`: the file is brought into the site directory automatically.
+- Lares on another VPS: the sites are read straight from the source Lares's database (folder, app type, PHP version), including a site that got a domain but still lives in its `siteNNNN.localhost` folder. Sites still served on a port (no domain yet) are skipped: give them a domain on the source first, or enter them by hand.
 
 ## Development
 

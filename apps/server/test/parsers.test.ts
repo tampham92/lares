@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { cleanHostnames, detectPhpVersion, parseApache, parseCpanelUserdata, parseHestiaWebConf, parseNginx, pickPrimary, vhostsToSites } from '../src/migration/panels/parsers.js';
+import {
+  cleanHostnames,
+  detectPhpVersion,
+  laresSitesFromRows,
+  parseApache,
+  parseCpanelUserdata,
+  parseHestiaWebConf,
+  parseLaresVhosts,
+  parseNginx,
+  pickPrimary,
+  vhostsToSites,
+} from '../src/migration/panels/parsers.js';
+import { renderVhost, type VhostSpec } from '../src/services/nginx.js';
 import { dbFromEnv, isNextPackage, parseDbHost, parseDotEnv, parseWpConfig, rewriteDotEnv } from '../src/migration/appDetect.js';
 import { rewriteWpConfig } from '../src/services/wordpress.js';
 import { parseAccessLine, parseNginxTime } from '../src/services/logs.js';
@@ -76,6 +88,46 @@ server { server_name own.com; root /var/www/own.com/public_html; }
     const s = vhostsToSites(parseNginx(d), 't');
     expect(s).toHaveLength(1);
     expect(s[0]).toMatchObject({ domain: 'a.com', aliases: ['www.a.com'], rootPath: '/x' });
+  });
+});
+
+describe('another Lares panel as the source', () => {
+  it('lists its sites from its database, at their application folder', () => {
+    const { sites, skipped } = laresSitesFromRows([
+      { domain: 'shop.com', aliases_json: '["www.shop.com"]', root_path: '/var/www/site8001.localhost', web_root: '/var/www/site8001.localhost/public_html', php_version: '8.3', app_type: 'wordpress', status: 'active' },
+      { domain: 'api.dev', aliases_json: '[]', root_path: '/var/www/api.dev', web_root: '/var/www/api.dev/public_html/public', php_version: '8.2', app_type: 'laravel', status: 'disabled' },
+      { domain: 'app.io', aliases_json: null, root_path: '/var/www/app.io', web_root: '/var/www/app.io/app', app_type: 'nextjs', app_port: 3001 },
+      { domain: 'site8002.localhost', aliases_json: '[]', root_path: '/var/www/site8002.localhost', app_type: 'wordpress', listen_port: 8002 },
+    ]);
+    expect(sites).toEqual([
+      // a site that got its domain later keeps its old folder: the database knows where it is
+      { domain: 'shop.com', aliases: ['www.shop.com'], rootPath: '/var/www/site8001.localhost/public_html', phpVersion: '8.3', proxyPass: null, owner: null, discoveredBy: 'Lares: /var/www/site8001.localhost' },
+      { domain: 'api.dev', aliases: [], rootPath: '/var/www/api.dev/public_html', phpVersion: '8.2', proxyPass: null, owner: null, discoveredBy: 'Lares (disabled): /var/www/api.dev' },
+      { domain: 'app.io', aliases: [], rootPath: '/var/www/app.io/app', phpVersion: null, proxyPass: 'http://127.0.0.1:3001', owner: null, discoveredBy: 'Lares: /var/www/app.io' },
+    ]);
+    expect(skipped).toEqual(['site8002.localhost (port 8002)']);
+  });
+
+  it('falls back to its vhosts when the database cannot be read', () => {
+    const base: VhostSpec = { domain: 'x', aliases: [], appType: 'wordpress', webRoot: '', phpVersion: '8.3', appPort: null, accessLog: true, disabled: false, ssl: null };
+    const dump = [
+      { ...base, domain: 'shop.com', aliases: ['www.shop.com'], webRoot: '/var/www/site8001.localhost/public_html', ssl: { certificate: '/c', privateKey: '/k', forceHttps: true } },
+      { ...base, domain: 'api.dev', appType: 'laravel' as const, webRoot: '/var/www/api.dev/public_html/public', phpSocket: '/run/lares-php/site-4.sock' },
+      { ...base, domain: 'old.org', webRoot: '/var/www/old.org/public_html', quarantined: true },
+      { ...base, domain: 'site8002.localhost', webRoot: '/var/www/site8002.localhost/public_html', listenPort: 8002 },
+    ]
+      .map((spec) => `### FILE: /etc/nginx/sites-enabled/${spec.domain}.conf\n${renderVhost(spec)}`)
+      .join('\n');
+    const { sites, skipped } = parseLaresVhosts(dump + '\n### FILE: /etc/nginx/sites-enabled/foreign.conf\nserver { server_name foreign.com; root /srv/f; }\n');
+    expect(sites.map((s) => [s.domain, s.aliases, s.rootPath, s.phpVersion])).toEqual([
+      ['shop.com', ['www.shop.com'], '/var/www/site8001.localhost/public_html', '8.3'],
+      // its own PHP-FPM socket does not tell the version
+      ['api.dev', [], '/var/www/api.dev/public_html', null],
+      // a quarantined site has no root in its vhost: default layout
+      ['old.org', [], '/var/www/old.org/public_html', null],
+    ]);
+    expect(sites[2]!.discoveredBy).toContain('(stopped)');
+    expect(skipped).toEqual(['site8002.localhost (port 8002)']);
   });
 });
 

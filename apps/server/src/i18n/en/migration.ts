@@ -91,5 +91,9 @@ export const MIGRATION_EN: Dict = {
   'Port 80 đang do "{owner}" (web server của panel nguồn) chiếm. Sau khi chuyển, site trên Lares chỉ nhận traffic khi bạn dừng web server đó và khởi động nginx của Lares.': 'Port 80 is held by "{owner}" (the source panel\'s web server). After migration, sites on Lares will only receive traffic once you stop that web server and start Lares\'s nginx.',
   'Panel nguồn chạy chung VPS: dữ liệu được copy trực tiếp trên máy (không qua mạng), database được dump sang database mới nên site cũ vẫn chạy song song.': 'The source panel runs on the same server: data is copied locally (not over the network) and databases are dumped into new databases, so the old sites keep running side by side.',
   '{domain}: không truy cập được {path}': '{domain}: cannot access {path}',
+  'Không đọc được database của Lares nguồn: danh sách site lấy từ vhost nginx (phiên bản PHP và thư mục của site đang tắt có thể cần sửa tay)':
+    "Could not read the source Lares's database: sites were read from its nginx vhosts (the PHP version, and the folder of a stopped site, may need fixing by hand)",
+  'Bỏ qua site chạy theo port (chưa có tên miền): {sites}. Gán tên miền cho site trên Lares nguồn, hoặc nhập thủ công.':
+    'Skipped sites served on a port (no domain yet): {sites}. Give them a domain on the source Lares, or enter them by hand.',
   '{domain}: reverse proxy tới {target} - hãy nhập thư mục mã nguồn ứng dụng': "{domain}: reverse proxy to {target} - enter the application's source directory",
 };

@@ -502,6 +502,7 @@ export const PANEL_TYPES = [
   'cloudpanel',
   'plesk',
   'webinoly',
+  'lares',
   'generic',
   'manual',
 ] as const;
@@ -517,6 +518,7 @@ export const PANEL_LABELS: Record<PanelType, string> = {
   cloudpanel: 'CloudPanel',
   plesk: 'Plesk',
   webinoly: 'Webinoly',
+  lares: 'Lares Panel (VPS khác)',
   generic: 'VPS thuần (Nginx/Apache, không panel)',
   manual: 'Nhập thủ công',
 };
