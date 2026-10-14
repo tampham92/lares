@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.8-beta] - 2026-10-14
+
 ### Added
 - Migration from another Lares panel (moving to a new VPS): new source type **Lares Panel (another
   VPS)**, also auto-detected.
