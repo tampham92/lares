@@ -85,8 +85,13 @@ Chạy lại lệnh cài đặt. Installer thấy `/etc/lares/lares.env` nên t�
 curl -sSL https://lares.thocode.dev/install | sudo bash
 ```
 
-- Installer chỉ thay mã nguồn trong `/opt/lares/src` rồi build lại. Panel khởi động lại nên gián đoạn
-  vài giây. **Website vẫn chạy bình thường.**
+- Installer chỉ thay mã nguồn trong `/opt/lares/src`. Bản mới được build ở thư mục riêng
+  (`/opt/lares/src.new`), bản đang chạy giữ nguyên cho đến lúc đổi. Panel khởi động lại nên gián đoạn
+  vài giây. **Website vẫn chạy bình thường.** Build lỗi thì bản cũ vẫn chạy; bản mới không khởi động
+  được thì installer tự chạy lại bản cũ.
+- Build chạy với ưu tiên CPU/ổ đĩa thấp để không giành tài nguyên của website. Máy còn dưới 2 GB
+  RAM + swap trống thì installer thêm swap tạm 2 GB cho lúc build rồi gỡ ngay sau đó (cần đủ chỗ trống
+  trên đĩa).
 - Được giữ nguyên: site, database, vhost, SSL, tài khoản, cùng với ngôn ngữ, port, phiên bản PHP và
   lựa chọn thống kê ẩn danh đã lưu.
 - Trước khi nâng cấp, installer sao lưu `/etc/lares`, database SQLite và template riêng vào
@@ -127,7 +132,7 @@ gửi một ping ẩn danh rất nhỏ. **Ping chỉ gồm các trường sau:**
 | Trường | Ví dụ | Ghi chú |
 |---|---|---|
 | `install_id` | `0b5c3f9e-2f4b-…` | UUID ngẫu nhiên, tạo một lần, lưu ở `/etc/lares/install-id`. Không suy ra từ phần cứng |
-| `version` | `0.4.6-beta` | Phiên bản Lares |
+| `version` | `0.4.7-beta` | Phiên bản Lares |
 | `event` | `install` / `upgrade` / `heartbeat` | |
 | `os`, `os_version` | `ubuntu`, `24.04` | Lấy từ `/etc/os-release` |
 | `arch` | `amd64` | Kiến trúc CPU |

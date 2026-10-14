@@ -29,6 +29,8 @@ export const RELEASE_EN: Dict = {
   'Đã nâng cấp lên v{version}. Tải lại trang để dùng giao diện mới.': 'Upgraded to v{version}. Reload the page to use the new interface.',
   'Lần nâng cấp gần nhất (v{from} lên v{to}) đã xong.': 'The last upgrade (v{from} to v{to}) finished.',
   'Tải lại trang': 'Reload page',
+  'Lần nâng cấp lên v{version} bị dừng vì máy chủ hết bộ nhớ (RAM và swap) lúc build. Bản đang chạy không bị ảnh hưởng. Tắt bớt tiến trình nặng hoặc thêm swap rồi thử lại.':
+    'The upgrade to v{version} was stopped because the server ran out of memory (RAM and swap) while building. The running version is not affected. Stop some heavy processes or add swap, then try again.',
   'Lần nâng cấp lên v{version} bị gián đoạn.': 'The upgrade to v{version} was interrupted.',
   'Nâng cấp lên v{version} thất bại (mã lỗi {code}).': 'The upgrade to v{version} failed (exit code {code}).',
   'Xem log bên dưới, hoặc chạy lệnh nâng cấp trên VPS:': 'See the log below, or run the upgrade command on the VPS:',

@@ -61,9 +61,19 @@ export function exitCodeOf(log: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * Was the installer killed for lack of memory? `journal`: the lines of the upgrade unit and of
+ * systemd-oomd (`journalctl -o cat`), which name the unit: "lares-upgrade.service: A process of this
+ * unit has been killed by the OOM killer", "... Failed with result 'oom-kill'", "Killed
+ * /system.slice/lares-upgrade.service due to swap used ...". Lines about other units do not count.
+ */
+export function killedForMemory(journal: string): boolean {
+  return journal.split('\n').some((l) => l.includes(`${UPGRADE_UNIT}.service`) && /oom|memory|swap/i.test(l));
+}
+
 /** Status shown in Settings, from what is on disk and whether the unit is still active. */
 export function upgradeStatus(meta: UpgradeMeta | null, log: string | null, unitActive: boolean, now = Date.now()): UpgradeStatus {
-  if (!meta) return { state: 'idle', target: null, from: null, startedAt: null, exitCode: null, log: [] };
+  if (!meta) return { state: 'idle', target: null, from: null, startedAt: null, exitCode: null, log: [], reason: null };
   const text = log ?? '';
   const exitCode = exitCodeOf(text);
   let state: UpgradeState;
@@ -75,5 +85,5 @@ export function upgradeStatus(meta: UpgradeMeta | null, log: string | null, unit
     .filter((l) => l && !l.startsWith(EXIT_MARKER))
     // colour codes of the installer's output
     .map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''));
-  return { state, target: meta.target, from: meta.from, startedAt: meta.startedAt, exitCode, log: lines.slice(-LOG_TAIL) };
+  return { state, target: meta.target, from: meta.from, startedAt: meta.startedAt, exitCode, log: lines.slice(-LOG_TAIL), reason: null };
 }

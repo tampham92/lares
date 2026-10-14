@@ -185,7 +185,54 @@ trap 'die "$(L "Cài đặt thất bại ở dòng $LINENO (lệnh: $BASH_COMMAN
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-24}" || true; }
 WARNINGS=()
 TMP_FILES=()
-cleanup() { rm -f ${TMP_FILES[@]+"${TMP_FILES[@]}"} 2>/dev/null || true; restore_policy_rc; }
+
+# ---- Memory for the build ---------------------------------------------------
+# Building Lares (npm ci, then tsc + vite) needs ~500 MB. On a small VPS already busy with sites, a
+# build short of memory gets killed (kernel OOM killer, or systemd-oomd once swap is ~90% full) and
+# drags MySQL and PHP into swap with it. Below this much free RAM + swap the build gets a temporary
+# swap file, removed as soon as the build is over.
+BUILD_SWAP="$INSTALL_DIR/build.swap"
+BUILD_MIN_FREE_KB=$(( ${LARES_BUILD_MIN_FREE_MB:-2048} * 1024 ))   # override: CI forces the swap path
+BUILD_SWAP_MB=2048
+release_build_swap() {
+  [[ -e "$BUILD_SWAP" ]] || return 0
+  if grep -q "^$BUILD_SWAP " /proc/swaps 2>/dev/null && ! swapoff "$BUILD_SWAP" 2>/dev/null; then
+    # swapoff needs room in RAM for what is swapped out; leave it rather than fail the install
+    warn "$(L "Chưa gỡ được swap tạm $BUILD_SWAP (RAM đang đầy) - gỡ sau bằng: swapoff $BUILD_SWAP && rm $BUILD_SWAP" "Could not remove the temporary swap $BUILD_SWAP yet (RAM is full) - remove it later: swapoff $BUILD_SWAP && rm $BUILD_SWAP")"
+    return 0
+  fi
+  rm -f "$BUILD_SWAP"
+}
+ensure_build_memory() {
+  release_build_swap   # a leftover of an interrupted run
+  local avail swap_free disk
+  avail=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+  swap_free=$(awk '/^SwapFree:/ {print $2}' /proc/meminfo)
+  (( avail + swap_free >= BUILD_MIN_FREE_KB )) && return 0
+  disk=$(df -Pk "$INSTALL_DIR" | awk 'NR == 2 {print $4}')
+  if (( disk < (BUILD_SWAP_MB + 1024) * 1024 )); then
+    warn "$(L "Máy còn ít RAM/swap ($(( (avail + swap_free) / 1024 )) MB) và không đủ chỗ trống cho swap tạm: build có thể chậm hoặc bị dừng (bản đang chạy vẫn giữ nguyên)" "Little free RAM/swap ($(( (avail + swap_free) / 1024 )) MB) and no disk space for a temporary swap: the build may be slow or killed (the running version is kept)")"
+    return 0
+  fi
+  # fallocate is instant but some filesystems refuse a swap file made that way: then write it out
+  local made=0
+  if fallocate -l "${BUILD_SWAP_MB}M" "$BUILD_SWAP" 2>/dev/null && chmod 600 "$BUILD_SWAP" && mkswap "$BUILD_SWAP" >/dev/null 2>&1 && swapon "$BUILD_SWAP" 2>/dev/null; then
+    made=1
+  else
+    rm -f "$BUILD_SWAP"
+    if dd if=/dev/zero of="$BUILD_SWAP" bs=1M count="$BUILD_SWAP_MB" status=none 2>/dev/null && chmod 600 "$BUILD_SWAP" && mkswap "$BUILD_SWAP" >/dev/null 2>&1 && swapon "$BUILD_SWAP" 2>/dev/null; then
+      made=1
+    fi
+  fi
+  if [[ $made == 1 ]]; then
+    ok "$(L "Máy còn ít RAM/swap ($(( (avail + swap_free) / 1024 )) MB): thêm swap tạm ${BUILD_SWAP_MB} MB cho lúc build" "Little free RAM/swap ($(( (avail + swap_free) / 1024 )) MB): added a temporary ${BUILD_SWAP_MB} MB swap for the build")"
+  else
+    rm -f "$BUILD_SWAP"
+    warn "$(L 'Không tạo được swap tạm (container?): build có thể chậm hoặc bị dừng (bản đang chạy vẫn giữ nguyên)' 'Could not add a temporary swap (container?): the build may be slow or killed (the running version is kept)')"
+  fi
+}
+
+cleanup() { rm -f ${TMP_FILES[@]+"${TMP_FILES[@]}"} 2>/dev/null || true; release_build_swap; restore_policy_rc; }
 trap cleanup EXIT
 
 export DEBIAN_FRONTEND=noninteractive
@@ -516,8 +563,13 @@ install -d -m 700 "${LARES_BACKUP_DIR:-/var/backups/lares}"   # site backups (ro
 chmod 700 "${LARES_BACKUP_DIR:-/var/backups/lares}"
 
 # ---- Fetch & build Lares ----------------------------------------------------
+# Built in a folder of its own and swapped in just before the restart. The running panel keeps its
+# code meanwhile (npm ci starts by deleting node_modules; the build rewrites dist/), and a build that
+# fails or is killed for lack of memory leaves the installed version as it was, still restartable.
 step "$(L 'Tải mã nguồn Lares' 'Downloading Lares source code')"
 SRC="$INSTALL_DIR/src"
+NEW_SRC="$INSTALL_DIR/src.new"
+rm -rf "$NEW_SRC"
 if [[ -n "$LARES_TARBALL" ]]; then
   tmp=$(mktemp -d)
   # A local path (CI, offline installs) or any URL curl understands (https://, file://)
@@ -527,37 +579,39 @@ if [[ -n "$LARES_TARBALL" ]]; then
   inner="$tmp"
   [[ $(printf '%s\n' "$top" | wc -l) -eq 1 && -d "$top" ]] && inner="$top"
   [[ -f "$inner/package.json" && -d "$inner/apps/server" ]] || { rm -rf "$tmp"; die "$(L 'File tarball không chứa mã nguồn Lares' 'The tarball does not contain the Lares source code'): $LARES_TARBALL"; }
-  rsync -a --delete --exclude node_modules "$inner/" "$SRC/"
+  rsync -a --exclude node_modules "$inner/" "$NEW_SRC/"
   rm -rf "$tmp"
 else
+  # The repository of the installed copy, unless this is a first install.
+  repo_url="$LARES_REPO"
+  [[ -d "$SRC/.git" ]] && repo_url=$(git -C "$SRC" remote get-url origin 2>/dev/null || echo "$LARES_REPO")
   # Releases are vX.Y.Z tags: code pushed to main reaches nobody until it is tagged. The panel's
   # update check and its "Upgrade" button look at the same tags.
   if [[ -z "$LARES_BRANCH" ]]; then
-    repo_url="$LARES_REPO"
-    [[ -d "$SRC/.git" ]] && repo_url=$(git -C "$SRC" remote get-url origin 2>/dev/null || echo "$LARES_REPO")
     LARES_BRANCH=$(latest_release_tag "$repo_url")
     if [[ -z "$LARES_BRANCH" ]]; then
       LARES_BRANCH=main
       warn "$(L 'Không tìm thấy tag phát hành (vX.Y.Z), dùng nhánh main' 'No release tag (vX.Y.Z) found, using the main branch')"
     fi
   fi
-  if [[ -d "$SRC/.git" ]]; then
-    git -C "$SRC" fetch --depth 1 origin "$LARES_BRANCH"
-    git -C "$SRC" reset --hard FETCH_HEAD
-  else
-    rm -rf "$SRC"   # e.g. an earlier --tarball install: git clone needs an empty directory
-    git clone --depth 1 --branch "$LARES_BRANCH" "$LARES_REPO" "$SRC"
-  fi
+  git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$LARES_BRANCH" "$repo_url" "$NEW_SRC"
 fi
-LARES_VERSION=$(/usr/bin/node -p 'require(process.argv[1]).version' "$SRC/package.json" 2>/dev/null || echo unknown)
-ok "$(L 'Mã nguồn tại' 'Source code in') $SRC (Lares $LARES_VERSION)"
+LARES_VERSION=$(/usr/bin/node -p 'require(process.argv[1]).version' "$NEW_SRC/package.json" 2>/dev/null || echo unknown)
+ok "$(L 'Mã nguồn' 'Source code'): Lares $LARES_VERSION"
 
 step "$(L 'Build Lares (có thể mất 1-2 phút)' 'Building Lares (may take 1-2 minutes)')"
-cd "$SRC"
+ensure_build_memory
+cd "$NEW_SRC"
 export PATH="/usr/bin:$PATH"   # build with the same node the service will run
+# Low CPU and disk priority, and a bounded Node heap (the build peaks around 500 MB): the sites and
+# their databases keep the machine while it builds, which only makes the build a little slower.
+BUILD=(env NODE_OPTIONS=--max-old-space-size=1024 nice -n 10)
+command -v ionice >/dev/null && BUILD=(ionice -c 2 -n 7 "${BUILD[@]}")
 # --include=dev: the build needs typescript/vite even if NODE_ENV=production leaked into this shell
-if [[ -f package-lock.json ]]; then npm ci --include=dev --no-audit --no-fund; else npm install --include=dev --no-audit --no-fund; fi
-npm run build
+if [[ -f package-lock.json ]]; then "${BUILD[@]}" npm ci --include=dev --no-audit --no-fund; else "${BUILD[@]}" npm install --include=dev --no-audit --no-fund; fi
+"${BUILD[@]}" npm run build
+cd /
+release_build_swap
 ok "$(L 'Build xong' 'Build finished')"
 
 # ---- Panel TLS (self-signed; replace with a real cert any time) ---------------
@@ -664,15 +718,34 @@ if [[ $UPGRADE == 1 && -f "$DATA_DIR/lares.db" ]]; then
   ls -1t "$BACKUP_DIR"/lares-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f   # keep the 5 newest
   ok "$(L 'Đã sao lưu' 'Backed up to'): $BACKUP_FILE"
 fi
+# Swap the new build in. The previous one stays next to it until the new panel answers.
+rm -rf "$SRC.old"
+[[ -d "$SRC" ]] && mv "$SRC" "$SRC.old"
+mv "$NEW_SRC" "$SRC"
 systemctl restart lares
 # The server creates the admin account before it starts listening, so a 401 from the API means it is ready.
-ready=0
-for _ in $(seq 1 30); do
-  code=$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:$LARES_PORT/api/auth/me" || true)
-  [[ "$code" == 401 ]] && { ready=1; break; }
-  sleep 1
-done
-[[ $ready == 1 ]] || { journalctl -u lares -n 40 --no-pager; die "$(L "Lares không khởi động được (không phản hồi trên port $LARES_PORT sau 30s)" "Lares failed to start (no response on port $LARES_PORT after 30s)")"; }
+panel_ready() {
+  local code
+  for _ in $(seq 1 30); do
+    code=$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:$LARES_PORT/api/auth/me" || true)
+    [[ "$code" == 401 ]] && return 0
+    sleep 1
+  done
+  return 1
+}
+if ! panel_ready; then
+  journalctl -u lares -n 40 --no-pager
+  if [[ -d "$SRC.old" ]]; then
+    # Back to the version that was running: the new build is kept aside for a look
+    rm -rf "$SRC.failed"
+    mv "$SRC" "$SRC.failed"
+    mv "$SRC.old" "$SRC"
+    systemctl restart lares
+    die "$(L "Lares $LARES_VERSION không khởi động được (không phản hồi trên port $LARES_PORT sau 30s): đã chạy lại bản cũ. Bản build lỗi giữ ở $SRC.failed" "Lares $LARES_VERSION failed to start (no response on port $LARES_PORT after 30s): the previous version is running again. The failed build is kept in $SRC.failed")"
+  fi
+  die "$(L "Lares không khởi động được (không phản hồi trên port $LARES_PORT sau 30s)" "Lares failed to start (no response on port $LARES_PORT after 30s)")"
+fi
+rm -rf "$SRC.old" "$SRC.failed"
 ok "$(L 'lares.service đang chạy' 'lares.service is running')"
 
 # Admin CLI: sudo lares users | sudo lares reset-password [user]

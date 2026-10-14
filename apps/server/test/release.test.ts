@@ -9,7 +9,7 @@ import { setSetting } from '../src/db/index.js';
 import { releaseRoutes } from '../src/routes/release.js';
 import { fetchLatestVersion, releaseTick, setUpdateCheck, telemetryPayload, VERSION, versionInfo } from '../src/services/release.js';
 import { startUpgrade } from '../src/services/upgrade.js';
-import { exitCodeOf, upgradeCommand, upgradeStatus } from '../src/services/upgradePolicy.js';
+import { exitCodeOf, killedForMemory, upgradeCommand, upgradeStatus } from '../src/services/upgradePolicy.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const rootVersion = (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { version: string }).version;
@@ -167,6 +167,17 @@ describe('one-click upgrade', () => {
     expect(upgradeStatus({ ...meta, startedAt: new Date().toISOString() }, '', false).state).toBe('running');
     expect(upgradeStatus(meta, '\x1b[0;32m✔\x1b[0m done\n', true).log).toEqual(['✔ done']);
     expect(exitCodeOf('x\n__LARES_UPGRADE_EXIT__ 97\n')).toBe(97);
+  });
+
+  it('tells a run killed for lack of memory from other failures', () => {
+    // systemd-oomd kills the whole unit (no exit line); the kernel's OOM killer only one process
+    expect(killedForMemory('Killed /system.slice/lares-upgrade.service due to swap used (95.12%) being more than 90.00%')).toBe(true);
+    expect(killedForMemory('lares-upgrade.service: A process of this unit has been killed by the OOM killer.')).toBe(true);
+    expect(killedForMemory("lares-upgrade.service: Failed with result 'oom-kill'.")).toBe(true);
+    // another unit killed, or the unit failing for another reason
+    expect(killedForMemory('Killed /system.slice/lares-php-3.service due to memory pressure')).toBe(false);
+    expect(killedForMemory("lares-upgrade.service: Failed with result 'exit-code'.")).toBe(false);
+    expect(killedForMemory('')).toBe(false);
   });
 
   it('only upgrades to the newer release the last check found', async () => {
