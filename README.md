@@ -142,7 +142,7 @@ Không bao giờ gửi IP, tên miền, hostname, số lượng site hay bất k
 
 **Chuyển site** → nhập VPS nguồn (IP, SSH user, mật khẩu hoặc private key, sudo), chọn panel nguồn → **Quét site** → chọn site và tuỳ chỉnh → **Bắt đầu**.
 
-Panel được hỗ trợ và tự nhận diện: **aaPanel, CyberPanel, HestiaCP/VestaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly**, VPS thuần Nginx/Apache, hoặc nhập thủ công.
+Panel được hỗ trợ và tự nhận diện: **aaPanel, CyberPanel, HestiaCP/VestaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, Lares** (chuyển sang VPS mới), VPS thuần Nginx/Apache, hoặc nhập thủ công.
 
 Với mỗi site:
 
@@ -165,6 +165,7 @@ Lares nhận ra trường hợp này qua `machine-id` hoặc IP cục bộ, kể
 - Database mặc định được **dump sang database mới** để site cũ vẫn chạy song song. Nếu cùng một MySQL server, có thể chọn **dùng lại** database cũ (Lares kiểm tra `@@hostname/@@port/@@datadir`). Database dùng lại không bao giờ bị Lares xoá, và cũng không được search-replace để tránh làm hỏng site nguồn.
 - Cảnh báo khi port 80 đang do web server của panel cũ giữ (ví dụ OpenLiteSpeed của CyberPanel, nginx của aaPanel), hoặc khi có nguy cơ trùng `server_name`.
 - Webinoly để `wp-config.php` bên ngoài `htdocs`: file này được tự mang vào thư mục site.
+- Lares trên VPS khác: danh sách site đọc thẳng từ database của Lares nguồn (thư mục, loại app, phiên bản PHP), kể cả site đã đổi tên miền nhưng vẫn ở thư mục `siteNNNN.localhost`. Site còn chạy theo port (chưa có tên miền) bị bỏ qua: gán tên miền trên Lares nguồn trước, hoặc nhập thủ công.
 
 ## Phát triển
 

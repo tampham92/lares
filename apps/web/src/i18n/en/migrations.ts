@@ -11,8 +11,8 @@ export const MIGRATIONS_EN: Dict = {
   'Đã huỷ': 'Cancelled',
 
   // Migrations.tsx
-  'Di chuyển website từ VPS / panel khác (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, VPS thuần) về Lares':
-    'Move sites from another server / panel (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, plain VPS) to Lares',
+  'Di chuyển website từ VPS / panel khác (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, Lares trên VPS khác, VPS thuần) về Lares':
+    'Move sites from another server / panel (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, Lares on another VPS, plain VPS) to Lares',
   '+ Chuyển site mới': '+ New migration',
   'Tên': 'Name',
   'Nguồn': 'Source',

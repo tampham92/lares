@@ -22,7 +22,7 @@ export function Migrations() {
         <div>
           <h1>{t('Chuyển site')}</h1>
           <div className="sub">
-            {t('Di chuyển website từ VPS / panel khác (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, VPS thuần) về Lares')}
+            {t('Di chuyển website từ VPS / panel khác (aaPanel, CyberPanel, HestiaCP, cPanel, DirectAdmin, CloudPanel, Plesk, Webinoly, Lares trên VPS khác, VPS thuần) về Lares')}
           </div>
         </div>
         <Link to="/migrations/new" className="btn primary">

@@ -81,18 +81,25 @@ function directive(text: string, name: string): string[] {
   return [...text.matchAll(re)].map((m) => m[1]!.trim());
 }
 
+/** Bodies of the `server { ... }` blocks of a (comment-free) nginx file. */
+function serverBlocks(s: string): string[] {
+  const bodies: string[] = [];
+  const re = /(?:^|[\s;{}])server\s*\{/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    const open = s.indexOf('{', m.index);
+    const end = blockEnd(s, open);
+    bodies.push(s.slice(open + 1, end));
+    re.lastIndex = end;
+  }
+  return bodies;
+}
+
 export function parseNginx(dump: string): ParsedVhost[] {
   const result: ParsedVhost[] = [];
   for (const { file, content } of splitDump(dump)) {
     if (content.includes('# Managed by Lares')) continue; // never offer Lares's own vhosts
-    const s = stripComments(content);
-    const re = /(?:^|[\s;{}])server\s*\{/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(s))) {
-      const open = s.indexOf('{', m.index);
-      const end = blockEnd(s, open);
-      const body = s.slice(open + 1, end);
-      re.lastIndex = end;
+    for (const body of serverBlocks(stripComments(content))) {
       const top = topLevel(body);
       const names = directive(top, 'server_name').flatMap((v) => v.split(/\s+/));
       let root = directive(top, 'root')[0] ?? null;
@@ -204,6 +211,92 @@ export function vhostsToSites(vhosts: ParsedVhost[], by: string): RawSite[] {
     map.set(p.domain, { ...p, rootPath: v.root, phpVersion: v.phpVersion, proxyPass: v.proxyPass, owner: null, discoveredBy: `${by}: ${v.file}` });
   }
   return [...map.values()];
+}
+
+// ---- Another Lares panel -------------------------------------------------------------
+
+/** A row of the `sites` table of a Lares database, as read on the source. */
+export interface LaresSiteRow {
+  domain: string;
+  aliases_json?: string | null;
+  root_path: string;
+  web_root?: string | null;
+  php_version?: string | null;
+  app_type?: string | null;
+  app_port?: number | null;
+  listen_port?: number | null;
+  status?: string | null;
+}
+
+/**
+ * Where a Lares site's application lives: `public_html` (`app` for Next.js) in its folder. That folder
+ * holds the code and wp-config.php / .env; the web root may be a subfolder (Laravel's public/).
+ */
+const laresAppDir = (rootPath: string, appType: string | null | undefined) => `${rootPath.replace(/\/+$/, '')}/${appType === 'nextjs' ? 'app' : 'public_html'}`;
+
+/**
+ * Sites of another Lares panel, from its database. A site still on a port (siteNNNN.localhost) has no
+ * domain to move to: it is reported in `skipped` (give it a domain on the source, or enter it by hand).
+ */
+export function laresSitesFromRows(rows: LaresSiteRow[]): { sites: RawSite[]; skipped: string[] } {
+  const sites: RawSite[] = [];
+  const skipped: string[] = [];
+  for (const r of rows) {
+    let aliases: string[] = [];
+    try {
+      aliases = JSON.parse(r.aliases_json ?? '[]') as string[];
+    } catch {
+      // keep the site without its aliases
+    }
+    const p = r.listen_port ? null : pickPrimary([r.domain, ...(Array.isArray(aliases) ? aliases : [])]);
+    if (!p || !r.root_path?.startsWith('/')) {
+      skipped.push(r.listen_port ? `${r.domain} (port ${r.listen_port})` : r.domain);
+      continue;
+    }
+    sites.push({
+      ...p,
+      rootPath: laresAppDir(r.root_path, r.app_type),
+      phpVersion: r.php_version ?? null,
+      proxyPass: r.app_type === 'nextjs' && r.app_port ? `http://127.0.0.1:${r.app_port}` : null,
+      owner: null,
+      discoveredBy: `Lares${r.status && r.status !== 'active' ? ` (${r.status})` : ''}: ${r.root_path}`,
+    });
+  }
+  return { sites, skipped };
+}
+
+/**
+ * Sites of another Lares panel from its vhost files, when its database cannot be read. Each file starts
+ * with `# site: <domain> (<app type>)`. A stopped site (disabled, quarantined) has no `root` in its
+ * vhost: its folder is guessed from the default layout, /var/www/<domain>.
+ */
+export function parseLaresVhosts(dump: string): { sites: RawSite[]; skipped: string[] } {
+  const rows: LaresSiteRow[] = [];
+  for (const { content } of splitDump(dump)) {
+    const head = /^# site: (\S+) \(([a-z]+)\)$/m.exec(content);
+    if (!content.includes('# Managed by Lares') || !head) continue;
+    const s = stripComments(content);
+    // server-level directives only: the ACME location has a `root` of its own
+    const top = serverBlocks(s).map(topLevel).join('\n');
+    const names = directive(top, 'server_name').flatMap((v) => v.split(/\s+/));
+    const listen = /listen\s+(\d+)\s*;/.exec(top);
+    const root = directive(top, 'root')[0];
+    const appType = head[2]!;
+    const proxy = directive(s, 'proxy_pass')[0];
+    const webRoot = root ? unquote(root) : null;
+    const rootPath = webRoot ? webRoot.replace(/\/(public_html|app)(\/.*)?$/, '') : `/var/www/${head[1]}`;
+    rows.push({
+      domain: head[1]!,
+      aliases_json: JSON.stringify(names.filter((n) => n !== head[1] && n !== '_')),
+      root_path: rootPath,
+      app_type: appType,
+      php_version: detectPhpVersion(content),
+      app_port: proxy ? Number(/:(\d+)/.exec(proxy)?.[1]) || null : null,
+      listen_port: names.includes('_') && listen ? Number(listen[1]) : null,
+      status: /return\s+503\b/.test(s) ? 'stopped' : 'active',
+    });
+  }
+  return laresSitesFromRows(rows);
 }
 
 /** Parse Hestia/Vesta web.conf: one line per domain of KEY='value' pairs. */
