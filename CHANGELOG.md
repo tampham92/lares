@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.7-beta] - 2026-10-14
+
 ### Fixed
 - An upgrade on a small VPS (2 GB RAM, busy sites) could be killed for lack of memory in the middle of
   the build. The panel then stopped answering for minutes, and the upgrade showed only "interrupted".
