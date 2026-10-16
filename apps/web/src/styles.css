@@ -329,6 +329,11 @@ tr:last-child td { border-bottom: 0; }
 .kv > div { overflow-wrap: anywhere; min-width: 0; }
 .kv > div:nth-child(odd) { color: var(--muted); }
 details summary { cursor: pointer; color: var(--primary); }
+/* known vulnerabilities under a plugin/theme name (WpUpdatesTab) */
+.vuln-list { margin-top: 6px; }
+.vuln-list summary { color: inherit; }
+.vuln-list ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.vuln-list li { overflow-wrap: anywhere; }
 /* malware scan findings (SecurityTab) */
 .finding { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border); }
 .finding:first-child { border-top: 0; }

@@ -14,8 +14,8 @@ export async function wpUpdateRoutes(app: FastifyInstance) {
   await app.register(async (priv) => {
     priv.addHook('preHandler', requireAuth);
 
-    /** Pending update counts of every WordPress site (badges). */
-    priv.get('/api/wp-updates/summary', () => wpUpdates.updatesSummary());
+    /** Pending update and known-vulnerability counts of every WordPress site (badges). */
+    priv.get('/api/wp-updates/summary', () => wpUpdates.updatesSummary(true));
 
     /** Cached inventory, running job and history of one site. */
     priv.get('/api/sites/:id/wp-updates', async (req) => wpUpdates.siteUpdates(idParam(req.params)));

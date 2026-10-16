@@ -150,6 +150,30 @@ vào các thư mục cho phép (mặc định với WordPress: `wp-content/uploa
 plugin/theme trong wp-admin sẽ không chạy nữa: cập nhật qua tab Cập nhật của panel, panel tự mở khoá
 trong lúc cập nhật rồi khoá lại.
 
+## Lỗ hổng đã công bố của WordPress, plugin và theme
+
+Tab **Cập nhật** của site WordPress cho biết phiên bản đang cài của core, plugin và theme có lỗ hổng
+nào đã được công bố hay không. Mỗi lỗ hổng có mức độ (Nghiêm trọng, Cao, Trung bình, Thấp), bản đã vá,
+mã CVE và link tới bài phân tích. Nút **Chọn các mục có lỗ hổng và có bản mới** chọn sẵn những mục cập
+nhật được, rồi bạn cập nhật như bình thường (có sao lưu và tự khôi phục). Mục chưa có bản vá thì nên
+tắt hoặc thay bằng plugin, theme khác. Danh sách site hiện số mục có lỗ hổng cạnh số bản cập nhật.
+
+- **Nguồn dữ liệu:** [WPVulnerability](https://www.wpvulnerability.com), miễn phí, không cần API key.
+  Nguồn này gom dữ liệu từ Wordfence, WPScan, Patchstack và các bản ghi CVE, nên có cả theme, plugin trả
+  phí phổ biến. Plugin tự viết hoặc không có trong cơ sở dữ liệu thì không có thông tin.
+- **Gửi đi những gì:** tên (slug) của plugin, theme và phiên bản WordPress. Không gửi tên miền, IP của
+  site hay nội dung nào khác. Kết quả dùng chung cho mọi site trên máy và được lưu 24 giờ, nên mỗi tên
+  chỉ được hỏi khoảng một lần mỗi ngày. Lần tra lỗi được thử lại sau vài giờ.
+- **Khi nào tra:** mỗi lần panel đọc lại danh sách cập nhật (tự động mỗi ngày, hoặc khi bấm **Kiểm tra
+  lại**) và ngay sau khi cập nhật xong.
+- **Cảnh báo:** lỗ hổng mức Nghiêm trọng, Cao hoặc chưa có bản vá được báo ở chuông. Nếu bật **Gửi cảnh
+  báo qua Telegram / webhook**, panel còn gửi một tin cho mỗi lỗ hổng mới (webhook nhận sự kiện
+  `security.vulnerabilities`). Lỗ hổng mức Trung bình và Thấp chỉ hiện trong tab Cập nhật.
+- **Tắt:** tab Bảo mật → Lịch quét tự động → bỏ chọn **Tra lỗ hổng đã công bố**.
+
+Dữ liệu này chỉ gồm lỗ hổng đã công bố. Không thấy lỗ hổng nào không có nghĩa là site an toàn, nên vẫn
+cần cập nhật đều và bật quét mã độc.
+
 ## Xác thực 2 lớp (2FA)
 
 Vào **Cài đặt → Xác thực hai lớp (2FA)**, quét mã QR bằng một ứng dụng TOTP bất kỳ (Google Authenticator, Aegis,
@@ -262,3 +286,9 @@ thử theo IP không còn tác dụng, vì loopback luôn được phép.
 Mỗi ngày Lares kiểm tra GitHub một lần, và hiện **Có bản mới x.y.z** ở thanh bên khi có phiên bản mới.
 Để nâng cấp, chạy lại `curl -sSL https://lares.thocode.dev/install | sudo bash`. Xem
 [Cài đặt](installation.md#nâng-cấp).
+
+**Bản vá bảo mật của hệ điều hành** (nginx, PHP, MariaDB, OpenSSL…): khi cài mới, installer bật
+`unattended-upgrades` của Ubuntu/Debian với cấu hình mặc định của gói: chỉ cài bản vá bảo mật từ kho
+của hệ điều hành, không đụng tới kho bên thứ ba và không tự khởi động lại máy. Máy đã có cấu hình sẵn
+(kể cả đang tắt) được giữ nguyên, và khi nâng cấp installer chỉ báo trạng thái. Không muốn bật: cài với
+`--no-auto-updates`. Tắt sau này: `sudo dpkg-reconfigure -plow unattended-upgrades`.

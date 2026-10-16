@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   WP_MARKER_LABELS,
+  compareWpVersions,
   msg,
+  wpVulnCount,
   type Site,
   type WpExtension,
   type WpHealthProblem,
@@ -12,6 +14,9 @@ import {
   type WpUpdateRun,
   type WpUpdatesResponse,
   type WpUpdatesSummaryItem,
+  type WpSiteVulns,
+  type WpVuln,
+  type WpVulnSeverity,
 } from '@lares/shared';
 import { errMsg, fmtDate, get, post, siteLabel, type TaskInfo } from '../api';
 import { t } from '../i18n';
@@ -29,14 +34,128 @@ export function useWpUpdatesTabLabel(siteId: number, enabled: boolean): string {
   return pending ? `${t('Cập nhật')} (${pending})` : t('Cập nhật');
 }
 
-/** Pending-updates badge for the site list. */
+/** Pending-updates and known-vulnerability badges for the site list. */
 export function WpUpdatesBadge({ siteId }: { siteId: number }) {
-  const pending = useSummary().data?.find((s) => s.siteId === siteId)?.pending ?? 0;
-  if (!pending) return null;
+  const s = useSummary().data?.find((x) => x.siteId === siteId);
+  if (!s?.pending && !s?.vulnerable) return null;
   return (
-    <span title={t('Có bản cập nhật WordPress, plugin hoặc theme')}>
-      <Badge tone="warn">{t('{count} cập nhật', { count: pending })}</Badge>
-    </span>
+    <>
+      {!!s.vulnerable && (
+        <span title={t('WordPress, plugin hoặc theme đang cài có lỗ hổng đã công bố')}>
+          <Badge tone={SEVERITY[s.worstVuln ?? 'unknown'].tone}>{t('{count} mục có lỗ hổng', { count: s.vulnerable })}</Badge>
+        </span>
+      )}{' '}
+      {!!s.pending && (
+        <span title={t('Có bản cập nhật WordPress, plugin hoặc theme')}>
+          <Badge tone="warn">{t('{count} cập nhật', { count: s.pending })}</Badge>
+        </span>
+      )}
+    </>
+  );
+}
+
+const SEVERITY: Record<WpVulnSeverity, { tone: 'err' | 'warn' | 'default'; label: string }> = {
+  critical: { tone: 'err', label: msg('Nghiêm trọng') },
+  high: { tone: 'err', label: msg('Cao') },
+  medium: { tone: 'warn', label: msg('Trung bình') },
+  low: { tone: 'default', label: msg('Thấp') },
+  unknown: { tone: 'default', label: msg('Chưa rõ') },
+};
+
+/** What the available version does about the listed vulnerabilities, as far as the fix versions tell. */
+function updateEffect(vulns: WpVuln[], update: string | null): 'fixes' | 'partial' | 'unknown' | 'none' {
+  if (!update || update === '?') return 'none';
+  if (vulns.some((v) => v.fixedIn && compareWpVersions(update, v.fixedIn) < 0)) return 'partial';
+  return vulns.every((v) => v.fixedIn) ? 'fixes' : 'unknown';
+}
+
+const fixText = (v: WpVuln) => (v.fixedIn ? t('Đã vá ở bản {version}', { version: v.fixedIn }) : v.unfixed ? t('Chưa có bản vá') : t('Chưa rõ bản nào đã vá'));
+
+/** Updatable items with a known vulnerability, as a selection. */
+function vulnerableSelection(inv: WpInventory, v: WpSiteVulns): Selection {
+  const pick = (list: WpExtension[], hits: Record<string, WpVuln[]>) => list.filter((x) => x.update && hits[x.slug]?.length).map((x) => x.slug);
+  return { core: !!inv.core.update && v.core.length > 0, plugins: pick(inv.plugins, v.plugins), themes: pick(inv.themes, v.themes) };
+}
+
+/** Under an item's name: its known vulnerabilities, folded. */
+function VulnList({ vulns, update }: { vulns: WpVuln[] | undefined; update: string | null }) {
+  if (!vulns?.length) return null;
+  const worst = vulns[0]!; // sorted by the server, worst first
+  const effect = updateEffect(vulns, update);
+  return (
+    <details className="vuln-list">
+      <summary>
+        <Badge tone={SEVERITY[worst.severity].tone}>
+          {t('{count} lỗ hổng', { count: vulns.length })} · {t(SEVERITY[worst.severity].label)}
+        </Badge>{' '}
+        <span className="sub">
+          {effect === 'fixes'
+            ? t('bản mới đã vá')
+            : vulns.some((v) => v.unfixed)
+              ? t('có lỗ hổng chưa có bản vá')
+              : effect === 'none'
+                ? t('chưa có bản cập nhật')
+                : effect === 'partial'
+                  ? t('bản {version} chưa vá hết', { version: update! })
+                  : null}
+        </span>
+      </summary>
+      <ul>
+        {vulns.map((v) => (
+          <li key={v.id}>
+            <Badge tone={SEVERITY[v.severity].tone}>{t(SEVERITY[v.severity].label)}</Badge>{' '}
+            {v.link ? (
+              <a href={v.link} target="_blank" rel="noopener noreferrer">
+                {v.title}
+              </a>
+            ) : (
+              v.title
+            )}
+            <div className="sub">
+              {fixText(v)}
+              {v.cves.length > 0 && ` · ${v.cves.join(', ')}`}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** Top of the tab: how many items are vulnerable, and a shortcut to select the updatable ones. */
+function VulnSummary({ inv, vulns, busy, onSelect }: { inv: WpInventory; vulns: WpSiteVulns | null; busy: boolean; onSelect: (s: Selection) => void }) {
+  if (!vulns) return <div className="sub">{t('Tra lỗ hổng đã công bố đang tắt (bật ở tab Bảo mật → Lịch quét tự động).')}</div>;
+  const { items, worst } = wpVulnCount(vulns);
+  const source = (
+    <>
+      {t('Dữ liệu lỗ hổng:')}{' '}
+      <a href="https://www.wpvulnerability.com" target="_blank" rel="noopener noreferrer">
+        WPVulnerability
+      </a>
+      {vulns.checkedAt && ` · ${t('tra lần cuối {date}', { date: fmtDate(vulns.checkedAt) })}`}
+      {vulns.unknown > 0 && ` · ${t('{count} mục chưa tra được', { count: vulns.unknown })}`}
+    </>
+  );
+  if (!items) return <div className="sub">{source}</div>;
+  const selection = vulnerableSelection(inv, vulns);
+  const updatable = (selection.core ? 1 : 0) + selection.plugins.length + selection.themes.length;
+  return (
+    <Alert tone={worst === 'critical' || worst === 'high' ? 'err' : 'warn'}>
+      <div className="stack" style={{ gap: 8 }}>
+        <div>
+          <strong>{t('{count} mục đang cài có lỗ hổng đã công bố.', { count: items })}</strong>{' '}
+          {t('Cập nhật các mục đó trước. Mục chưa có bản vá thì nên tắt hoặc thay bằng plugin, theme khác.')}
+        </div>
+        <div className="sub">{source}</div>
+        {updatable > 0 && (
+          <div>
+            <button className="btn sm" disabled={busy} onClick={() => onSelect(selection)}>
+              {t('Chọn {count} mục có lỗ hổng và có bản mới', { count: updatable })}
+            </button>
+          </div>
+        )}
+      </div>
+    </Alert>
   );
 }
 
@@ -145,6 +264,7 @@ export function WpUpdatesTab({ site }: { site: Site }) {
         <div className="sub">
           {t('Mỗi lần cập nhật, Lares ghi nhận tình trạng site, sao lưu file + database, cập nhật rồi kiểm tra lại. Nếu site lỗi sau khi cập nhật, bản sao lưu được khôi phục tự động.')}
         </div>
+        {inv && data && <VulnSummary inv={inv} vulns={data.vulns} busy={busy || checking} onSelect={setSel} />}
         <ErrorBox error={error ?? q.error} />
         {data?.checkError && <Alert tone="warn">{t('Lần kiểm tra gần nhất bị lỗi: {error}', { error: data.checkError })}</Alert>}
         {!inv && (checking || !data) && <div className="sub">{t('Đang đọc phiên bản bằng wp-cli…')}</div>}
@@ -179,8 +299,9 @@ export function WpUpdatesTab({ site }: { site: Site }) {
                   <td>
                     <input type="checkbox" aria-label={t('Chọn')} disabled={!inv.core.update || busy} checked={sel.core && !!inv.core.update} onChange={(e) => setSel({ ...sel, core: e.target.checked })} />
                   </td>
-                  <td>
+                  <td style={{ minWidth: 180 }}>
                     <strong>WordPress core</strong>
+                    <VulnList vulns={data?.vulns?.core} update={inv.core.update} />
                   </td>
                   <td className="mono">{inv.core.version}</td>
                   <td>{inv.core.update ? <Badge tone="warn">{inv.core.update}</Badge> : <span className="sub">{t('Mới nhất')}</span>}</td>
@@ -188,8 +309,8 @@ export function WpUpdatesTab({ site }: { site: Site }) {
               </tbody>
             </table>
           </div>
-          <ExtensionTable title={t('Plugin ({count})', { count: inv.plugins.length })} kind="plugins" list={inv.plugins} selected={sel.plugins} busy={busy} onToggle={toggle} onSetAll={(slugs) => setSel({ ...sel, plugins: slugs })} />
-          <ExtensionTable title={t('Theme ({count})', { count: inv.themes.length })} kind="themes" list={inv.themes} selected={sel.themes} busy={busy} onToggle={toggle} onSetAll={(slugs) => setSel({ ...sel, themes: slugs })} />
+          <ExtensionTable title={t('Plugin ({count})', { count: inv.plugins.length })} kind="plugins" list={inv.plugins} vulns={data?.vulns?.plugins} selected={sel.plugins} busy={busy} onToggle={toggle} onSetAll={(slugs) => setSel({ ...sel, plugins: slugs })} />
+          <ExtensionTable title={t('Theme ({count})', { count: inv.themes.length })} kind="themes" list={inv.themes} vulns={data?.vulns?.themes} selected={sel.themes} busy={busy} onToggle={toggle} onSetAll={(slugs) => setSel({ ...sel, themes: slugs })} />
         </>
       )}
 
@@ -232,6 +353,7 @@ function ExtensionTable(props: {
   title: string;
   kind: 'plugins' | 'themes';
   list: WpExtension[];
+  vulns: Record<string, WpVuln[]> | undefined;
   selected: string[];
   busy: boolean;
   onToggle: (kind: 'plugins' | 'themes', slug: string, on: boolean) => void;
@@ -265,6 +387,7 @@ function ExtensionTable(props: {
               <td style={{ minWidth: 180 }}>
                 <strong>{x.title}</strong>
                 {x.title !== x.slug && <div className="sub mono">{x.slug}</div>}
+                <VulnList vulns={props.vulns?.[x.slug]} update={x.update} />
               </td>
               <td>{statusBadge(kind, x.status)}</td>
               <td className="mono">{x.version || '—'}</td>

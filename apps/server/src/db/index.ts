@@ -187,6 +187,24 @@ CREATE TABLE IF NOT EXISTS wp_update_runs (
 CREATE INDEX IF NOT EXISTS idx_wp_update_runs_site ON wp_update_runs(site_id, id);
 `);
 
+// ---- Known vulnerabilities (services/wpVulns.ts) -----------------------------
+// wp_vuln_cache: one WPVulnerability lookup (kind core/plugin/theme, slug or core version), shared by
+// every site; data_json NULL = the lookup failed (retried sooner). wp_vuln_alerts: keys of the
+// findings already sent for a site, so a finding is reported once.
+db.exec(`
+CREATE TABLE IF NOT EXISTS wp_vuln_cache (
+  kind TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  data_json TEXT,
+  fetched_at TEXT NOT NULL,
+  PRIMARY KEY (kind, slug)
+);
+CREATE TABLE IF NOT EXISTS wp_vuln_alerts (
+  site_id INTEGER PRIMARY KEY REFERENCES sites(id) ON DELETE CASCADE,
+  keys_json TEXT NOT NULL
+);
+`);
+
 // ---- Lead capture: contact form submissions + notifications (services/leads.ts, leadNotify.ts) ----
 // Leads hold personal data: they live only here and are purged after the retention period.
 // site_id is nulled when a site is deleted; site_domain keeps the lead readable until it expires.

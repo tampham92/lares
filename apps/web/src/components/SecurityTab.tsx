@@ -162,6 +162,10 @@ function ScheduleForm({ settings, onSaved }: { settings: SecuritySettings; onSav
           {t('Tự động cách ly khẩn site khi lần quét hằng ngày có phát hiện nghiêm trọng mới')}
         </Check>
         <div className="hint">{t('Chỉ áp dụng cho site có user riêng. Một lần báo nhầm cũng làm site ngừng phục vụ cho đến khi bạn gỡ cách ly.')}</div>
+        <Check checked={form.vulnCheck} onChange={(v) => setForm({ ...form, vulnCheck: v })}>
+          {t('Tra lỗ hổng đã công bố của WordPress, plugin và theme (tab Cập nhật)')}
+        </Check>
+        <div className="hint">{t('Panel gửi tên plugin, theme và phiên bản WordPress tới wpvulnerability.net, không gửi tên miền hay dữ liệu site. Kết quả được lưu 24 giờ.')}</div>
         {error && <Alert tone="err">{error}</Alert>}
         <div className="row end">
           <button className="btn" disabled={busy} onClick={() => void save()}>

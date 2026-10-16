@@ -1,4 +1,4 @@
-import { WP_SLUG_RE, type WpExtension, type WpHealthProblem, type WpInventory, type WpPage, type WpUpdateItem, type WpUpdateRequest, type WpUpdateRun } from '@lares/shared';
+import { WP_SLUG_RE, compareWpVersions, type WpExtension, type WpHealthProblem, type WpInventory, type WpPage, type WpUpdateItem, type WpUpdateRequest, type WpUpdateRun } from '@lares/shared';
 
 /*
  * Pure rules of the WordPress update feature (no I/O): parsing wp-cli output, choosing what to
@@ -35,23 +35,8 @@ export function parseCoreVersion(stdout: string): string | null {
   return null;
 }
 
-/** Numeric comparison of dotted versions ("6.10" > "6.9"); a pre-release suffix sorts first. */
-export function compareVersions(a: string, b: string): number {
-  const split = (v: string) => {
-    const [main = '', pre = ''] = v.split(/[-+]/, 2);
-    return { nums: main.split('.').map((n) => Number.parseInt(n, 10) || 0), pre };
-  };
-  const x = split(a);
-  const y = split(b);
-  for (let i = 0; i < Math.max(x.nums.length, y.nums.length); i++) {
-    const d = (x.nums[i] ?? 0) - (y.nums[i] ?? 0);
-    if (d) return d < 0 ? -1 : 1;
-  }
-  if (x.pre === y.pre) return 0;
-  if (!x.pre) return 1;
-  if (!y.pre) return -1;
-  return x.pre < y.pre ? -1 : 1;
-}
+/** Numeric comparison of dotted versions (shared with the web UI). */
+export const compareVersions = compareWpVersions;
 
 /**
  * `wp core check-update --format=json` → newest offered version, or null. wp-cli prints

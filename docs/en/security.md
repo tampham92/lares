@@ -154,6 +154,31 @@ to the allowed folders (WordPress default: `wp-content/uploads`, `wp-content/cac
 plugins/themes from wp-admin stops working: update from the panel's Updates tab, which unlocks for the
 update and locks again.
 
+## Known vulnerabilities in WordPress, plugins and themes
+
+The **Updates** tab of a WordPress site shows whether the installed versions of core, plugins and
+themes have published vulnerabilities. Each one comes with its severity (Critical, High, Medium, Low),
+the fixed version, CVE ids and a link to the advisory. **Select the vulnerable items that have an
+update** picks the items that can be updated, then the usual safe update runs (backup and automatic
+rollback). Deactivate or replace an item that has no fix yet. The site list shows the number of
+vulnerable items next to the pending updates.
+
+- **Data source:** [WPVulnerability](https://www.wpvulnerability.com), free, no API key. It combines
+  Wordfence, WPScan, Patchstack and CVE records, so popular premium themes and plugins are covered too.
+  A custom plugin, or one the database does not know, has no data.
+- **What is sent:** plugin and theme slugs and the WordPress version. Never the domain, the site's IP
+  or anything else. Results are shared by every site on the server and kept for 24 hours, so each slug
+  is asked about roughly once a day. A failed lookup is retried after a few hours.
+- **When:** every time the panel reads the list of updates (daily, or with **Check again**) and right
+  after an update.
+- **Alerts:** critical, high and unfixed vulnerabilities show in the bell. With **Send alerts to
+  Telegram / webhook** on, each new one is also sent there (webhook event `security.vulnerabilities`).
+  Medium and low ones are only shown in the Updates tab.
+- **Turn off:** Security tab → Automatic scan schedule → untick **Look up published vulnerabilities**.
+
+Only published vulnerabilities are listed. Seeing none does not mean the site is safe: keep updating
+and keep the malware scan on.
+
 ## Two-factor authentication (2FA)
 
 **Settings → Two-factor authentication (2FA)**: scan the QR code with any TOTP authenticator app (Google Authenticator,
@@ -264,3 +289,9 @@ then no longer work, because loopback is always allowed.
 
 Lares checks GitHub daily and shows **New version x.y.z** in the sidebar. To upgrade, run
 `curl -sSL https://lares.thocode.dev/install | sudo bash` again. See [Installation](installation.md#upgrade).
+
+**Operating system security fixes** (nginx, PHP, MariaDB, OpenSSL…): a fresh install turns on Ubuntu's
+or Debian's `unattended-upgrades` with the package's default policy: security fixes from the OS
+repositories only, no third-party repositories, no automatic reboot. A server that already has a setting
+(even "off") keeps it, and an upgrade only reports the state. To skip it, install with
+`--no-auto-updates`. To turn it off later: `sudo dpkg-reconfigure -plow unattended-upgrades`.
