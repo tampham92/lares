@@ -8,6 +8,12 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Security
+- `fast-jwt` (used by the panel's login tokens) updated to 6.3.5: its verifier cache could accept an
+  expired token without `iat`. Lares does not turn that cache on and its tokens carry `iat`, so it was
+  not exploitable here. Build-only dependencies `source-map-js` and `shell-quote` (via `concurrently`)
+  updated too.
+
 ## [0.4.9-beta] - 2026-10-16
 
 ### Added
