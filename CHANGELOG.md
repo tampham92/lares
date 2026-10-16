@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.9-beta] - 2026-10-16
+
 ### Added
 - Known vulnerabilities in the **Updates** tab of WordPress sites: core, plugins and themes whose
   installed version has a published vulnerability show its severity, the fixed version, CVE ids and a
