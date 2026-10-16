@@ -8,6 +8,21 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Added
+- Known vulnerabilities in the **Updates** tab of WordPress sites: core, plugins and themes whose
+  installed version has a published vulnerability show its severity, the fixed version, CVE ids and a
+  link to the advisory. A button selects the vulnerable items that have an update. The site list shows
+  the number of vulnerable items.
+  - Data from [WPVulnerability](https://www.wpvulnerability.com) (free, no API key; includes Wordfence,
+    WPScan and Patchstack data). Only plugin/theme slugs and the WordPress version are sent, never the
+    domain. Lookups are cached for 24 hours and shared by every site on the server.
+  - Critical, high and unfixed vulnerabilities show in the bell and, when security alerts to Telegram /
+    webhook are on, are sent there once (webhook event `security.vulnerabilities`).
+  - On by default; turned off under Security tab → Automatic scan schedule.
+- A fresh install turns on the OS's automatic security updates (`unattended-upgrades`, its default
+  policy: OS security fixes only, no automatic reboot). An existing setting is never changed, and an
+  upgrade only reports the state. `--no-auto-updates` skips it.
+
 ## [0.4.8-beta] - 2026-10-14
 
 ### Added

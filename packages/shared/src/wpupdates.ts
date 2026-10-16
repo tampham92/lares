@@ -15,6 +15,24 @@ export const WP_SLUG_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,199}$/;
 export const WP_ITEM_TYPES = ['core', 'plugin', 'theme'] as const;
 export type WpItemType = (typeof WP_ITEM_TYPES)[number];
 
+/** Numeric comparison of WordPress/plugin versions ("6.10" > "6.9", any number of parts); a pre-release suffix sorts first. */
+export function compareWpVersions(a: string, b: string): number {
+  const split = (v: string) => {
+    const [main = '', pre = ''] = v.split(/[-+]/, 2);
+    return { nums: main.split('.').map((n) => Number.parseInt(n, 10) || 0), pre };
+  };
+  const x = split(a);
+  const y = split(b);
+  for (let i = 0; i < Math.max(x.nums.length, y.nums.length); i++) {
+    const d = (x.nums[i] ?? 0) - (y.nums[i] ?? 0);
+    if (d) return d < 0 ? -1 : 1;
+  }
+  if (x.pre === y.pre) return 0;
+  if (!x.pre) return 1;
+  if (!y.pre) return -1;
+  return x.pre < y.pre ? -1 : 1;
+}
+
 export interface WpExtension {
   slug: string;
   title: string;
@@ -101,6 +119,47 @@ export interface WpUpdateRun {
   finishedAt: string | null;
 }
 
+// ---- Known vulnerabilities (WPVulnerability database) ------------------------------------
+
+export const WP_VULN_SEVERITIES = ['critical', 'high', 'medium', 'low', 'unknown'] as const;
+export type WpVulnSeverity = (typeof WP_VULN_SEVERITIES)[number];
+
+/** A published vulnerability that affects the installed version of core, a plugin or a theme. */
+export interface WpVuln {
+  id: string;
+  title: string;
+  severity: WpVulnSeverity;
+  /** CVSS base score, when the database has one. */
+  score: number | null;
+  /** First version without the flaw; null when no fix is known. */
+  fixedIn: string | null;
+  /** The database says no fixed version exists. */
+  unfixed: boolean;
+  cves: string[];
+  /** Advisory page (https), for the details. */
+  link: string | null;
+}
+
+export interface WpSiteVulns {
+  /** Oldest lookup the result is built from (null: nothing looked up yet). */
+  checkedAt: string | null;
+  core: WpVuln[];
+  /** By slug; only items with at least one vulnerability. */
+  plugins: Record<string, WpVuln[]>;
+  themes: Record<string, WpVuln[]>;
+  /** Items whose lookup failed or has not run yet (their vulnerabilities are unknown). */
+  unknown: number;
+}
+
+/** Items (core, plugins, themes) with at least one known vulnerability, and the worst severity among them. */
+export function wpVulnCount(v: WpSiteVulns | null | undefined): { items: number; worst: WpVulnSeverity | null } {
+  if (!v) return { items: 0, worst: null };
+  const lists = [v.core, ...Object.values(v.plugins), ...Object.values(v.themes)].filter((l) => l.length);
+  const all = lists.flat();
+  const worst = WP_VULN_SEVERITIES.find((s) => all.some((x) => x.severity === s)) ?? null;
+  return { items: lists.length, worst };
+}
+
 export interface WpUpdatesResponse {
   inventory: WpInventory | null;
   checkedAt: string | null;
@@ -109,10 +168,15 @@ export interface WpUpdatesResponse {
   /** Update/backup/restore currently holding this site's lock. */
   running: { taskId: string; kind: SiteJobKind } | null;
   history: WpUpdateRun[];
+  /** Known vulnerabilities of the installed versions; null when the check is turned off or nothing was read yet. */
+  vulns: WpSiteVulns | null;
 }
 
 export interface WpUpdatesSummaryItem {
   siteId: number;
   pending: number;
   checkedAt: string | null;
+  /** Items with a known vulnerability (0 when the check is off). */
+  vulnerable: number;
+  worstVuln: WpVulnSeverity | null;
 }

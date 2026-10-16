@@ -99,6 +99,8 @@ export const securitySettingsSchema = z.object({
   externalAlerts: z.boolean().default(true),
   /** Quarantine a site by itself when the daily scan finds something new and critical (off: a false positive takes the site down). */
   autoQuarantine: z.boolean().default(false),
+  /** Look up published vulnerabilities of WordPress core, plugins and themes (sends their slugs and the core version to wpvulnerability.net). */
+  vulnCheck: z.boolean().default(true),
 });
 export type SecuritySettings = z.infer<typeof securitySettingsSchema>;
 

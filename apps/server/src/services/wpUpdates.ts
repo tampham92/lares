@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   WP_MARKER_LABELS,
   wpPendingCount,
+  wpVulnCount,
   type Site,
   type WpHealthProblem,
   type WpInventory,
@@ -26,6 +27,7 @@ import { reloadSitePhp, runAsOf } from './isolation.js';
 import { wpCliAsWebUser } from './wordpress.js';
 import { markLogs, takeHealth } from './wpHealth.js';
 import * as policy from './wpUpdatePolicy.js';
+import * as vulns from './wpVulns.js';
 import { assertNotQuarantined, isQuarantined } from './securityStore.js';
 import { withCodeUnlocked } from './codeLock.js';
 
@@ -164,13 +166,20 @@ function cachedInventory(siteId: number): { inventory: WpInventory | null; check
 }
 
 const checking = new Map<number, Promise<void>>();
+const VULN_WAIT = 20_000;
 
 /** Read the inventory now and cache it (or the error). Concurrent calls for one site share the work. */
 async function refreshInventory(site: Site): Promise<void> {
   const current = checking.get(site.id);
   if (current) return current;
   const job = readInventory(site)
-    .then((inv) => saveInventory(site.id, inv, null))
+    .then((inv) => {
+      saveInventory(site.id, inv, null);
+      // known vulnerabilities of the versions just read (cached lookups; never throws). A slow
+      // database must not hold "Check again" for minutes: past VULN_WAIT the lookups go on in the
+      // background and the tab shows what is cached so far.
+      return Promise.race([vulns.afterInventory(site, inv), new Promise<void>((r) => setTimeout(r, VULN_WAIT).unref())]);
+    })
     .catch((err) => saveInventory(site.id, null, errorMessage(err)))
     .finally(() => checking.delete(site.id));
   checking.set(site.id, job);
@@ -263,22 +272,24 @@ export function siteUpdates(siteId: number): WpUpdatesResponse {
     pending: wpPendingCount(cache.inventory),
     running: backups.runningJob(site.id),
     history: updateHistory(site.id),
+    vulns: vulns.siteVulns(cache.inventory),
   };
 }
 
-/** Pending update counts of every WordPress site (badges in the site list). */
-export function updatesSummary(): WpUpdatesSummaryItem[] {
+/** Pending update counts of every WordPress site (badges in the site list); `withVulns` adds the known-vulnerability counts. */
+export function updatesSummary(withVulns = false): WpUpdatesSummaryItem[] {
   const rows = db
     .prepare("SELECT s.id AS site_id, i.data_json, i.checked_at FROM sites s LEFT JOIN wp_update_inventory i ON i.site_id = s.id WHERE s.app_type = 'wordpress'")
     .all() as Array<{ site_id: number; data_json: string | null; checked_at: string | null }>;
   return rows.map((r) => {
-    let pending = 0;
+    let inv: WpInventory | null = null;
     try {
-      pending = r.data_json ? wpPendingCount(JSON.parse(r.data_json) as WpInventory) : 0;
+      inv = r.data_json ? (JSON.parse(r.data_json) as WpInventory) : null;
     } catch {
       /* unreadable cache */
     }
-    return { siteId: r.site_id, pending, checkedAt: r.checked_at };
+    const v = withVulns ? wpVulnCount(vulns.siteVulns(inv)) : { items: 0, worst: null };
+    return { siteId: r.site_id, pending: wpPendingCount(inv), checkedAt: r.checked_at, vulnerable: v.items, worstVuln: v.worst };
   });
 }
 
@@ -494,7 +505,11 @@ async function runUpdate(site: Site, req: WpUpdateRequest, log: HostLogger): Pro
     if (!verdict.problems.length) {
       const updated = items.filter((i) => i.status === 'updated');
       const failed = items.filter((i) => i.status === 'failed');
-      if (verdict.inventory) saveInventory(site.id, verdict.inventory, null);
+      if (verdict.inventory) {
+        saveInventory(site.id, verdict.inventory, null);
+        // new versions: look them up in the background (the new core version is a new lookup)
+        void vulns.afterInventory(site, verdict.inventory);
+      }
       for (const i of updated) log(t('Đã cập nhật {item}', { item: itemLabel(i) }));
       for (const i of failed) log(t('Cảnh báo: không cập nhật được {name}: {error}', { name: i.name, error: i.error ?? '' }));
       if (!updated.length) {
@@ -600,9 +615,14 @@ export async function recoverInterruptedRuns(log: HostLogger) {
 
 const STALE_MS = 24 * 3_600_000;
 
-/** Refresh the oldest inventory (one site per tick) so the site list badges stay current. */
+/**
+ * Refresh the oldest inventory (one site per tick) so the site list badges stay current. When every
+ * inventory is fresh, look up the vulnerabilities of one site with missing or expired lookups
+ * (right after an upgrade, or after the check was turned back on): no wp-cli run needed for that.
+ */
 export async function checkerTick(now = Date.now()) {
-  const stale = updatesSummary()
+  const summary = updatesSummary();
+  const stale = summary
     .filter((s) => !s.checkedAt || now - Date.parse(s.checkedAt) > STALE_MS)
     .sort((a, b) => (a.checkedAt ?? '').localeCompare(b.checkedAt ?? ''));
   for (const s of stale) {
@@ -611,6 +631,12 @@ export async function checkerTick(now = Date.now()) {
     if (site.status !== 'active' || isQuarantined(site.id)) continue;
     if (!config.dryRun && !(await host.has('wp'))) return;
     await refreshInventory(site);
+    return;
+  }
+  for (const s of summary) {
+    const inv = cachedInventory(s.siteId).inventory;
+    if (!inv || !vulns.hasDueLookups(inv, now)) continue;
+    await vulns.afterInventory(sites.getSite(s.siteId), inv);
     return;
   }
 }

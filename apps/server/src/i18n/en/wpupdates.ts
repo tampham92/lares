@@ -85,4 +85,21 @@ export const WPUPDATES_EN: Dict = {
   'Site đã hoạt động lại như trước khi cập nhật': 'The site works again as it did before the update',
   'Cập nhật bị lỗi ({error}) - đã khôi phục bản sao lưu {id}.': 'The update failed ({error}) - backup {id} was restored.',
   'Cập nhật WordPress {domain}': 'Update WordPress on {domain}',
+
+  // services/wpVulns.ts
+  'Nghiêm trọng': 'Critical',
+  'Cao': 'High',
+  'Trung bình': 'Medium',
+  'Thấp': 'Low',
+  'Chưa rõ': 'Unknown',
+  'Plugin {slug}': 'Plugin {slug}',
+  'Theme {slug}': 'Theme {slug}',
+  'đã vá ở {version}': 'fixed in {version}',
+  'chưa có bản vá': 'no fix yet',
+  'chưa rõ bản nào đã vá': 'fixed version not known',
+  '{domain}: {count} lỗ hổng đã công bố trong WordPress, plugin hoặc theme': '{domain}: {count} published vulnerabilities in WordPress, plugins or themes',
+  '... và {n} lỗ hổng khác': '... and {n} more',
+  'Mở tab Cập nhật của site để cập nhật.': "Open the site's Updates tab to update.",
+  'Cảnh báo: không tra được lỗ hổng đã công bố: {error}': 'Warning: could not look up published vulnerabilities: {error}',
+  'Mở tab Cập nhật': 'Open the Updates tab',
 };

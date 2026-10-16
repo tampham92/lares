@@ -39,6 +39,7 @@ MYSQL_ROOT_USER="${MYSQL_ROOT_USER:-root}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 FRESH_DATA=0
 FORCE_UNSUPPORTED=0
+AUTO_UPDATES=1                              # 0 = fresh install leaves automatic security updates alone
 TELEMETRY_ARG="${LARES_TELEMETRY:-}"        # 0 = no anonymous install ping / daily heartbeat
 TELEMETRY_URL="${LARES_TELEMETRY_URL:-https://lares.thocode.dev/ping}"
 INSTALL_DIR="/opt/lares"
@@ -92,6 +93,8 @@ Options:
   --fresh-data                 Old data found without its env file: back it up and install fresh
   --no-telemetry               Do not send the anonymous install/upgrade ping or the daily
                                heartbeat (saved as LARES_TELEMETRY=0 in /etc/lares/lares.env)
+  --no-auto-updates            Fresh install: do not turn on the OS's automatic security updates
+                               (unattended-upgrades). An existing setting is never changed.
   --force-unsupported          Install on an end-of-life / unsupported OS anyway (no support)
   -h, --help                   Show this help
 
@@ -122,6 +125,8 @@ Tuỳ chọn:
   --fresh-data                 Có dữ liệu cũ nhưng thiếu file env: sao lưu dữ liệu cũ rồi cài mới
   --no-telemetry               Không gửi ping ẩn danh khi cài/nâng cấp và heartbeat hằng ngày
                                (lưu thành LARES_TELEMETRY=0 trong /etc/lares/lares.env)
+  --no-auto-updates            Cài mới: không bật cập nhật bảo mật tự động của HĐH (unattended-upgrades).
+                               Cấu hình sẵn có trên máy không bao giờ bị đổi.
   --force-unsupported          Vẫn cài trên HĐH đã hết hạn hỗ trợ / không được hỗ trợ (tự chịu rủi ro)
   -h, --help                   Hiện trợ giúp này
 
@@ -146,6 +151,7 @@ while [[ $# -gt 0 ]]; do
     --mysql-root-password) MYSQL_ROOT_PASSWORD="$2"; shift 2 ;;
     --fresh-data) FRESH_DATA=1; shift ;;
     --no-telemetry) TELEMETRY_ARG=0; shift ;;
+    --no-auto-updates) AUTO_UPDATES=0; shift ;;
     --force-unsupported) FORCE_UNSUPPORTED=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "$(L 'Tham số không hợp lệ' 'Invalid option'): $1 ($(L 'xem' 'see') --help)"; exit 1 ;;
@@ -346,6 +352,38 @@ $APT install curl ca-certificates gnupg git tar gzip pigz rsync unzip openssl ls
 # left disabled - it starts with `flush ruleset`, which would also wipe ufw's rules.
 $APT install nftables || warn "$(L 'Không cài được nftables - các site vẫn chạy, chỉ chưa chặn kết nối ra ngoài' 'Could not install nftables - sites still work, only their outgoing connections are not restricted')"
 ok "$(L 'Gói cơ bản' 'Base packages')"
+
+# ---- Automatic security updates -------------------------------------------------
+# Lares runs as root and serves sites from distro nginx/PHP/MariaDB/OpenSSL packages, so their
+# security fixes should not wait for someone to log in. A fresh install turns on the distribution's
+# own unattended-upgrades with its default policy (50unattended-upgrades: the -security pocket /
+# Debian-Security only, no third-party repos such as ondrej or nodesource, no automatic reboot),
+# the way `dpkg-reconfigure unattended-upgrades` would: the debconf answer is preseeded, so the
+# package itself writes 20auto-upgrades. An existing choice is never overridden: when
+# APT::Periodic::Unattended-Upgrade is already set (even to 0), or on an upgrade, the installer
+# only reports the state.
+uu_setting() { apt-config dump 2>/dev/null | sed -n 's/^APT::Periodic::Unattended-Upgrade "\(.*\)";$/\1/p' | tail -1; }
+uu_on() { pkg_installed unattended-upgrades && [[ "$(uu_setting)" =~ ^(1|[Tt]rue|[Yy]es|always)$ ]]; }
+UU_HINT="sudo apt-get install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades"
+if uu_on; then
+  ok "$(L 'Cập nhật bảo mật tự động của HĐH: đang bật' 'Automatic OS security updates: on')"
+elif [[ $AUTO_UPDATES == 0 ]]; then
+  ok "$(L 'Bỏ qua cập nhật bảo mật tự động (--no-auto-updates)' 'Skipping automatic security updates (--no-auto-updates)')"
+elif [[ $UPGRADE == 0 && -z "$(uu_setting)" ]]; then
+  echo 'unattended-upgrades unattended-upgrades/enable_auto_updates boolean true' | debconf-set-selections 2>/dev/null || true
+  $APT install unattended-upgrades || true
+  # already installed before (its postinst did not run again): write the same two lines it would
+  if pkg_installed unattended-upgrades && [[ -z "$(uu_setting)" ]]; then
+    printf '%s\n' 'APT::Periodic::Update-Package-Lists "1";' 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
+  fi
+  if uu_on; then
+    ok "$(L 'Đã bật cập nhật bảo mật tự động của HĐH (unattended-upgrades: chỉ bản vá bảo mật, không tự khởi động lại)' 'Turned on automatic OS security updates (unattended-upgrades: security fixes only, no automatic reboot)')"
+  else
+    warn "$(L "Không bật được cập nhật bảo mật tự động. Tự bật: $UU_HINT" "Could not turn on automatic security updates. To do it yourself: $UU_HINT")"
+  fi
+else
+  warn "$(L "Cập nhật bảo mật tự động của HĐH đang tắt trên máy này. Nên bật: $UU_HINT" "Automatic OS security updates are off on this server. Recommended: $UU_HINT")"
+fi
 
 # ---- IPv6 without a route ---------------------------------------------------
 # Some VPS get a global IPv6 address but no IPv6 route to the Internet. curl and Node fall back to
