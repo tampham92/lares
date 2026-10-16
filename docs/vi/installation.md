@@ -59,6 +59,7 @@ Việc cần làm ngay sau lần đăng nhập đầu tiên:
 | `--tarball <url\|đường dẫn>` | `LARES_TARBALL` | | Cài từ file `.tar.gz` (https://, file:// hoặc đường dẫn trên máy) thay cho git |
 | `--fresh-data` | | | Có dữ liệu cũ nhưng thiếu `/etc/lares/lares.env`: chuyển dữ liệu cũ sang chỗ khác rồi cài mới |
 | `--no-telemetry` | `LARES_TELEMETRY=0` | bật | Tắt bộ đếm cài đặt ẩn danh, xem [Thống kê ẩn danh](#thống-kê-ẩn-danh-telemetry) |
+| `--no-auto-updates` | | bật | Cài mới: không bật cập nhật bảo mật tự động của HĐH (`unattended-upgrades`), xem [Bảo mật](security.md#cập-nhật). Cấu hình sẵn có không bao giờ bị đổi |
 | `--force-unsupported` | | | Vẫn cài trên HĐH đã hết vòng đời hoặc không được hỗ trợ (không có hỗ trợ) |
 
 Ví dụ: `curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --port 9443 --php "8.3" --no-telemetry`

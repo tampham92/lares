@@ -59,6 +59,7 @@ Right after the first login:
 | `--tarball <url\|path>` | `LARES_TARBALL` | | Install from a `.tar.gz` (https://, file:// or a local path) instead of git |
 | `--fresh-data` | | | Old data was found without `/etc/lares/lares.env`: move it aside and install fresh |
 | `--no-telemetry` | `LARES_TELEMETRY=0` | on | Disable the anonymous install counter (see [Telemetry](#telemetry)) |
+| `--no-auto-updates` | | on | Fresh install: do not turn on the OS's automatic security updates (`unattended-upgrades`), see [Security](security.md#updates). An existing setting is never changed |
 | `--force-unsupported` | | | Install on an end-of-life or unsupported OS (no support) |
 
 Example: `curl -sSL https://lares.thocode.dev/install | sudo bash -s -- --port 9443 --php "8.3" --no-telemetry`
