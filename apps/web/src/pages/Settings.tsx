@@ -10,6 +10,7 @@ import { AllowlistCard, SessionsCard, TwoFactorCard } from '../components/Securi
 import { BackupSettingsCard } from '../components/BackupSettingsCard';
 import { LeadSettingsCard } from '../components/LeadSettingsCard';
 import { UpdateSettingsCard } from '../components/UpdateSettingsCard';
+import { PhpUpdatesCard } from '../components/PhpUpdatesCard';
 import { Alert, Check, Field, Tabs } from '../components/ui';
 import { t } from '../i18n';
 
@@ -41,7 +42,7 @@ export function Settings() {
       )}
       {tab === 'backup' && <Columns left={<BackupSettingsCard />} right={<LogrotateCard />} />}
       {tab === 'integrations' && <Columns left={[<GithubAppCard key="github" />, <AiSettingsCard key="ai" />]} right={<LeadSettingsCard />} />}
-      {tab === 'update' && <Columns left={<UpdateSettingsCard />} right={null} />}
+      {tab === 'update' && <Columns left={<UpdateSettingsCard />} right={<PhpUpdatesCard />} />}
     </>
   );
 }

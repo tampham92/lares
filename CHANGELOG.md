@@ -8,6 +8,20 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Added
+- **PHP updates** under Settings → Updates. PHP comes from the ondrej / sury repository, which the OS's
+  automatic security updates skip, so PHP security releases never reached the server unless someone ran
+  apt by hand.
+  - A daily check lists, per installed PHP version, the running release, the available patch release,
+    the sites using it and php.net's end of security support.
+  - **Update PHP** installs patch releases within the same version only, keeps `php.ini` and the pool
+    settings, then restarts PHP-FPM, including the isolated sites' own PHP-FPM (which otherwise kept
+    running the old binary).
+  - Optional automatic install every night (2–6 am server time), off by default; the result shows in
+    the bell.
+  - The bell shows pending PHP updates and sites still running a PHP version without security support
+    (7.4, 8.0, 8.1).
+
 ### Security
 - `fast-jwt` (used by the panel's login tokens) updated to 6.3.5: its verifier cache could accept an
   expired token without `iat`. Lares does not turn that cache on and its tokens carry `iat`, so it was

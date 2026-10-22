@@ -290,8 +290,32 @@ then no longer work, because loopback is always allowed.
 Lares checks GitHub daily and shows **New version x.y.z** in the sidebar. To upgrade, run
 `curl -sSL https://lares.thocode.dev/install | sudo bash` again. See [Installation](installation.md#upgrade).
 
-**Operating system security fixes** (nginx, PHP, MariaDB, OpenSSL…): a fresh install turns on Ubuntu's
+**Operating system security fixes** (nginx, MariaDB, OpenSSL…): a fresh install turns on Ubuntu's
 or Debian's `unattended-upgrades` with the package's default policy: security fixes from the OS
 repositories only, no third-party repositories, no automatic reboot. A server that already has a setting
 (even "off") keeps it, and an upgrade only reports the state. To skip it, install with
 `--no-auto-updates`. To turn it off later: `sudo dpkg-reconfigure -plow unattended-upgrades`.
+
+### PHP security updates
+
+PHP is installed from the [ondrej/php](https://launchpad.net/~ondrej/+archive/ubuntu/php) PPA (Ubuntu)
+or [packages.sury.org](https://packages.sury.org/php/) (Debian). `unattended-upgrades` installs nothing
+from third-party repositories, so Lares takes care of PHP's security fixes under
+**Settings → Updates → PHP updates**:
+
+- Once a day Lares refreshes the package lists (`apt-get update`) and dry-runs (`apt-get -s`) an upgrade
+  of the installed PHP packages. The card shows, per PHP version, the running release, the available
+  update, the number of sites using it and php.net's end of security support. **Check now** checks again.
+- **Update PHP** stays within the same version (e.g. 8.3.12 to 8.3.14, never 8.3 to 8.4), keeps
+  `php.ini` and the pool settings (`--force-confold`), then restarts that version's PHP-FPM: the shared
+  `php<version>-fpm` and the isolated sites' own PHP-FPM. Disabled or quarantined sites are not started.
+  Each site is interrupted for a few seconds.
+- **Install PHP updates automatically every night** (off by default): installs pending updates between
+  2 and 6 am server time, at most once a day. The result (success or error) shows in the bell.
+- The bell also shows pending updates (unless the nightly update is on) and sites still running a PHP
+  version without security support (7.4, 8.0, and 8.1 since the end of 2025). Move those sites with
+  **PHP version** in the **Configuration** card of the site page.
+
+To let `unattended-upgrades` install PHP fixes instead: add the PHP repository to
+`Unattended-Upgrade::Origins-Pattern` (e.g. `"origin=LP-PPA-ondrej-php";` on Ubuntu) in
+`/etc/apt/apt.conf.d/50unattended-upgrades`.
