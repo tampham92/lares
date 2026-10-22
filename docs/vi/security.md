@@ -287,8 +287,31 @@ Mỗi ngày Lares kiểm tra GitHub một lần, và hiện **Có bản mới x.
 Để nâng cấp, chạy lại `curl -sSL https://lares.thocode.dev/install | sudo bash`. Xem
 [Cài đặt](installation.md#nâng-cấp).
 
-**Bản vá bảo mật của hệ điều hành** (nginx, PHP, MariaDB, OpenSSL…): khi cài mới, installer bật
+**Bản vá bảo mật của hệ điều hành** (nginx, MariaDB, OpenSSL…): khi cài mới, installer bật
 `unattended-upgrades` của Ubuntu/Debian với cấu hình mặc định của gói: chỉ cài bản vá bảo mật từ kho
 của hệ điều hành, không đụng tới kho bên thứ ba và không tự khởi động lại máy. Máy đã có cấu hình sẵn
 (kể cả đang tắt) được giữ nguyên, và khi nâng cấp installer chỉ báo trạng thái. Không muốn bật: cài với
 `--no-auto-updates`. Tắt sau này: `sudo dpkg-reconfigure -plow unattended-upgrades`.
+
+### Bản vá PHP
+
+PHP được cài từ kho [ondrej/php](https://launchpad.net/~ondrej/+archive/ubuntu/php) (Ubuntu) hoặc
+[packages.sury.org](https://packages.sury.org/php/) (Debian). `unattended-upgrades` không cài gì từ kho
+bên thứ ba, nên bản vá bảo mật của PHP do Lares lo, trong **Cài đặt → Cập nhật → Cập nhật PHP**:
+
+- Mỗi ngày Lares làm mới danh sách gói (`apt-get update`) và chạy thử (`apt-get -s`) việc nâng các gói
+  PHP đang cài. Thẻ hiện phiên bản đang chạy, bản vá có sẵn của từng phiên bản PHP, số site đang dùng và
+  ngày hết hỗ trợ bảo mật của php.net. Bấm **Kiểm tra ngay** để kiểm tra lại.
+- **Cài bản vá PHP** chỉ nâng trong cùng phiên bản (ví dụ 8.3.12 lên 8.3.14, không bao giờ 8.3 lên 8.4),
+  giữ nguyên `php.ini` và cấu hình pool (`--force-confold`), rồi khởi động lại PHP-FPM của phiên bản đó:
+  cả `php<phiên bản>-fpm` dùng chung lẫn PHP-FPM riêng của các site cô lập. Site đang tắt hoặc đang cách
+  ly khẩn không bị bật lại. Mỗi site gián đoạn vài giây.
+- **Tự cài bản vá PHP mỗi đêm** (tắt sẵn): cài bản vá trong khoảng 2h–6h theo giờ máy chủ, tối đa một lần
+  mỗi ngày. Kết quả (thành công hoặc lỗi) hiện ở chuông thông báo.
+- Chuông báo khi có bản vá chưa cài (trừ khi đã bật tự cài), và khi còn site chạy phiên bản PHP đã hết hỗ
+  trợ bảo mật (7.4, 8.0, 8.1 tính tới cuối 2025). Với các site đó, đổi **Phiên bản PHP** ở thẻ
+  **Cấu hình** trong trang site.
+
+Muốn để `unattended-upgrades` tự cài bản vá PHP thay cho Lares: thêm kho PHP vào
+`Unattended-Upgrade::Origins-Pattern` (ví dụ `"origin=LP-PPA-ondrej-php";` trên Ubuntu) trong
+`/etc/apt/apt.conf.d/50unattended-upgrades`.

@@ -397,6 +397,8 @@ textarea.prose-input { font-family: inherit; font-size: 14px; min-height: 0; }
 }
 .lead-toolbar .lead-search { flex: 1 1 220px; width: auto; height: 30px; font-size: 13px; }
 .lead-table td.nowrap { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Settings > Updates > PHP: the version and its site count stay on their own lines, unbroken */
+.php-updates td:first-child { white-space: nowrap; }
 .lead-table .lead-site { max-width: 200px; overflow-wrap: anywhere; }
 .lead-table .lead-contact { min-width: 160px; overflow-wrap: anywhere; }
 .lead-preview {
