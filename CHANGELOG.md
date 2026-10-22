@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.10-beta] - 2026-10-22
+
 ### Added
 - **PHP updates** under Settings → Updates. PHP comes from the ondrej / sury repository, which the OS's
   automatic security updates skip, so PHP security releases never reached the server unless someone ran
