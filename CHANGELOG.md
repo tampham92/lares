@@ -8,6 +8,17 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Fixed
+- **Next.js builds no longer freeze a small VPS.** On a 2 GB server a `next build` could run out of
+  memory without being killed: the whole machine stalled (sites, SSH, the panel) until the 30-minute
+  timeout. Builds now:
+  - get a temporary 2 GB swap when the server has less than 2 GB of free RAM + swap (removed when the
+    build ends; shared when several sites build at once);
+  - run at low CPU/disk priority in their own cgroup capped at 75 % of RAM, so MySQL and the sites keep
+    theirs, and a build that still runs out is stopped with "The build was killed for lack of memory"
+    and what to do, instead of a bare exit code;
+  - stop completely on cancel or timeout (Next.js build workers used to keep running).
+
 ## [0.4.10-beta] - 2026-10-22
 
 ### Added
