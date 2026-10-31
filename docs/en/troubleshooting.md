@@ -120,6 +120,13 @@ The first time, Lares downloads Adminer from github.com and verifies its SHA-256
 - **`Cannot find module '@tailwindcss/postcss'`** (or another devDependency): fixed in this version;
   the install step now runs without the panel's `NODE_ENV=production`, so devDependencies are
   installed. Click **Build & start** again.
+- **Build hangs, or "The build was killed for lack of memory"** (1–2 GB VPS): `next build` needs 1–2 GB
+  of RAM. Lares runs the build at low CPU/disk priority, capped at 75 % of RAM, and adds a temporary
+  2 GB swap when the machine has less than 2 GB of free RAM + swap; if it still runs out, the build
+  stops with that message instead of freezing the whole VPS. To fix it: add a permanent swap (e.g.
+  4 GB: `fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`,
+  then add `/swapfile none swap sw 0 0` to `/etc/fstab`), set `experimental: { cpus: 1 }` in
+  `next.config`, or add RAM.
 
 ## IPv6 address without a working route
 

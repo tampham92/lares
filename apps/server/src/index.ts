@@ -30,6 +30,7 @@ import { templateRoutes } from './routes/templates.js';
 import { wpUpdateRoutes } from './routes/wpupdates.js';
 import { phpUpdateRoutes } from './routes/phpupdates.js';
 import { builderRoutes } from './routes/builder.js';
+import { cleanupBuildLeftovers } from './services/buildMemory.js';
 import { getLogrotate, saveLogrotate } from './services/logs.js';
 import { closeMysql } from './services/mysql.js';
 import { stopDevNginx, syncDevNginx } from './services/devNginx.js';
@@ -111,6 +112,7 @@ if (config.dryRun) app.log.warn(t('LARES_DRY_RUN=1 - các lệnh thay đổi h�
 await ensureGlobalConfig((m) => app.log.info(m)).catch((err) => app.log.warn(`nginx global config: ${err.message}`));
 await saveLogrotate(getLogrotate()).catch((err) => app.log.warn(`logrotate: ${err.message}`));
 await repairSites((m) => app.log.warn(m)).catch((err) => app.log.warn(`repairSites: ${err.message}`));
+await cleanupBuildLeftovers((m) => app.log.warn(m)).catch((err) => app.log.warn(`build leftovers: ${err.message}`));
 setInterval(() => void refreshSslExpiry().catch(() => {}), 12 * 3_600_000).unref();
 await syncDevNginx((m) => app.log.info(m));
 startCloudflareRealIp((m) => app.log.info(m));

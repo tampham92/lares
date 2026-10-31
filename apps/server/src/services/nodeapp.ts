@@ -7,6 +7,7 @@ import { t } from '../i18n/index.js';
 import { shq } from '../lib/shell.js';
 import { CommandError } from '../executors/types.js';
 import { credentialLine, isGitAuthError } from './gitAuth.js';
+import { withBuildMemory } from './buildMemory.js';
 import { host, type HostLogger } from './host.js';
 import { fixPermissions, nodeSandboxLines, runAsOf, type RunAs } from './isolation.js';
 
@@ -43,9 +44,17 @@ export async function defaultCommands(appDir: string, pm: PM) {
  * Run a command inside the app dir as the site's unprivileged user. `alsoInDryRun` is only for git
  * clone/pull: it writes nothing outside the site's folder (under LARES_DATA_DIR in dry-run) and runs
  * no code from the repo, so a laptop can fetch the real source and test the rest of the flow.
+ * `wrap`: from withBuildMemory, for the memory-hungry install and build.
  */
-async function runAsWebUser(appDir: string, runAs: RunAs, command: string, log: HostLogger, signal?: AbortSignal, alsoInDryRun = false) {
-  const full = host.asWebUser(command, { cwd: appDir, ...runAs });
+async function runAsWebUser(
+  appDir: string,
+  runAs: RunAs,
+  command: string,
+  log: HostLogger,
+  opts: { signal?: AbortSignal; alsoInDryRun?: boolean; wrap?: (command: string) => string } = {},
+) {
+  const { signal, alsoInDryRun = false, wrap = (c: string) => c } = opts;
+  const full = wrap(host.asWebUser(command, { cwd: appDir, ...runAs }));
   log(`$ ${command}`);
   let pending = '';
   await (alsoInDryRun ? host.run.bind(host) : host.mutate.bind(host))(full, {
@@ -139,11 +148,13 @@ export async function buildAndRestart(
   await fixPermissions(site, log);
   await writeServiceFiles(site, cfg, log);
   const runAs = runAsOf(site);
-  await runAsWebUser(appDir, runAs, cfg.installCommand || defaults.install, log, signal);
-  // Turbopack caches failed module lookups across builds: a build that once ran without
-  // devDependencies keeps failing ("Cannot find module '@tailwindcss/postcss'") until this is cleared.
-  await runAsWebUser(appDir, runAs, 'rm -rf .next/cache/turbopack', log, signal);
-  await runAsWebUser(appDir, runAs, `NODE_ENV=production ${cfg.buildCommand || defaults.build}`, log, signal);
+  await withBuildMemory(site.domain, log, async (wrap) => {
+    await runAsWebUser(appDir, runAs, cfg.installCommand || defaults.install, log, { signal, wrap });
+    // Turbopack caches failed module lookups across builds: a build that once ran without
+    // devDependencies keeps failing ("Cannot find module '@tailwindcss/postcss'") until this is cleared.
+    await runAsWebUser(appDir, runAs, 'rm -rf .next/cache/turbopack', log, { signal });
+    await runAsWebUser(appDir, runAs, `NODE_ENV=production ${cfg.buildCommand || defaults.build}`, log, { signal, wrap });
+  });
   await host.mutate(`systemctl restart ${shq(serviceName(site.domain))}`, { log });
   log(t('Đã khởi động {service} trên 127.0.0.1:{port}', { service: serviceName(site.domain), port: String(site.appPort) }));
 }
@@ -179,14 +190,14 @@ export async function gitCloneOrPull(appDir: string, runAs: RunAs, repo: GitRepo
     if (await host.exists(path.join(appDir, '.git'))) {
       // set-url: a Git URL changed in the build settings takes effect on the next deploy.
       await withGitAuth(repo, runAs.user, log, (git) =>
-        runAsWebUser(appDir, runAs, `git remote set-url origin ${shq(repo.gitUrl)} && ${git} fetch --depth 1 origin ${branch} && git reset --hard FETCH_HEAD`, log, signal, true),
+        runAsWebUser(appDir, runAs, `git remote set-url origin ${shq(repo.gitUrl)} && ${git} fetch --depth 1 origin ${branch} && git reset --hard FETCH_HEAD`, log, { signal, alsoInDryRun: true }),
       );
       return;
     }
     if (!(await host.isEmptyDir(appDir))) throw new Error(t('{dir} không trống, không thể git clone', { dir: appDir }));
     await fs.mkdir(appDir, { recursive: true });
     await host.mutate(`chown -R ${shq(`${runAs.user}:${runAs.user}`)} ${shq(runAs.home)}`, { log });
-    await withGitAuth(repo, runAs.user, log, (git) => runAsWebUser(appDir, runAs, `${git} clone --depth 1 --branch ${branch} ${shq(repo.gitUrl)} .`, log, signal, true));
+    await withGitAuth(repo, runAs.user, log, (git) => runAsWebUser(appDir, runAs, `${git} clone --depth 1 --branch ${branch} ${shq(repo.gitUrl)} .`, log, { signal, alsoInDryRun: true }));
   } catch (err) {
     if (err instanceof CommandError && isGitAuthError(`${err.result.stderr}\n${err.result.stdout}`)) {
       throw new Error(

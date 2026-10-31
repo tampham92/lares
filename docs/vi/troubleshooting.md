@@ -125,6 +125,13 @@ Lần đầu mở, Lares tải Adminer từ github.com và kiểm tra SHA-256, n
 - **`Cannot find module '@tailwindcss/postcss'`** (hoặc một devDependency khác): đã sửa ở phiên bản
   này; bước cài đặt không còn nhận `NODE_ENV=production` của panel nên devDependencies được cài đủ.
   Bấm lại **Build & khởi động**.
+- **Build treo hoặc "Build bị dừng vì hết RAM"** (VPS 1–2 GB): `next build` cần 1–2 GB RAM. Lares chạy
+  build với ưu tiên CPU/ổ đĩa thấp, giới hạn ở 75 % RAM, và thêm swap tạm 2 GB khi máy còn dưới 2 GB
+  RAM + swap trống; nếu vẫn hết, build bị dừng với thông báo trên thay vì làm treo cả VPS. Cách xử lý:
+  thêm swap cố định (vd. 4 GB:
+  `fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`, rồi thêm
+  `/swapfile none swap sw 0 0` vào `/etc/fstab`), đặt `experimental: { cpus: 1 }` trong `next.config`,
+  hoặc nâng RAM.
 
 ## Có địa chỉ IPv6 nhưng IPv6 không hoạt động
 

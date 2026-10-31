@@ -159,6 +159,16 @@ export const SERVICES_EN: Dict = {
   'Không tìm thấy package.json trong {dir}. Hãy upload mã nguồn hoặc cấu hình Git URL.':
     'package.json not found in {dir}. Upload the source code or configure a Git URL.',
   'Đã khởi động {service} trên 127.0.0.1:{port}': 'Started {service} on 127.0.0.1:{port}',
+  'Cảnh báo: máy còn ít RAM/swap ({free} MB) và không đủ chỗ trống cho swap tạm - build có thể chậm hoặc bị dừng':
+    'Warning: little free RAM/swap ({free} MB) and no disk space for a temporary swap - the build may be slow or killed',
+  'Cảnh báo: không tạo được swap tạm (container?) - build có thể chậm hoặc bị dừng':
+    'Warning: could not add a temporary swap (container?) - the build may be slow or killed',
+  'Máy còn ít RAM/swap ({free} MB): thêm swap tạm {size} MB cho lúc build':
+    'Little free RAM/swap ({free} MB): added a temporary {size} MB swap for the build',
+  'Cảnh báo: chưa gỡ được swap tạm {file} (RAM đang đầy), sẽ gỡ ở lần build sau':
+    'Warning: could not remove the temporary swap {file} yet (RAM is full), it will be removed after the next build',
+  'Build bị dừng vì hết RAM. Thêm swap cố định cho VPS (vd. 4 GB), nâng RAM, hoặc giảm bộ nhớ build (experimental.cpus: 1 trong next.config).':
+    'The build was killed for lack of memory. Add a permanent swap to the VPS (e.g. 4 GB), add RAM, or make the build use less memory (experimental.cpus: 1 in next.config).',
   '{dir} không trống, không thể git clone': '{dir} is not empty, cannot git clone',
   'Access token chỉ dùng được với Git URL dạng https://': 'An access token only works with an https:// Git URL',
   'Git từ chối access token: token sai, đã hết hạn hoặc không có quyền đọc repo này.':
