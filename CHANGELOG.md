@@ -8,6 +8,8 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.4.11-beta] - 2026-10-31
+
 ### Fixed
 - **Next.js builds no longer freeze a small VPS.** On a 2 GB server a `next build` could run out of
   memory without being killed: the whole machine stalled (sites, SSH, the panel) until the 30-minute
