@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { aiSettingsSchema, articleRequestSchema, publicHostSchema, publishArticleSchema, wpAdminTargetSchema } from '@lares/shared';
+import { aiScheduleSchema, aiSettingsSchema, articleRequestSchema, publicHostSchema, publishArticleSchema, wpAdminTargetSchema } from '@lares/shared';
 import { requireAuth } from '../auth/index.js';
 import { t } from '../i18n/index.js';
 import { badRequest } from '../lib/errors.js';
 import { idParam, parse } from '../lib/validate.js';
 import * as ai from '../services/ai.js';
+import * as schedules from '../services/aiSchedules.js';
 import * as sites from '../services/sites.js';
 import { startTask } from '../services/tasks.js';
 import { aiSiteContext, publishArticle, wpLoginUrl, wpSiteInfo } from '../services/wpContent.js';
@@ -17,6 +18,7 @@ function wordpressSite(params: unknown) {
 }
 
 export async function aiRoutes(app: FastifyInstance) {
+  app.addHook('onReady', async () => schedules.startAiScheduler((m) => app.log.warn(m)));
   app.addHook('preHandler', requireAuth);
 
   // ---- Settings: AI provider & API key ---------------------------------------
@@ -39,6 +41,21 @@ export async function aiRoutes(app: FastifyInstance) {
     if (!ai.getAiSettings().hasKey) throw badRequest(t('Chưa có API key AI - thêm key trong mục Cài đặt'));
     return startTask(t('Viết bài AI: {keyword}', { keyword: input.keyword }), async (log) => ai.generateArticle(input, await aiSiteContext(site, log), log));
   });
+
+  // ---- Scheduled AI articles (services/aiSchedules.ts) ---------------------------
+
+  app.get('/api/sites/:id/ai/schedules', async (req) => schedules.siteSchedules(wordpressSite(req.params).id));
+  app.post('/api/sites/:id/ai/schedules', async (req) => schedules.createSchedule(wordpressSite(req.params), parse(aiScheduleSchema, req.body)));
+  app.put('/api/ai/schedules/:id', async (req) => schedules.updateSchedule(idParam(req.params), parse(aiScheduleSchema, req.body)));
+  app.delete('/api/ai/schedules/:id', async (req) => {
+    schedules.deleteSchedule(idParam(req.params));
+    return { ok: true };
+  });
+  app.post('/api/ai/schedules/:id/run', async (req) => {
+    if (!ai.getAiSettings().hasKey) throw badRequest(t('Chưa có API key AI - thêm key trong mục Cài đặt'));
+    return schedules.runNow(idParam(req.params));
+  });
+  app.get('/api/ai/schedule-runs/:id/article', async (req) => schedules.runArticle(idParam(req.params)));
 
   app.post('/api/sites/:id/wp/posts', async (req) => publishArticle(wordpressSite(req.params), parse(publishArticleSchema, req.body)));
 

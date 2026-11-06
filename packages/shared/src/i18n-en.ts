@@ -56,6 +56,14 @@ export const SHARED_EN: Dict = {
   'Thiếu tiêu đề': 'Title is required',
   'Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang': 'Slug may only contain lowercase letters (no accents), digits and hyphens',
   'Thiếu nội dung': 'Content is required',
+  'Lưu nháp trong WordPress': 'Save as a WordPress draft',
+  'Đăng công khai ngay': 'Publish right away',
+  'Nhập tên lịch': 'Enter a schedule name',
+  'Chọn ít nhất một ngày trong tuần': 'Pick at least one weekday',
+  'Thêm ít nhất một giờ chạy': 'Add at least one run time',
+  'Tối đa 6 bài mỗi ngày': 'At most 6 articles a day',
+  'Giờ phải có dạng HH:MM': 'Time must be HH:MM',
+  'Tối đa 200 chủ đề mỗi lịch': 'At most 200 topics per schedule',
 
   // Migration: source panels
   'Tự động nhận diện': 'Auto-detect',

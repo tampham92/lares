@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { siteLimitsSchema, type SiteLimits } from './limits.js';
 import { builderSpecSchema } from './builder.js';
+import { HHMM_RE } from './backup.js';
+import { msg } from './i18n.js';
 
 export * from './i18n.js';
 export { SHARED_EN } from './i18n-en.js';
@@ -457,6 +459,90 @@ export interface PublishedPost {
   url: string;
   editUrl: string;
   status: string;
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled AI articles: a queue of topics written and posted on a weekly timetable
+// ---------------------------------------------------------------------------
+
+/** One queued article. `id` is set by the server; a saved list keeps the ids it was loaded with. */
+export const aiTopicSchema = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9-]{1,40}$/).optional(),
+  topic: articleRequestSchema.shape.topic,
+  keyword: articleRequestSchema.shape.keyword,
+  secondaryKeywords: articleRequestSchema.shape.secondaryKeywords,
+});
+export type AiTopicInput = z.infer<typeof aiTopicSchema>;
+export type AiTopic = AiTopicInput & { id: string };
+
+/** How a written article reaches WordPress: a draft to review, or published right away. */
+export const AI_PUBLISH_MODES = { draft: msg('Lưu nháp trong WordPress'), publish: msg('Đăng công khai ngay') } as const;
+export type AiPublishMode = keyof typeof AI_PUBLISH_MODES;
+
+/** Settings shared by every article of a schedule (the per-article part is the topic). */
+export const aiScheduleArticleSchema = articleRequestSchema.pick({ language: true, tone: true, words: true, audience: true, instructions: true, includeFaq: true });
+export type AiScheduleArticle = z.infer<typeof aiScheduleArticleSchema>;
+
+export const AI_SCHEDULE_MAX_TOPICS = 200;
+
+export const aiScheduleSchema = z.object({
+  name: z.string().trim().min(1, msg('Nhập tên lịch')).max(100),
+  enabled: z.boolean().default(true),
+  /** Weekdays as Date.getDay(): 0 = Sunday ... 6 = Saturday. */
+  days: z
+    .array(z.number().int().min(0).max(6))
+    .min(1, msg('Chọn ít nhất một ngày trong tuần'))
+    .max(7)
+    .transform((d) => [...new Set(d)].sort()),
+  /** Run times, server local time; one article per time slot. */
+  times: z
+    .array(z.string().regex(HHMM_RE, msg('Giờ phải có dạng HH:MM')))
+    .min(1, msg('Thêm ít nhất một giờ chạy'))
+    .max(6, msg('Tối đa 6 bài mỗi ngày'))
+    .transform((t) => [...new Set(t)].sort()),
+  article: aiScheduleArticleSchema,
+  publish: z.enum(Object.keys(AI_PUBLISH_MODES) as [AiPublishMode, ...AiPublishMode[]]).default('draft'),
+  categoryIds: z.array(z.number().int().positive()).max(20).default([]),
+  topics: z.array(aiTopicSchema).max(AI_SCHEDULE_MAX_TOPICS, msg('Tối đa 200 chủ đề mỗi lịch')),
+});
+export type AiScheduleInput = z.infer<typeof aiScheduleSchema>;
+
+export interface AiScheduleView extends Omit<AiScheduleInput, 'topics'> {
+  id: number;
+  siteId: number;
+  topics: AiTopic[];
+  /** Next time slot that will write an article (ISO), null when disabled or out of topics. */
+  nextRunAt: string | null;
+  /** Task of the article being written right now. */
+  runningTaskId: string | null;
+  createdAt: string;
+}
+
+export type AiRunTrigger = 'scheduled' | 'manual';
+
+export interface AiScheduleRun {
+  id: number;
+  scheduleId: number;
+  scheduleName: string;
+  trigger: AiRunTrigger;
+  status: 'running' | 'ok' | 'failed';
+  topic: AiTopicInput;
+  /** Title of the written article (null until written). */
+  title: string | null;
+  /** The article is kept so it can still be opened and posted by hand when publishing failed. */
+  hasArticle: boolean;
+  post: PublishedPost | null;
+  error: string | null;
+  taskId: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface AiSchedulesResponse {
+  schedules: AiScheduleView[];
+  runs: AiScheduleRun[];
+  /** Server UTC offset in minutes (east positive), so the UI can say which clock the times use. */
+  serverUtcOffset: number;
 }
 
 /** wp-admin page to land on after a one-click login, relative to /wp-admin/ (e.g. "post.php?post=5&action=edit"). */
