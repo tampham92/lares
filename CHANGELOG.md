@@ -8,6 +8,17 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+### Added
+- **Scheduled AI articles.** The AI Writer tab of a WordPress site has a new **Schedules** view: add
+  as many schedules as you need, each with its own list of topics (focus and secondary keywords, one
+  per row or pasted as many lines at once), weekdays and up to 6 run times a day (server time). At each
+  run time the AI writes the first topic with the schedule's length, tone, language, audience and
+  extra instructions, then saves it as a WordPress draft (default) or publishes it right away, with
+  the chosen categories. A written topic leaves the list; a failed AI call keeps it for the next run.
+  The history shows every article with links to the post, and an article that could not be posted
+  (site busy, wp-cli error) is kept and can be opened in the editor to post by hand. The notification
+  bell reports each result, failures and schedules that ran out of topics.
+
 ## [0.4.11-beta] - 2026-10-31
 
 ### Fixed

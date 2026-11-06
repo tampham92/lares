@@ -328,3 +328,39 @@ CREATE INDEX IF NOT EXISTS idx_security_events_site ON security_events(site_id, 
 ensureColumn('site_security', 'mu_plugins_json', 'TEXT');
 // files the owner marked as not malware (path -> sha256): a changed file is reported again
 ensureColumn('site_security', 'ignored_json', 'TEXT');
+
+// ---- Scheduled AI articles (services/aiSchedules.ts) -----------------------------------
+// config_json: the AiScheduleInput minus topics; topics_json: the queue (AiTopic[]), the first one is
+// written next and removed once written. last_slot: the last time slot taken ("YYYY-MM-DD HH:MM",
+// local), recorded before the run starts. Runs keep the article (article_json) so an article that
+// could not be posted is not lost; only the newest runs of each schedule are kept.
+db.exec(`
+CREATE TABLE IF NOT EXISTS ai_schedules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  config_json TEXT NOT NULL,
+  topics_json TEXT NOT NULL DEFAULT '[]',
+  last_slot TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_schedules_site ON ai_schedules(site_id);
+CREATE TABLE IF NOT EXISTS ai_schedule_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  schedule_id INTEGER NOT NULL REFERENCES ai_schedules(id) ON DELETE CASCADE,
+  site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  trigger TEXT NOT NULL,
+  status TEXT NOT NULL,
+  topic_json TEXT NOT NULL,
+  title TEXT,
+  article_json TEXT,
+  post_json TEXT,
+  error TEXT,
+  task_id TEXT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ai_schedule_runs_site ON ai_schedule_runs(site_id, id);
+`);

@@ -380,6 +380,18 @@ details summary { cursor: pointer; color: var(--primary); }
 .ai-editor { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; margin-top: 16px; }
 .ai-editor .seo-card { position: sticky; top: 72px; }
 @media (max-width: 1000px) { .ai-editor { grid-template-columns: minmax(0, 1fr); } .ai-editor .seo-card { position: static; } }
+/* a labelled group of several controls (a <label class="field"> may only wrap one) */
+div.field { display: flex; flex-direction: column; gap: 6px; }
+div.field > .label { font-weight: 550; font-size: 13px; }
+.err-text { color: var(--err); }
+/* queued topics of an AI schedule (AiSchedules): number, topic, keyword, secondary keywords, buttons */
+.topic-row { display: grid; grid-template-columns: 24px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.topic-row > .num { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+@media (max-width: 760px) {
+  .topic-row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .topic-row > input:not(:first-of-type) { grid-column: 2; }
+  .topic-row > .row { grid-column: 3; grid-row: 1; }
+}
 .article-preview { width: 100%; height: 640px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
 .article-html { width: 100%; min-height: 640px; font-size: 12.5px; line-height: 1.5; }
 .seo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
