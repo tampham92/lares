@@ -6,7 +6,7 @@ A hosting control panel written in TypeScript for Ubuntu/Debian VPS: manage **Wo
 
 **Docs:** [Installation](docs/en/installation.md) · [Security](docs/en/security.md) · [Troubleshooting](docs/en/troubleshooting.md) · [Backups](docs/en/backups.md) · [Contact leads](docs/en/leads.md) · [FAQ](docs/en/faq.md) · [Changelog](CHANGELOG.md)
 
-> **Beta**: Lares is in `0.x` beta. Take backups, and try it on a non-critical VPS before using it for important sites.
+> **Note**: Lares is still `0.x`: a minor version (e.g. 0.5 → 0.6) may bring larger changes. Keep backups, and try new versions on a non-critical VPS before upgrading important sites.
 
 **Questions and ideas:** [GitHub Discussions](https://github.com/tampham92/lares/discussions) · Bugs: [Issues](https://github.com/tampham92/lares/issues) · Security reports: [SECURITY.md](SECURITY.md)
 

@@ -8,6 +8,11 @@ breaking changes; upgrading is always the install command run again
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-06
+
+First release without the beta label. Lares stays `0.x`: a minor version may still bring larger
+changes, so keep backups and try new versions on a non-critical VPS first.
+
 ### Added
 - **Scheduled AI articles.** The AI Writer tab of a WordPress site has a new **Schedules** view: add
   as many schedules as you need, each with its own list of topics (focus and secondary keywords, one

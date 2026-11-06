@@ -6,7 +6,7 @@ Hosting control panel viết bằng TypeScript cho VPS Ubuntu/Debian: quản lý
 
 **Tài liệu:** [Cài đặt](docs/vi/installation.md) · [Bảo mật](docs/vi/security.md) · [Xử lý sự cố](docs/vi/troubleshooting.md) · [Sao lưu](docs/vi/backups.md) · [Khách liên hệ](docs/vi/leads.md) · [Câu hỏi thường gặp](docs/vi/faq.md) · [Thay đổi (CHANGELOG)](CHANGELOG.md)
 
-> **Beta**: Lares đang ở giai đoạn `0.x` beta. Hãy sao lưu và thử trên VPS không quan trọng trước khi dùng cho site thật.
+> **Lưu ý**: Lares vẫn ở giai đoạn `0.x`: bản minor (ví dụ 0.5 → 0.6) có thể có thay đổi lớn. Luôn có bản sao lưu và thử bản mới trên VPS không quan trọng trước khi nâng cấp site thật.
 
 **Hỏi đáp, góp ý:** [GitHub Discussions](https://github.com/tampham92/lares/discussions) · Báo lỗi: [Issues](https://github.com/tampham92/lares/issues) · Báo lỗ hổng bảo mật: [SECURITY.md](SECURITY.md)
 
